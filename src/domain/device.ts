@@ -46,7 +46,7 @@ export interface DeviceStats {
 export const TOTAL_TESTS = ALL_ITEMS.length;
 
 export function newDeviceId(): string {
-  return "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  return crypto.randomUUID();
 }
 
 export function blankDraft(tec = ""): DeviceDraft {
