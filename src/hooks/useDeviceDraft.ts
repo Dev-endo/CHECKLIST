@@ -5,6 +5,7 @@ import {
   type DeviceDraft,
   type DeviceRecord,
   type DraftField,
+  type Results,
   type TestResult,
 } from "../domain/device";
 import { preferences } from "../services/preferences";
@@ -27,7 +28,8 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
       return { draft: { ...state.draft, [action.field]: action.value }, revision: state.revision + 1 };
     case "toggleResult": {
       const current = state.draft.r[action.itemId];
-      const r = { ...state.draft.r, [action.itemId]: current === action.result ? "" : action.result };
+      const next: TestResult | "" = current === action.result ? "" : action.result;
+      const r: Results = { ...state.draft.r, [action.itemId]: next };
       return { draft: { ...state.draft, r }, revision: state.revision + 1 };
     }
     case "replace":
