@@ -1,0 +1,29 @@
+.button {
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+
+.primary,
+.ghost {
+  font-size: 14px;
+  border-radius: 5px;
+  padding: 8px 13px;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.ghost,
+.small {
+  background: transparent;
+  color: var(--accent);
+}
+
+.small {
+  font-size: 12.5px;
+  border-radius: 4px;
+  padding: 3px 9px;
+}

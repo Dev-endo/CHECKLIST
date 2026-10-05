@@ -1,0 +1,6 @@
+.report {
+  min-height: 140px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 8px;
+}
