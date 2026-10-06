@@ -20,6 +20,8 @@ type DraftAction =
   | { type: "setField"; field: DraftField; value: string }
   | { type: "toggleResult"; itemId: string; result: TestResult }
   | { type: "replace"; draft: DeviceDraft }
+  /** Abre o registro com as marcações zeradas e grava isso. */
+  | { type: "restart"; draft: DeviceDraft }
   | { type: "markCreated"; id: string; criado: string };
 
 function draftReducer(state: DraftState, action: DraftAction): DraftState {
@@ -34,6 +36,8 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
     }
     case "replace":
       return { ...state, draft: action.draft };
+    case "restart":
+      return { draft: { ...action.draft, r: {} }, revision: state.revision + 1 };
     case "markCreated":
       if (state.draft.id !== action.id || state.draft.criado) return state;
       return { ...state, draft: { ...state.draft, criado: action.criado } };
@@ -73,6 +77,11 @@ export function useDeviceDraft() {
     preferences.setCurrentDeviceId(record.id);
   }, []);
 
+  const restartRecord = useCallback((record: DeviceRecord) => {
+    dispatch({ type: "restart", draft: draftFromRecord(record) });
+    preferences.setCurrentDeviceId(record.id);
+  }, []);
+
   const startNew = useCallback(() => {
     const next = blankDraft(draft.tec);
     dispatch({ type: "replace", draft: next });
@@ -84,7 +93,7 @@ export function useDeviceDraft() {
   }, []);
 
   return useMemo(
-    () => ({ draft, revision, setField, toggleResult, openRecord, startNew, markCreated }),
-    [draft, revision, setField, toggleResult, openRecord, startNew, markCreated],
+    () => ({ draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, markCreated }),
+    [draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, markCreated],
   );
 }

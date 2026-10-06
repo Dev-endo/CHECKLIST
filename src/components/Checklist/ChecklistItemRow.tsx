@@ -7,6 +7,7 @@ interface ChecklistItemRowProps {
   item: ChecklistItem;
   result?: TestResult;
   onToggle: (itemId: string, result: TestResult) => void;
+  disabled?: boolean;
 }
 
 const OPTIONS: { value: TestResult; label: string }[] = [
@@ -14,7 +15,7 @@ const OPTIONS: { value: TestResult; label: string }[] = [
   { value: "fail", label: "Falha" },
 ];
 
-export const ChecklistItemRow = memo(function ChecklistItemRow({ item, result, onToggle }: ChecklistItemRowProps) {
+export const ChecklistItemRow = memo(function ChecklistItemRow({ item, result, onToggle, disabled }: ChecklistItemRowProps) {
   return (
     <div className={[styles.item, result && styles[result]].filter(Boolean).join(" ")}>
       <div>
@@ -36,6 +37,7 @@ export const ChecklistItemRow = memo(function ChecklistItemRow({ item, result, o
             type="button"
             className={styles[`toggle-${value}`]}
             aria-pressed={result === value}
+            disabled={disabled}
             onClick={() => onToggle(item.id, value)}
           >
             {label}

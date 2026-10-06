@@ -8,9 +8,10 @@ interface RecordsPanelProps {
   loaded: boolean;
   currentId: string;
   onOpen: (record: DeviceRecord) => void;
+  onRestart: (record: DeviceRecord) => void;
 }
 
-export function RecordsPanel({ records, loaded, currentId, onOpen }: RecordsPanelProps) {
+export function RecordsPanel({ records, loaded, currentId, onOpen, onRestart }: RecordsPanelProps) {
   const [query, setQuery] = useState("");
   const visible = useMemo(() => records.filter((r) => matchesSearch(r, query)), [records, query]);
 
@@ -22,13 +23,19 @@ export function RecordsPanel({ records, loaded, currentId, onOpen }: RecordsPane
     );
   else
     body = visible.map((record) => (
-      <RecordRow key={record.id} record={record} isCurrent={record.id === currentId} onOpen={onOpen} />
+      <RecordRow
+        key={record.id}
+        record={record}
+        isCurrent={record.id === currentId}
+        onOpen={onOpen}
+        onRestart={onRestart}
+      />
     ));
 
   return (
-    <section className={styles.panel} aria-label="Aparelhos registrados">
+    <section className={styles.panel} aria-label="Meus aparelhos">
       <div className={styles.header}>
-        <h2>Aparelhos registrados</h2>
+        <h2>Meus aparelhos</h2>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}

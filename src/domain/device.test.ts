@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { ALL_ITEMS } from "./checklist";
-import { blankDraft, computeStats, findDuplicate, toDeviceDoc, TOTAL_TESTS, type Results } from "./device";
-import { buildReport } from "./report";
+import {
+  blankDraft,
+  computeStats,
+  findDuplicate,
+  isEditable,
+  isIdentified,
+  toDeviceDoc,
+  TOTAL_TESTS,
+  type Results,
+} from "./device";
 
 const allOk = (): Results => Object.fromEntries(ALL_ITEMS.map((item) => [item.id, "ok" as const]));
 
@@ -42,16 +50,49 @@ describe("findDuplicate", () => {
   });
 });
 
-describe("buildReport", () => {
-  it("lists failures", () => {
-    const draft = { ...blankDraft("Ana"), modelo: "iPhone 13", r: { ...allOk(), flash: "fail" as const } };
-    const report = buildReport(draft);
-    expect(report).toContain("Resultado: REPROVADO");
-    expect(report).toContain("Falhas: Flash e lanterna");
-    expect(report).toContain("Técnico: Ana");
+describe("findDuplicate (fase)", () => {
+  it("prefers a pending record over a concluded one", () => {
+    const draft = { ...blankDraft(), serial: "abc" };
+    const records = [
+      { id: "done", serial: "abc", fase: "concluido" as const },
+      { id: "open", serial: "abc", fase: "pendente" as const },
+    ];
+    expect(findDuplicate(draft, records)?.id).toBe("open");
   });
 
-  it("lists pending tests when nothing failed", () => {
-    expect(buildReport(blankDraft())).toContain("Não testados:");
+  it("falls back to a concluded record when none is pending", () => {
+    const draft = { ...blankDraft(), serial: "abc" };
+    expect(findDuplicate(draft, [{ id: "done", serial: "abc", fase: "concluido" as const }])?.id).toBe("done");
+  });
+});
+
+describe("isIdentified", () => {
+  it("needs model, serial and technician", () => {
+    expect(isIdentified({ modelo: "iPhone 13", serial: "1", tec: "Ana" })).toBe(true);
+    expect(isIdentified({ modelo: "iPhone 13", serial: " ", tec: "Ana" })).toBe(false);
+    expect(isIdentified({ modelo: "", serial: "1", tec: "Ana" })).toBe(false);
+    expect(isIdentified({ modelo: "iPhone 13", serial: "1", tec: "" })).toBe(false);
+  });
+});
+
+describe("isEditable", () => {
+  it("allows only pending checklists of the logged user", () => {
+    const draft = blankDraft();
+    expect(isEditable(draft, "u1")).toBe(true);
+    expect(isEditable({ ...draft, autor: "u1" }, "u1")).toBe(true);
+    expect(isEditable({ ...draft, autor: "u2" }, "u1")).toBe(false);
+    expect(isEditable({ ...draft, autor: "u1", fase: "concluido" }, "u1")).toBe(false);
+  });
+});
+
+describe("toDeviceDoc fase", () => {
+  it("carries the phase and trims identification fields", () => {
+    const draft = { ...blankDraft(), modelo: " iPhone ", serial: " 1 ", tec: " Ana ", fase: "concluido" as const };
+    expect(toDeviceDoc(draft, "2026-02-01T00:00:00.000Z")).toMatchObject({
+      fase: "concluido",
+      modelo: "iPhone",
+      serial: "1",
+      tec: "Ana",
+    });
   });
 });

@@ -1,0 +1,39 @@
+.screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding-block: 32px;
+}
+
+.card {
+  width: min(100%, 380px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  text-align: center;
+}
+
+.title {
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.text {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.error {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 5px;
+  background: var(--crit-soft);
+  color: var(--crit);
+}

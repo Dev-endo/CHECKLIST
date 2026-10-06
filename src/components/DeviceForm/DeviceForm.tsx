@@ -10,9 +10,10 @@ const FIELDS: { field: DraftField; label: string; placeholder?: string }[] = [
 interface DeviceFormProps {
   draft: DeviceDraft;
   onChange: (field: DraftField, value: string) => void;
+  disabled?: boolean;
 }
 
-export function DeviceForm({ draft, onChange }: DeviceFormProps) {
+export function DeviceForm({ draft, onChange, disabled }: DeviceFormProps) {
   return (
     <div className={styles.fields}>
       {FIELDS.map(({ field, label, placeholder }) => (
@@ -21,6 +22,7 @@ export function DeviceForm({ draft, onChange }: DeviceFormProps) {
           <input
             value={draft[field]}
             placeholder={placeholder}
+            disabled={disabled}
             onChange={(e) => onChange(field, e.target.value)}
           />
         </label>

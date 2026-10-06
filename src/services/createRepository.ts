@@ -5,12 +5,12 @@ import { getSupabaseClient } from "./supabase/client";
 import { SupabaseRepository } from "./supabase/supabaseRepository";
 
 /**
- * Escolhe onde gravar, em ordem: Supabase (se configurado no .env),
- * banco do artifact do claude.ai, ou só este navegador.
+ * Escolhe onde gravar, em ordem: Supabase (se configurado no .env; exige
+ * usuário logado), banco do artifact do claude.ai, ou só este navegador.
  */
-export async function createRepository(): Promise<DeviceRepository> {
+export async function createRepository(userId: string): Promise<DeviceRepository> {
   const supabase = getSupabaseClient();
-  if (supabase) return new SupabaseRepository(supabase);
+  if (supabase) return new SupabaseRepository(supabase, userId);
 
   const db = await getClaudeDb();
   return db ? new ClaudeDbRepository(db) : new LocalStorageRepository();

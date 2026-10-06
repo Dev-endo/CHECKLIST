@@ -8,9 +8,10 @@ interface ChecklistSectionProps {
   number: number;
   results: Results;
   onToggle: (itemId: string, result: TestResult) => void;
+  disabled?: boolean;
 }
 
-export function ChecklistSection({ block, number, results, onToggle }: ChecklistSectionProps) {
+export function ChecklistSection({ block, number, results, onToggle, disabled }: ChecklistSectionProps) {
   const done = block.items.filter((item) => results[item.id]).length;
 
   return (
@@ -25,7 +26,10 @@ export function ChecklistSection({ block, number, results, onToggle }: Checklist
         </span>
       </div>
       {block.items.map((item) => (
-        <ChecklistItemRow key={item.id} item={item} result={results[item.id] || undefined} onToggle={onToggle} />
+        <ChecklistItemRow key={item.id} item={item} result={results[item.id] || undefined}
+          onToggle={onToggle}
+          disabled={disabled}
+        />
       ))}
     </section>
   );

@@ -100,3 +100,8 @@ input {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+input:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}

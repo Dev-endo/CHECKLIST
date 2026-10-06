@@ -110,3 +110,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.buttons button:disabled {
+  cursor: default;
+}

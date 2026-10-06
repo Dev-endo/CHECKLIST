@@ -13,11 +13,14 @@ const SAVE_LABELS: Record<SaveState, string> = {
 interface StatusBarProps {
   results: Results;
   saveState: SaveState;
-  onCopyReport: () => void;
+  /** "edit": checklist pendente do usuário; "view": concluído ou de outra pessoa. */
+  mode: "edit" | "view";
+  busy?: boolean;
+  onConclude: () => void;
   onNewDevice: () => void;
 }
 
-export function StatusBar({ results, saveState, onCopyReport, onNewDevice }: StatusBarProps) {
+export function StatusBar({ results, saveState, mode, busy = false, onConclude, onNewDevice }: StatusBarProps) {
   const { done, fails, status } = computeStats(results);
 
   const summary =
@@ -49,10 +52,15 @@ export function StatusBar({ results, saveState, onCopyReport, onNewDevice }: Sta
           <span className={styles.saved}>{SAVE_LABELS[saveState]}</span>
         </div>
         <div className={styles.actions}>
-          <Button onClick={onCopyReport}>Copiar laudo</Button>
-          <Button variant="ghost" onClick={onNewDevice}>
-            Novo aparelho
-          </Button>
+          {mode === "edit" ? (
+            <Button onClick={onConclude} disabled={busy}>
+              {busy ? "Concluindo…" : "Concluir"}
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={onNewDevice}>
+              Novo checklist
+            </Button>
+          )}
         </div>
       </div>
     </div>

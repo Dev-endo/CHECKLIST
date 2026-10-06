@@ -3,6 +3,8 @@ import { ALL_ITEMS, type ChecklistItem } from "./checklist";
 export type TestResult = "ok" | "fail";
 export type Results = Partial<Record<string, TestResult | "">>;
 export type DeviceStatus = "liberado" | "reprovado" | "incompleto";
+/** Ciclo de vida do checklist: pendente pode ser alterado; concluído é definitivo. */
+export type DevicePhase = "pendente" | "concluido";
 
 /**
  * Aparelho em edição. Os nomes dos campos seguem o esquema já gravado no
@@ -14,7 +16,12 @@ export interface DeviceDraft {
   serial: string;
   tec: string;
   r: Results;
+  fase: DevicePhase;
   criado?: string;
+  /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
+  autor?: string;
+  /** Nome de quem fez o checklist, para consulta por supervisor e admin. */
+  colaborador?: string;
 }
 
 export type DraftField = "modelo" | "serial" | "tec";
@@ -25,6 +32,7 @@ export interface DeviceDoc {
   serial: string;
   tec: string;
   r: Results;
+  fase: DevicePhase;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -34,6 +42,8 @@ export interface DeviceDoc {
 
 export interface DeviceRecord extends Partial<DeviceDoc> {
   id: string;
+  autor?: string;
+  colaborador?: string;
 }
 
 export interface DeviceStats {
@@ -50,7 +60,7 @@ export function newDeviceId(): string {
 }
 
 export function blankDraft(tec = ""): DeviceDraft {
-  return { id: newDeviceId(), modelo: "", serial: "", tec, r: {} };
+  return { id: newDeviceId(), modelo: "", serial: "", tec, r: {}, fase: "pendente" };
 }
 
 export function draftFromRecord(record: DeviceRecord): DeviceDraft {
@@ -60,7 +70,11 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     serial: record.serial ?? "",
     tec: record.tec ?? "",
     r: { ...record.r },
+    // Registros antigos, sem fase, seguem editáveis.
+    fase: record.fase ?? "pendente",
     criado: record.criado,
+    autor: record.autor,
+    colaborador: record.colaborador,
   };
 }
 
@@ -76,13 +90,28 @@ export function hasContent(draft: DeviceDraft): boolean {
   return Boolean(draft.serial || draft.modelo || Object.values(draft.r).some(Boolean));
 }
 
+/** O aparelho só é gravado depois de identificado: modelo, serial e técnico. */
+export function isIdentified(draft: Pick<DeviceDraft, "modelo" | "serial" | "tec">): boolean {
+  return [draft.modelo, draft.serial, draft.tec].every((value) => value.trim() !== "");
+}
+
+/** Editável pelo usuário logado: pendente e dele (ou ainda sem dono). */
+export function isEditable(draft: DeviceDraft, userId: string): boolean {
+  return draft.fase === "pendente" && (!draft.autor || draft.autor === userId);
+}
+
+export function isPending(record: DeviceRecord): boolean {
+  return (record.fase ?? "pendente") === "pendente";
+}
+
 export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
   const stats = computeStats(draft.r);
   return {
-    modelo: draft.modelo,
-    serial: draft.serial,
-    tec: draft.tec,
+    modelo: draft.modelo.trim(),
+    serial: draft.serial.trim(),
+    tec: draft.tec.trim(),
     r: { ...draft.r },
+    fase: draft.fase,
     status: stats.status,
     falhas: stats.fails.map((item) => item.title),
     testados: stats.done,
@@ -93,11 +122,16 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
 
 const normalizeSerial = (serial?: string) => (serial ?? "").trim().toLowerCase();
 
-/** Outro registro com o mesmo serial do rascunho, se houver. */
+/**
+ * Outro registro com o mesmo serial do rascunho, se houver. Prefere um
+ * pendente (que pode ser retomado) a um já concluído; `records` vem do mais
+ * recente para o mais antigo.
+ */
 export function findDuplicate(draft: DeviceDraft, records: readonly DeviceRecord[]): DeviceRecord | undefined {
   const serial = normalizeSerial(draft.serial);
   if (!serial) return undefined;
-  return records.find((r) => r.id !== draft.id && normalizeSerial(r.serial) === serial);
+  const matches = records.filter((r) => r.id !== draft.id && normalizeSerial(r.serial) === serial);
+  return matches.find(isPending) ?? matches[0];
 }
 
 export function matchesSearch(record: DeviceRecord, query: string): boolean {

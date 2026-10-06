@@ -26,7 +26,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 4px 12px;
   align-items: center;
   padding: 9px 14px;
@@ -76,4 +76,24 @@
   padding: 14px;
   font-size: 13.5px;
   color: var(--muted);
+}
+
+.badge.pending {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .actions {
+    grid-column: 1 / -1;
+  }
 }

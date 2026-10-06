@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth } from "./auth/AuthProvider";
+import { AdminPanel } from "./components/AdminPanel/AdminPanel";
+import { AppHeader, type AppTab } from "./components/AppHeader/AppHeader";
 import { Checklist } from "./components/Checklist/Checklist";
 import { DeviceForm } from "./components/DeviceForm/DeviceForm";
 import { DuplicateHint } from "./components/DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "./components/RecordsPanel/RecordsPanel";
-import { ReportFallback } from "./components/ReportFallback/ReportFallback";
+import { ReviewPanel } from "./components/ReviewPanel/ReviewPanel";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useToast } from "./components/Toast/ToastProvider";
-import { hasContent, type DeviceRecord } from "./domain/device";
-import { buildReport } from "./domain/report";
+import {
+  computeStats,
+  findDuplicate,
+  hasContent,
+  isEditable,
+  isIdentified,
+  isPending,
+  type DeviceRecord,
+} from "./domain/device";
+import { canManageUsers, canReviewAll } from "./domain/roles";
 import { useAutosave } from "./hooks/useAutosave";
 import { useDeviceDraft } from "./hooks/useDeviceDraft";
 import { useDeviceRecords } from "./hooks/useDeviceRecords";
@@ -17,95 +28,162 @@ import styles from "./App.module.css";
 
 export default function App() {
   const toast = useToast();
-  const repository = useRepository();
+  const { user, client, signOut } = useAuth();
+  const userId = user?.id ?? "";
+  const repository = useRepository(userId);
   const { records, loaded, failed } = useDeviceRecords(repository);
-  const { draft, revision, setField, toggleResult, openRecord, startNew, markCreated } = useDeviceDraft();
-  const { saveState, readOnly } = useAutosave({ repository, draft, revision, onCreated: markCreated });
-  const [reportFallback, setReportFallback] = useState<string | null>(null);
+  const { draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, markCreated } =
+    useDeviceDraft();
+
+  const [tab, setTab] = useState<AppTab>("checklist");
+  const [concluding, setConcluding] = useState(false);
+
+  // Pendente do próprio usuário pode ser alterado; concluído e de outros, só consulta.
+  const editable = isEditable(draft, userId);
+  // Outro checklist pendente com o mesmo serial: o usuário escolhe retomar ou reiniciar antes de salvar.
+  const duplicate = findDuplicate(draft, records);
+  const blocked = Boolean(duplicate && isPending(duplicate));
+
+  const { saveState, readOnly, conclude } = useAutosave({
+    repository,
+    draft,
+    revision,
+    enabled: editable && !blocked,
+    onCreated: markCreated,
+  });
+
+  const tabs: AppTab[] = ["checklist"];
+  if (client && user && canReviewAll(user.role)) tabs.push("registros");
+  if (client && user && canManageUsers(user.role)) tabs.push("admin");
+  const activeTab = tabs.includes(tab) ? tab : "checklist";
 
   const handleOpen = useCallback(
     (record: DeviceRecord) => {
       openRecord(record);
-      setReportFallback(null);
+      setTab("checklist");
       window.scrollTo(0, 0);
       toast("Registro aberto");
     },
     [openRecord, toast],
   );
 
+  const handleRestart = (record: DeviceRecord) => {
+    if (!window.confirm("Reiniciar apaga todas as marcações deste checklist pendente. Continuar?")) return;
+    restartRecord(record);
+    setTab("checklist");
+    window.scrollTo(0, 0);
+    toast("Checklist reiniciado");
+  };
+
   const handleNew = () => {
     startNew();
-    setReportFallback(null);
     window.scrollTo(0, 0);
     toast("Novo checklist em branco");
   };
 
-  const handleCopyReport = async () => {
-    const text = buildReport(draft);
-    try {
-      await navigator.clipboard.writeText(text);
-      setReportFallback(null);
-      toast("Laudo copiado");
-    } catch {
-      setReportFallback(text);
-      toast("Selecione e copie o texto");
+  const handleConclude = async () => {
+    if (!isIdentified(draft)) {
+      toast("Preencha modelo, serial e técnico para concluir");
+      return;
+    }
+    if (blocked) {
+      toast("Retome ou reinicie o checklist pendente deste serial");
+      return;
+    }
+    const missing = computeStats(draft.r).pending.length;
+    if (
+      missing &&
+      !window.confirm(`Faltam ${missing} itens sem teste. Concluir mesmo assim? Depois de concluído, não dá para alterar.`)
+    ) {
+      return;
+    }
+    setConcluding(true);
+    const ok = await conclude(draft);
+    setConcluding(false);
+    if (ok) {
+      startNew();
+      window.scrollTo(0, 0);
+      toast("Checklist concluído");
+    } else {
+      toast("Não foi possível concluir. Tente de novo.");
     }
   };
 
-  // Na primeira carga, reabre o aparelho em que este navegador estava.
+  // Na primeira carga, reabre o aparelho pendente em que este navegador estava.
   const [lastDeviceId] = useState(preferences.getCurrentDeviceId);
   const restored = useRef(false);
   useEffect(() => {
     if (!loaded || restored.current) return;
     restored.current = true;
     const last = records.find((r) => r.id === lastDeviceId);
-    if (last && last.id !== draft.id && !hasContent(draft)) handleOpen(last);
+    if (last && isPending(last) && last.id !== draft.id && !hasContent(draft)) handleOpen(last);
   }, [loaded, records, lastDeviceId, draft, handleOpen]);
 
-  const banner = readOnly
-    ? "Você pode consultar os registros, mas não salvar. Peça acesso de Colaborador à página."
-    : failed
-      ? "Não foi possível carregar os registros agora. Recarregue a página."
-      : null;
+  let banner: string | null = null;
+  if (readOnly) banner = "Você pode consultar os registros, mas não salvar. Peça acesso de Colaborador à página.";
+  else if (failed) banner = "Não foi possível carregar os registros agora. Recarregue a página.";
+  else if (!editable) {
+    banner =
+      draft.autor && draft.autor !== userId
+        ? `Checklist de ${draft.colaborador ?? "outro colaborador"}: somente leitura.`
+        : "Checklist concluído: somente leitura.";
+  }
 
   return (
     <>
+      <AppHeader tabs={tabs} active={activeTab} onChange={setTab} user={user} onSignOut={() => void signOut()} />
+
       <main className={styles.wrap}>
-        <header>
-          <h1 className={styles.title}>Checklist de testes · iPhone</h1>
-          <p className={styles.subtitle}>
-            Testes funcionais com o aparelho aberto. Marque OK ou Falha em cada item; qualquer falha reprova.
-          </p>
-          <DeviceForm draft={draft} onChange={setField} />
-          <DuplicateHint draft={draft} records={records} onOpen={handleOpen} />
-        </header>
+        {activeTab === "registros" && client && <ReviewPanel client={client} onOpen={handleOpen} />}
+        {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 
-        {banner && (
-          <div className={styles.banner} role="alert">
-            {banner}
-          </div>
+        {activeTab === "checklist" && (
+          <>
+            <header>
+              <h1 className={styles.title}>Checklist de testes · iPhone</h1>
+              <p className={styles.subtitle}>
+                Testes funcionais com o aparelho aberto. Marque OK ou Falha em cada item; qualquer falha reprova.
+              </p>
+              <DeviceForm draft={draft} onChange={setField} disabled={!editable} />
+              {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
+            </header>
+
+            {banner && (
+              <div className={styles.banner} role="alert">
+                {banner}
+              </div>
+            )}
+
+            <Checklist results={draft.r} onToggle={toggleResult} disabled={!editable} />
+
+            <RecordsPanel
+              records={records}
+              loaded={loaded}
+              currentId={draft.id}
+              onOpen={handleOpen}
+              onRestart={handleRestart}
+            />
+
+            <p className={styles.note}>
+              {repository?.kind === "local"
+                ? "Cada marcação é salva neste navegador. "
+                : "Depois de preencher modelo, serial e técnico, cada marcação é salva sozinha e o aparelho fica pendente. "}
+              Concluir finaliza o checklist e começa um novo; só os pendentes podem ser alterados.
+            </p>
+          </>
         )}
-
-        <Checklist results={draft.r} onToggle={toggleResult} />
-
-        {reportFallback && <ReportFallback text={reportFallback} />}
-
-        <RecordsPanel records={records} loaded={loaded} currentId={draft.id} onOpen={handleOpen} />
-
-        <p className={styles.note}>
-          {repository?.kind === "local"
-            ? "Cada marcação é salva neste navegador. "
-            : "Cada marcação é salva no registro do aparelho. "}
-          Novo aparelho começa um checklist em branco; os anteriores ficam na lista acima.
-        </p>
       </main>
 
-      <StatusBar
-        results={draft.r}
-        saveState={saveState}
-        onCopyReport={handleCopyReport}
-        onNewDevice={handleNew}
-      />
+      {activeTab === "checklist" && (
+        <StatusBar
+          results={draft.r}
+          saveState={saveState}
+          mode={editable ? "edit" : "view"}
+          busy={concluding}
+          onConclude={() => void handleConclude()}
+          onNewDevice={handleNew}
+        />
+      )}
     </>
   );
 }

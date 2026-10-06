@@ -1,4 +1,3 @@
-// Gerado a partir do banco do Supabase. Não edite à mão: regenere após mudar o schema.
 export type Json =
   | string
   | number
@@ -17,40 +16,96 @@ export type Database = {
     Tables: {
       devices: {
         Row: {
+          concluded_at: string | null
           created_at: string
           failed_items: string[]
           id: string
           model: string
+          phase: Database["public"]["Enums"]["device_phase"]
           results: Json
           serial: string
           status: Database["public"]["Enums"]["device_status"]
           technician: string
           tested_count: number
           updated_at: string
+          user_id: string
+        }
+        Insert: {
+          concluded_at?: string | null
+          created_at?: string
+          failed_items?: string[]
+          id?: string
+          model?: string
+          phase?: Database["public"]["Enums"]["device_phase"]
+          results?: Json
+          serial?: string
+          status?: Database["public"]["Enums"]["device_status"]
+          technician?: string
+          tested_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          concluded_at?: string | null
+          created_at?: string
+          failed_items?: string[]
+          id?: string
+          model?: string
+          phase?: Database["public"]["Enums"]["device_phase"]
+          results?: Json
+          serial?: string
+          status?: Database["public"]["Enums"]["device_status"]
+          technician?: string
+          tested_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           created_at?: string
-          failed_items?: string[]
-          id?: string
-          model?: string
-          results?: Json
-          serial?: string
-          status?: Database["public"]["Enums"]["device_status"]
-          technician?: string
-          tested_count?: number
-          updated_at?: string
+          email?: string
+          id: string
+          name?: string
+          role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           created_at?: string
-          failed_items?: string[]
+          email?: string
           id?: string
-          model?: string
-          results?: Json
-          serial?: string
-          status?: Database["public"]["Enums"]["device_status"]
-          technician?: string
-          tested_count?: number
-          updated_at?: string
+          name?: string
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
+      role_presets: {
+        Row: {
+          email: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          email: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          email?: string
+          role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
       }
@@ -59,10 +114,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
     }
     Enums: {
+      device_phase: "pendente" | "concluido"
       device_status: "incompleto" | "liberado" | "reprovado"
+      user_role: "admin" | "supervisor" | "colaborador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -190,7 +250,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      device_phase: ["pendente", "concluido"],
       device_status: ["incompleto", "liberado", "reprovado"],
+      user_role: ["admin", "supervisor", "colaborador"],
     },
   },
 } as const
