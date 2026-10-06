@@ -18,11 +18,17 @@ const startOfDay = (date: string) => new Date(`${date}T00:00:00`);
 /** Escapa os curingas do LIKE para o serial ser buscado como texto literal. */
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, (char) => `\\${char}`);
 
+export interface ReviewResult {
+  records: DeviceRecord[];
+  /** Total que bate com os filtros, mesmo além do limite de linhas mostradas. */
+  total: number;
+}
+
 /** Checklists de todos os usuários, para supervisor e admin (RLS libera só esses papéis). */
-export async function fetchReviewRecords(client: AppSupabaseClient, filters: ReviewFilters): Promise<DeviceRecord[]> {
+export async function fetchReviewRecords(client: AppSupabaseClient, filters: ReviewFilters): Promise<ReviewResult> {
   let query = client
     .from("devices")
-    .select("*, profiles(name, email)")
+    .select("*, profiles(name, email)", { count: "exact" })
     .order("created_at", { ascending: false })
     .limit(REVIEW_LIMIT);
 
@@ -36,7 +42,7 @@ export async function fetchReviewRecords(client: AppSupabaseClient, filters: Rev
     query = query.lt("created_at", nextDay.toISOString());
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw error;
-  return data.map(toRecord);
+  return { records: data.map(toRecord), total: count ?? data.length };
 }

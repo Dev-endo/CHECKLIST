@@ -1,0 +1,46 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pick input {
+  padding: 6px;
+}
+
+.preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.error,
+.result {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 5px;
+}
+
+.error {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.result {
+  background: var(--ok-soft);
+  color: var(--ok);
+}

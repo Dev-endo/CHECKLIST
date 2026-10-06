@@ -15,6 +15,7 @@ interface ReviewPanelProps {
 
 interface ListState {
   records: DeviceRecord[];
+  total: number;
   loaded: boolean;
   failed: boolean;
 }
@@ -26,7 +27,7 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
   const [filters, setFilters] = useState<ReviewFilters>({ from: "", to: "", userId: "", serial: "" });
   const [serialInput, setSerialInput] = useState("");
   const [people, setPeople] = useState<Profile[]>([]);
-  const [list, setList] = useState<ListState>({ records: [], loaded: false, failed: false });
+  const [list, setList] = useState<ListState>({ records: [], total: 0, loaded: false, failed: false });
   const [reloads, setReloads] = useState(0);
 
   const setFilter = (key: "from" | "to" | "userId", value: string) => setFilters((prev) => ({ ...prev, [key]: value }));
@@ -50,8 +51,8 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
     let active = true;
     setList((prev) => ({ ...prev, loaded: false, failed: false }));
     fetchReviewRecords(client, filters)
-      .then((records) => active && setList({ records, loaded: true, failed: false }))
-      .catch(() => active && setList({ records: [], loaded: true, failed: true }));
+      .then(({ records, total }) => active && setList({ records, total, loaded: true, failed: false }))
+      .catch(() => active && setList({ records: [], total: 0, loaded: true, failed: true }));
     return () => {
       active = false;
     };
@@ -73,7 +74,7 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
         {list.records.map((record) => (
           <RecordRow key={record.id} record={record} isCurrent={false} onOpen={onOpen} showOwner />
         ))}
-        {list.records.length >= REVIEW_LIMIT && (
+        {list.total > list.records.length && (
           <div className={recordStyles.empty}>Mostrando os {REVIEW_LIMIT} mais recentes. Refine os filtros.</div>
         )}
       </>
@@ -82,7 +83,7 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
   return (
     <section className={recordStyles.panel} aria-label="Registros de todos os colaboradores">
       <div className={recordStyles.header}>
-        <h2>Registros</h2>
+        <h2>Registros{list.loaded && !list.failed && ` · ${list.total} no total`}</h2>
         <div className={styles.actions}>
           {hasFilters && (
             <Button variant="small" onClick={clear}>

@@ -17,6 +17,8 @@ export interface DeviceDraft {
   tec: string;
   r: Results;
   fase: DevicePhase;
+  /** asset_short_id do ativo, preenchido ao bipar um serial da planilha de ativos. */
+  ativo?: string;
   criado?: string;
   /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
   autor?: string;
@@ -33,6 +35,7 @@ export interface DeviceDoc {
   tec: string;
   r: Results;
   fase: DevicePhase;
+  ativo?: string;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -55,6 +58,13 @@ export interface DeviceStats {
 
 export const TOTAL_TESTS = ALL_ITEMS.length;
 
+/** "iPhone 14 128GB-2386" vira modelo "iPhone 14 128GB" e unit id "2386" (separa no último hífen). */
+export function splitAssetId(assetShortId: string): { model: string; code: string } {
+  const cut = assetShortId.lastIndexOf("-");
+  if (cut < 0) return { model: assetShortId, code: "" };
+  return { model: assetShortId.slice(0, cut), code: assetShortId.slice(cut + 1) };
+}
+
 export function newDeviceId(): string {
   return crypto.randomUUID();
 }
@@ -72,6 +82,7 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     r: { ...record.r },
     // Registros antigos, sem fase, seguem editáveis.
     fase: record.fase ?? "pendente",
+    ativo: record.ativo,
     criado: record.criado,
     autor: record.autor,
     colaborador: record.colaborador,
@@ -112,6 +123,7 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     tec: draft.tec.trim(),
     r: { ...draft.r },
     fase: draft.fase,
+    ativo: draft.ativo,
     status: stats.status,
     falhas: stats.fails.map((item) => item.title),
     testados: stats.done,

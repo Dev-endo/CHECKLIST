@@ -22,6 +22,9 @@ type DraftAction =
   | { type: "replace"; draft: DeviceDraft }
   /** Abre o registro com as marcações zeradas e grava isso. */
   | { type: "restart"; draft: DeviceDraft }
+  /** Serial reconhecido na planilha de ativos: preenche unit id e modelo. */
+  | { type: "applyAsset"; ativo: string; modelo: string }
+  | { type: "clearAsset" }
   | { type: "markCreated"; id: string; criado: string };
 
 function draftReducer(state: DraftState, action: DraftAction): DraftState {
@@ -38,18 +41,23 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
       return { ...state, draft: action.draft };
     case "restart":
       return { draft: { ...action.draft, r: {} }, revision: state.revision + 1 };
+    case "applyAsset":
+      return { draft: { ...state.draft, ativo: action.ativo, modelo: action.modelo }, revision: state.revision + 1 };
+    case "clearAsset":
+      return { draft: { ...state.draft, ativo: undefined, modelo: "" }, revision: state.revision + 1 };
     case "markCreated":
       if (state.draft.id !== action.id || state.draft.criado) return state;
       return { ...state, draft: { ...state.draft, criado: action.criado } };
   }
 }
 
-function initState(): DraftState {
-  return { draft: blankDraft(preferences.getLastTech()), revision: 0 };
+function initState(tec: string): DraftState {
+  return { draft: blankDraft(tec), revision: 0 };
 }
 
-export function useDeviceDraft() {
-  const [{ draft, revision }, dispatch] = useReducer(draftReducer, undefined, initState);
+/** `defaultTec`: técnico dos checklists novos (o usuário logado, ou o último digitado no modo local). */
+export function useDeviceDraft(defaultTec: string) {
+  const [{ draft, revision }, dispatch] = useReducer(draftReducer, defaultTec, initState);
 
   const rememberEdit = useCallback((id: string, tec: string) => {
     preferences.setCurrentDeviceId(id);
@@ -83,17 +91,36 @@ export function useDeviceDraft() {
   }, []);
 
   const startNew = useCallback(() => {
-    const next = blankDraft(draft.tec);
+    const next = blankDraft(defaultTec);
     dispatch({ type: "replace", draft: next });
     preferences.setCurrentDeviceId(next.id);
-  }, [draft.tec]);
+  }, [defaultTec]);
+
+  const applyAsset = useCallback((ativo: string, modelo: string) => {
+    dispatch({ type: "applyAsset", ativo, modelo });
+  }, []);
+
+  const clearAsset = useCallback(() => {
+    dispatch({ type: "clearAsset" });
+  }, []);
 
   const markCreated = useCallback((id: string, criado: string) => {
     dispatch({ type: "markCreated", id, criado });
   }, []);
 
   return useMemo(
-    () => ({ draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, markCreated }),
-    [draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, markCreated],
+    () => ({
+      draft,
+      revision,
+      setField,
+      toggleResult,
+      openRecord,
+      restartRecord,
+      startNew,
+      applyAsset,
+      clearAsset,
+      markCreated,
+    }),
+    [draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
   );
 }

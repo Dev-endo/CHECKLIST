@@ -1,4 +1,4 @@
-import { computeStats, isPending, TOTAL_TESTS, type DeviceRecord } from "../../domain/device";
+import { computeStats, isPending, splitAssetId, TOTAL_TESTS, type DeviceRecord } from "../../domain/device";
 import { formatDateTime } from "../../utils/format";
 import { Button } from "../Button/Button";
 import styles from "./RecordsPanel.module.css";
@@ -30,6 +30,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
           {record.modelo || "Sem modelo"} · {record.serial || "sem serial"}
         </div>
         <div className={styles.meta}>
+          {record.ativo && `Unit ${splitAssetId(record.ativo).code || record.ativo} · `}
           {formatDateTime(record.atualizado)}
           {record.tec && ` · ${record.tec}`}
           {showOwner && record.colaborador && ` · ${record.colaborador}`}

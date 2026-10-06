@@ -35,7 +35,7 @@ export function RecordsPanel({ records, loaded, currentId, onOpen, onRestart }: 
   return (
     <section className={styles.panel} aria-label="Meus aparelhos">
       <div className={styles.header}>
-        <h2>Meus aparelhos</h2>
+        <h2>Meus aparelhos{loaded && ` · ${records.length}`}</h2>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}

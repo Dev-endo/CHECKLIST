@@ -3,6 +3,7 @@ import { ROLE_LABELS, ROLES, type UserRole } from "../../domain/roles";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchProfiles, updateRole, type Profile } from "../../services/supabase/profilesService";
 import { formatDateTime } from "../../utils/format";
+import { AssetImport } from "./AssetImport";
 import { useToast } from "../Toast/ToastProvider";
 import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
 import styles from "./AdminPanel.module.css";
@@ -77,15 +78,18 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
     });
 
   return (
-    <section className={recordStyles.panel} aria-label="Administração de usuários">
-      <div className={recordStyles.header}>
-        <h2>Usuários e acessos</h2>
-      </div>
-      <p className={styles.note}>
-        Quem entra com o Google começa como Colaborador. Supervisor e Administrador veem os checklists de todos; só o
-        Administrador altera papéis.
-      </p>
-      {body}
-    </section>
+    <>
+      <AssetImport client={client} />
+      <section className={recordStyles.panel} aria-label="Administração de usuários">
+        <div className={recordStyles.header}>
+          <h2>Usuários e acessos</h2>
+        </div>
+        <p className={styles.note}>
+          Quem entra com o Google começa como Colaborador. Supervisor e Administrador veem os checklists de todos; só o
+          Administrador altera papéis.
+        </p>
+        {body}
+      </section>
+    </>
   );
 }

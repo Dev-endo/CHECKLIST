@@ -16,6 +16,7 @@ import {
   isEditable,
   isIdentified,
   isPending,
+  splitAssetId,
   type DeviceRecord,
 } from "./domain/device";
 import { canManageUsers, canReviewAll } from "./domain/roles";
@@ -24,6 +25,7 @@ import { useDeviceDraft } from "./hooks/useDeviceDraft";
 import { useDeviceRecords } from "./hooks/useDeviceRecords";
 import { useRepository } from "./hooks/useRepository";
 import { preferences } from "./services/preferences";
+import { lookupAsset } from "./services/supabase/assetsService";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -32,9 +34,21 @@ export default function App() {
   const userId = user?.id ?? "";
   const repository = useRepository(userId);
   const { records, loaded, failed } = useDeviceRecords(repository);
-  const { draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, markCreated } =
-    useDeviceDraft();
+  const {
+    draft,
+    revision,
+    setField,
+    toggleResult,
+    openRecord,
+    restartRecord,
+    startNew,
+    applyAsset,
+    clearAsset,
+    markCreated,
+  } = useDeviceDraft(user ? user.name || user.email : preferences.getLastTech());
 
+  // missing: o serial não está na planilha de ativos (segue permitido, só avisa).
+  const [assetState, setAssetState] = useState<"idle" | "found" | "missing">("idle");
   const [tab, setTab] = useState<AppTab>("checklist");
   const [concluding, setConcluding] = useState(false);
 
@@ -43,6 +57,38 @@ export default function App() {
   // Outro checklist pendente com o mesmo serial: o usuário escolhe retomar ou reiniciar antes de salvar.
   const duplicate = findDuplicate(draft, records);
   const blocked = Boolean(duplicate && isPending(duplicate));
+
+  // Ao bipar o serial, busca o ativo e preenche unit id e modelo.
+  const serial = draft.serial.trim();
+  useEffect(() => {
+    if (!client || !editable) return;
+    if (!serial) {
+      setAssetState("idle");
+      if (draft.ativo) clearAsset();
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      lookupAsset(client, serial)
+        .then((asset) => {
+          if (!active) return;
+          if (asset) {
+            setAssetState("found");
+            if (draft.ativo !== asset.assetShortId || draft.modelo !== asset.model) {
+              applyAsset(asset.assetShortId, asset.model);
+            }
+          } else {
+            setAssetState("missing");
+            if (draft.ativo) clearAsset();
+          }
+        })
+        .catch(() => active && setAssetState("idle"));
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [client, editable, serial]);
 
   const { saveState, readOnly, conclude } = useAutosave({
     repository,
@@ -144,7 +190,16 @@ export default function App() {
               <p className={styles.subtitle}>
                 Testes funcionais com o aparelho aberto. Marque OK ou Falha em cada item; qualquer falha reprova.
               </p>
-              <DeviceForm draft={draft} onChange={setField} disabled={!editable} />
+              <DeviceForm
+                draft={draft}
+                onChange={setField}
+                disabled={!editable}
+                lockedFields={[...(user ? ["tec" as const] : []), ...(draft.ativo ? ["modelo" as const] : [])]}
+                unitId={draft.ativo ? splitAssetId(draft.ativo).code || draft.ativo : undefined}
+              />
+              {editable && client && assetState === "missing" && (
+                <p className={styles.hint}>Serial não encontrado na lista de ativos. Preencha o modelo manualmente.</p>
+              )}
               {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
             </header>
 

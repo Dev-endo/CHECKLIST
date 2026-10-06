@@ -14,8 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      assets: {
+        Row: {
+          asset_short_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          model: string | null
+          serial: string
+          serial_key: string | null
+          unit_code: string | null
+        }
+        Insert: {
+          asset_short_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          serial: string
+        }
+        Update: {
+          asset_short_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          serial?: string
+        }
+        Relationships: []
+      }
       devices: {
         Row: {
+          asset_short_id: string | null
           concluded_at: string | null
           created_at: string
           failed_items: string[]
@@ -31,6 +59,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          asset_short_id?: string | null
           concluded_at?: string | null
           created_at?: string
           failed_items?: string[]
@@ -46,6 +75,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          asset_short_id?: string | null
           concluded_at?: string | null
           created_at?: string
           failed_items?: string[]
@@ -117,6 +147,10 @@ export type Database = {
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      import_assets: {
+        Args: { rows: Json }
+        Returns: Json
       }
     }
     Enums: {
