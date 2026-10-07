@@ -31,7 +31,7 @@ export function StatusBar({ results, saveState, mode, busy = false, onConclude, 
         }
       : status === "liberado"
         ? { className: styles.ok, text: `Liberado · ${TOTAL_TESTS}/${TOTAL_TESTS} OK` }
-        : { className: undefined, text: `${done} de ${TOTAL_TESTS} testados` };
+        : { className: undefined, text: `${done} de ${TOTAL_TESTS} tópicos` };
 
   return (
     <div className={styles.bar}>

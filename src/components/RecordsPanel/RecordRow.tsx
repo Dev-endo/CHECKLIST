@@ -1,4 +1,4 @@
-import { computeStats, isPending, splitAssetId, TOTAL_TESTS, type DeviceRecord } from "../../domain/device";
+import { computeStats, describeFailures, isPending, splitAssetId, TOTAL_TESTS, type DeviceRecord } from "../../domain/device";
 import { formatDateTime } from "../../utils/format";
 import { Button } from "../Button/Button";
 import styles from "./RecordsPanel.module.css";
@@ -16,6 +16,7 @@ interface RecordRowProps {
 export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = false }: RecordRowProps) {
   const stats = computeStats(record.r);
   const pending = isPending(record);
+  const failures = describeFailures(record.r);
   const badge =
     stats.status === "liberado"
       ? { className: styles.ok, label: "Liberado" }
@@ -35,6 +36,13 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
           {record.tec && ` · ${record.tec}`}
           {showOwner && record.colaborador && ` · ${record.colaborador}`}
         </div>
+        {failures.length > 0 && (
+          <ul className={styles.failures} aria-label="Falhas">
+            {failures.map((failure) => (
+              <li key={failure}>{failure}</li>
+            ))}
+          </ul>
+        )}
       </div>
       <span className={[styles.badge, pending && styles.pending].filter(Boolean).join(" ")}>
         {pending ? "Pendente" : "Concluído"}

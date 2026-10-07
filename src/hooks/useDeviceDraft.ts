@@ -4,8 +4,9 @@ import {
   draftFromRecord,
   type DeviceDraft,
   type DeviceRecord,
+  toggleItemFailure,
+  toggleSectionResult,
   type DraftField,
-  type Results,
   type TestResult,
 } from "../domain/device";
 import { preferences } from "../services/preferences";
@@ -18,7 +19,8 @@ interface DraftState {
 
 type DraftAction =
   | { type: "setField"; field: DraftField; value: string }
-  | { type: "toggleResult"; itemId: string; result: TestResult }
+  | { type: "toggleResult"; sectionId: string; result: TestResult }
+  | { type: "toggleItemFail"; sectionId: string; itemId: string }
   | { type: "replace"; draft: DeviceDraft }
   /** Abre o registro com as marcações zeradas e grava isso. */
   | { type: "restart"; draft: DeviceDraft }
@@ -32,10 +34,12 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
     case "setField":
       return { draft: { ...state.draft, [action.field]: action.value }, revision: state.revision + 1 };
     case "toggleResult": {
-      const current = state.draft.r[action.itemId];
-      const next: TestResult | "" = current === action.result ? "" : action.result;
-      const r: Results = { ...state.draft.r, [action.itemId]: next };
+      const r = toggleSectionResult(state.draft.r, action.sectionId, action.result);
       return { draft: { ...state.draft, r }, revision: state.revision + 1 };
+    }
+    case "toggleItemFail": {
+      const r = toggleItemFailure(state.draft.r, action.sectionId, action.itemId);
+      return r === state.draft.r ? state : { draft: { ...state.draft, r }, revision: state.revision + 1 };
     }
     case "replace":
       return { ...state, draft: action.draft };
@@ -73,8 +77,16 @@ export function useDeviceDraft(defaultTec: string) {
   );
 
   const toggleResult = useCallback(
-    (itemId: string, result: TestResult) => {
-      dispatch({ type: "toggleResult", itemId, result });
+    (sectionId: string, result: TestResult) => {
+      dispatch({ type: "toggleResult", sectionId, result });
+      rememberEdit(draft.id, draft.tec);
+    },
+    [draft.id, draft.tec, rememberEdit],
+  );
+
+  const toggleItemFail = useCallback(
+    (sectionId: string, itemId: string) => {
+      dispatch({ type: "toggleItemFail", sectionId, itemId });
       rememberEdit(draft.id, draft.tec);
     },
     [draft.id, draft.tec, rememberEdit],
@@ -114,6 +126,7 @@ export function useDeviceDraft(defaultTec: string) {
       revision,
       setField,
       toggleResult,
+      toggleItemFail,
       openRecord,
       restartRecord,
       startNew,
@@ -121,6 +134,6 @@ export function useDeviceDraft(defaultTec: string) {
       clearAsset,
       markCreated,
     }),
-    [draft, revision, setField, toggleResult, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
+    [draft, revision, setField, toggleResult, toggleItemFail, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
   );
 }

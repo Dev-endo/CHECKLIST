@@ -7,28 +7,52 @@ interface ChecklistSectionProps {
   block: ChecklistBlock;
   number: number;
   results: Results;
-  onToggle: (itemId: string, result: TestResult) => void;
+  onToggle: (sectionId: string, result: TestResult) => void;
+  onToggleItem: (sectionId: string, itemId: string) => void;
   disabled?: boolean;
 }
 
-export function ChecklistSection({ block, number, results, onToggle, disabled }: ChecklistSectionProps) {
-  const done = block.items.filter((item) => results[item.id]).length;
+const OPTIONS: { value: TestResult; label: string }[] = [
+  { value: "ok", label: "OK" },
+  { value: "fail", label: "Falha" },
+];
+
+export function ChecklistSection({ block, number, results, onToggle, onToggleItem, disabled }: ChecklistSectionProps) {
+  const result = results[block.id] || undefined;
 
   return (
-    <section className={styles.block}>
+    <section className={[styles.block, result && styles[result]].filter(Boolean).join(" ")}>
       <div className={styles.header}>
         <h2>
           <span className={styles.number}>{number}</span>
           {block.title}
         </h2>
-        <span className={styles.count}>
-          {done}/{block.items.length}
-        </span>
+        <div className={styles.buttons}>
+          {OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={styles[`toggle-${value}`]}
+              aria-pressed={result === value}
+              aria-label={`${label}: ${block.title}`}
+              disabled={disabled}
+              onClick={() => onToggle(block.id, value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
+      {result === "fail" && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
       {block.items.map((item) => (
-        <ChecklistItemRow key={item.id} item={item} result={results[item.id] || undefined}
-          onToggle={onToggle}
+        <ChecklistItemRow
+          key={item.id}
+          item={item}
+          sectionId={block.id}
+          selectable={result === "fail"}
+          failed={results[item.id] === "fail"}
           disabled={disabled}
+          onToggleFail={onToggleItem}
         />
       ))}
     </section>

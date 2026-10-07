@@ -97,3 +97,19 @@
     grid-column: 1 / -1;
   }
 }
+
+.failures {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--crit);
+}
+
+.failures li::before {
+  content: "✕ ";
+  font-weight: 700;
+}

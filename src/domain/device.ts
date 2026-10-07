@@ -1,4 +1,7 @@
-import { ALL_ITEMS, type ChecklistItem } from "./checklist";
+import { ALL_SECTIONS, CHECKLIST } from "./checklist";
+
+/** Tópico do checklist (a unidade que recebe OK ou Falha). */
+export type ChecklistItem = (typeof ALL_SECTIONS)[number];
 
 export type TestResult = "ok" | "fail";
 export type Results = Partial<Record<string, TestResult | "">>;
@@ -56,7 +59,8 @@ export interface DeviceStats {
   status: DeviceStatus;
 }
 
-export const TOTAL_TESTS = ALL_ITEMS.length;
+/** Total de tópicos a marcar. */
+export const TOTAL_TESTS = ALL_SECTIONS.length;
 
 /** "iPhone 14 128GB-2386" vira modelo "iPhone 14 128GB" e unit id "2386" (separa no último hífen). */
 export function splitAssetId(assetShortId: string): { model: string; code: string } {
@@ -90,11 +94,38 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
 }
 
 export function computeStats(results: Results = {}): DeviceStats {
-  const fails = ALL_ITEMS.filter((item) => results[item.id] === "fail");
-  const pending = ALL_ITEMS.filter((item) => !results[item.id]);
+  const fails = ALL_SECTIONS.filter((item) => results[item.id] === "fail");
+  const pending = ALL_SECTIONS.filter((item) => !results[item.id]);
   const done = TOTAL_TESTS - pending.length;
   const status: DeviceStatus = fails.length ? "reprovado" : pending.length ? "incompleto" : "liberado";
   return { done, fails, pending, status };
+}
+
+/** Marca ou desmarca o resultado de um tópico; sair de "Falha" limpa os itens apontados. */
+export function toggleSectionResult(results: Results, sectionId: string, result: TestResult): Results {
+  const next: TestResult | "" = results[sectionId] === result ? "" : result;
+  const updated: Results = { ...results, [sectionId]: next };
+  if (next !== "fail") {
+    for (const item of CHECKLIST.find((block) => block.id === sectionId)?.items ?? []) delete updated[item.id];
+  }
+  return updated;
+}
+
+/** Aponta (ou tira) o item em que a falha ocorreu; só vale com o tópico em "Falha". */
+export function toggleItemFailure(results: Results, sectionId: string, itemId: string): Results {
+  if (results[sectionId] !== "fail") return results;
+  const updated: Results = { ...results };
+  if (updated[itemId] === "fail") delete updated[itemId];
+  else updated[itemId] = "fail";
+  return updated;
+}
+
+/** Texto das falhas: "Tópico: item" para cada item apontado, ou só o tópico se nenhum foi apontado. */
+export function describeFailures(results: Results = {}): string[] {
+  return CHECKLIST.filter((block) => results[block.id] === "fail").flatMap((block) => {
+    const items = block.items.filter((item) => results[item.id] === "fail");
+    return items.length ? items.map((item) => `${block.title}: ${item.title}`) : [block.title];
+  });
 }
 
 export function hasContent(draft: DeviceDraft): boolean {
@@ -125,7 +156,7 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     fase: draft.fase,
     ativo: draft.ativo,
     status: stats.status,
-    falhas: stats.fails.map((item) => item.title),
+    falhas: describeFailures(draft.r),
     testados: stats.done,
     criado: draft.criado ?? now,
     atualizado: now,

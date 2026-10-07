@@ -1,23 +1,28 @@
 import { memo } from "react";
 import type { ChecklistItem } from "../../domain/checklist";
-import type { TestResult } from "../../domain/device";
 import styles from "./Checklist.module.css";
 
 interface ChecklistItemRowProps {
   item: ChecklistItem;
-  result?: TestResult;
-  onToggle: (itemId: string, result: TestResult) => void;
+  sectionId: string;
+  /** Tópico em "Falha": o item pode ser apontado como o lugar da falha. */
+  selectable: boolean;
+  failed: boolean;
   disabled?: boolean;
+  onToggleFail: (sectionId: string, itemId: string) => void;
 }
 
-const OPTIONS: { value: TestResult; label: string }[] = [
-  { value: "ok", label: "OK" },
-  { value: "fail", label: "Falha" },
-];
-
-export const ChecklistItemRow = memo(function ChecklistItemRow({ item, result, onToggle, disabled }: ChecklistItemRowProps) {
+/** Instrução do teste. O resultado é do tópico; só a falha pode ser apontada por item. */
+export const ChecklistItemRow = memo(function ChecklistItemRow({
+  item,
+  sectionId,
+  selectable,
+  failed,
+  disabled,
+  onToggleFail,
+}: ChecklistItemRowProps) {
   return (
-    <div className={[styles.item, result && styles[result]].filter(Boolean).join(" ")}>
+    <div className={[styles.item, selectable && styles.selectable, failed && styles.itemFailed].filter(Boolean).join(" ")}>
       <div>
         <h3>{item.title}</h3>
         <p>
@@ -30,20 +35,18 @@ export const ChecklistItemRow = memo(function ChecklistItemRow({ item, result, o
           )}
         </p>
       </div>
-      <div className={styles.buttons}>
-        {OPTIONS.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            className={styles[`toggle-${value}`]}
-            aria-pressed={result === value}
-            disabled={disabled}
-            onClick={() => onToggle(item.id, value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {selectable && (
+        <button
+          type="button"
+          className={styles.itemFail}
+          aria-pressed={failed}
+          aria-label={`Falhou em: ${item.title}`}
+          disabled={disabled}
+          onClick={() => onToggleFail(sectionId, item.id)}
+        >
+          Falhou aqui
+        </button>
+      )}
     </div>
   );
 });

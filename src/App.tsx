@@ -39,6 +39,7 @@ export default function App() {
     revision,
     setField,
     toggleResult,
+    toggleItemFail,
     openRecord,
     restartRecord,
     startNew,
@@ -188,7 +189,7 @@ export default function App() {
             <header>
               <h1 className={styles.title}>Checklist de testes · iPhone</h1>
               <p className={styles.subtitle}>
-                Testes funcionais com o aparelho aberto. Marque OK ou Falha em cada item; qualquer falha reprova.
+                Testes funcionais com o aparelho aberto. Marque OK ou Falha em cada tópico; qualquer falha reprova.
               </p>
               <DeviceForm
                 draft={draft}
@@ -209,7 +210,7 @@ export default function App() {
               </div>
             )}
 
-            <Checklist results={draft.r} onToggle={toggleResult} disabled={!editable} />
+            <Checklist results={draft.r} onToggle={toggleResult} onToggleItem={toggleItemFail} disabled={!editable} />
 
             <RecordsPanel
               records={records}

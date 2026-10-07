@@ -28,7 +28,7 @@ export function DuplicateHint({ draft, records, onOpen, onRestart }: DuplicateHi
     return (
       <div className={styles.hint}>
         <span>
-          Já existe um checklist <b>pendente</b> deste serial ({done}/{TOTAL_TESTS} testados,{" "}
+          Já existe um checklist <b>pendente</b> deste serial ({done}/{TOTAL_TESTS} tópicos,{" "}
           {formatDateTime(duplicate.atualizado)}). O salvamento deste aparelho fica pausado até você escolher.
         </span>
         <Button variant="small" onClick={() => onOpen(duplicate)}>
