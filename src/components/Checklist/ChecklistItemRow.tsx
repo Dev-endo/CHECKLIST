@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { BATTERY_TARGET } from "../../domain/device";
 import type { ChecklistItem } from "../../domain/checklist";
 import styles from "./Checklist.module.css";
 
@@ -10,6 +11,9 @@ interface ChecklistItemRowProps {
   failed: boolean;
   disabled?: boolean;
   onToggleFail: (sectionId: string, itemId: string) => void;
+  /** Só no item com campo de bateria. */
+  battery?: number;
+  onBatteryChange?: (value: number | undefined) => void;
 }
 
 /** Instrução do teste. O resultado é do tópico; só a falha pode ser apontada por item. */
@@ -20,9 +24,12 @@ export const ChecklistItemRow = memo(function ChecklistItemRow({
   failed,
   disabled,
   onToggleFail,
+  battery,
+  onBatteryChange,
 }: ChecklistItemRowProps) {
+  const hasBattery = item.field === "battery" && onBatteryChange !== undefined;
   return (
-    <div className={[styles.item, selectable && styles.selectable, failed && styles.itemFailed].filter(Boolean).join(" ")}>
+    <div className={[styles.item, (selectable || hasBattery) && styles.selectable, failed && styles.itemFailed].filter(Boolean).join(" ")}>
       <div>
         <h3>{item.title}</h3>
         <p>
@@ -35,6 +42,17 @@ export const ChecklistItemRow = memo(function ChecklistItemRow({
           )}
         </p>
       </div>
+      {hasBattery && (
+        <label className={styles.battery}>
+          <input
+            type="checkbox"
+            checked={battery === BATTERY_TARGET}
+            disabled={disabled}
+            onChange={(e) => onBatteryChange(e.target.checked ? BATTERY_TARGET : undefined)}
+          />
+          <span>{BATTERY_TARGET}% de bateria</span>
+        </label>
+      )}
       {selectable && (
         <button
           type="button"

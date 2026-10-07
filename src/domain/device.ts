@@ -22,6 +22,8 @@ export interface DeviceDraft {
   fase: DevicePhase;
   /** asset_short_id do ativo, preenchido ao bipar um serial da planilha de ativos. */
   ativo?: string;
+  /** Saúde da bateria em %; só guarda BATTERY_TARGET (caixa marcada) ou fica vazio. */
+  bateria?: number;
   criado?: string;
   /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
   autor?: string;
@@ -39,6 +41,7 @@ export interface DeviceDoc {
   r: Results;
   fase: DevicePhase;
   ativo?: string;
+  bateria?: number;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -87,6 +90,7 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     // Registros antigos, sem fase, seguem editáveis.
     fase: record.fase ?? "pendente",
     ativo: record.ativo,
+    bateria: record.bateria,
     criado: record.criado,
     autor: record.autor,
     colaborador: record.colaborador,
@@ -128,6 +132,9 @@ export function describeFailures(results: Results = {}): string[] {
   });
 }
 
+/** Saúde da bateria exigida: a caixa do item marca que o ativo está com esse valor. */
+export const BATTERY_TARGET = 85;
+
 export function hasContent(draft: DeviceDraft): boolean {
   return Boolean(draft.serial || draft.modelo || Object.values(draft.r).some(Boolean));
 }
@@ -155,6 +162,7 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     r: { ...draft.r },
     fase: draft.fase,
     ativo: draft.ativo,
+    bateria: draft.bateria,
     status: stats.status,
     falhas: describeFailures(draft.r),
     testados: stats.done,

@@ -21,6 +21,7 @@ type DraftAction =
   | { type: "setField"; field: DraftField; value: string }
   | { type: "toggleResult"; sectionId: string; result: TestResult }
   | { type: "toggleItemFail"; sectionId: string; itemId: string }
+  | { type: "setBattery"; value: number | undefined }
   | { type: "replace"; draft: DeviceDraft }
   /** Abre o registro com as marcações zeradas e grava isso. */
   | { type: "restart"; draft: DeviceDraft }
@@ -41,6 +42,8 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
       const r = toggleItemFailure(state.draft.r, action.sectionId, action.itemId);
       return r === state.draft.r ? state : { draft: { ...state.draft, r }, revision: state.revision + 1 };
     }
+    case "setBattery":
+      return { draft: { ...state.draft, bateria: action.value }, revision: state.revision + 1 };
     case "replace":
       return { ...state, draft: action.draft };
     case "restart":
@@ -92,6 +95,14 @@ export function useDeviceDraft(defaultTec: string) {
     [draft.id, draft.tec, rememberEdit],
   );
 
+  const setBattery = useCallback(
+    (value: number | undefined) => {
+      dispatch({ type: "setBattery", value });
+      rememberEdit(draft.id, draft.tec);
+    },
+    [draft.id, draft.tec, rememberEdit],
+  );
+
   const openRecord = useCallback((record: DeviceRecord) => {
     dispatch({ type: "replace", draft: draftFromRecord(record) });
     preferences.setCurrentDeviceId(record.id);
@@ -127,6 +138,7 @@ export function useDeviceDraft(defaultTec: string) {
       setField,
       toggleResult,
       toggleItemFail,
+      setBattery,
       openRecord,
       restartRecord,
       startNew,
@@ -134,6 +146,6 @@ export function useDeviceDraft(defaultTec: string) {
       clearAsset,
       markCreated,
     }),
-    [draft, revision, setField, toggleResult, toggleItemFail, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
+    [draft, revision, setField, toggleResult, toggleItemFail, setBattery, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
   );
 }

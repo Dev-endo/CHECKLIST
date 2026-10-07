@@ -9,6 +9,8 @@ interface ChecklistSectionProps {
   results: Results;
   onToggle: (sectionId: string, result: TestResult) => void;
   onToggleItem: (sectionId: string, itemId: string) => void;
+  battery?: number;
+  onBatteryChange: (value: number | undefined) => void;
   disabled?: boolean;
 }
 
@@ -17,7 +19,16 @@ const OPTIONS: { value: TestResult; label: string }[] = [
   { value: "fail", label: "Falha" },
 ];
 
-export function ChecklistSection({ block, number, results, onToggle, onToggleItem, disabled }: ChecklistSectionProps) {
+export function ChecklistSection({
+  block,
+  number,
+  results,
+  onToggle,
+  onToggleItem,
+  battery,
+  onBatteryChange,
+  disabled,
+}: ChecklistSectionProps) {
   const result = results[block.id] || undefined;
 
   return (
@@ -53,6 +64,8 @@ export function ChecklistSection({ block, number, results, onToggle, onToggleIte
           failed={results[item.id] === "fail"}
           disabled={disabled}
           onToggleFail={onToggleItem}
+          battery={item.field === "battery" ? battery : undefined}
+          onBatteryChange={item.field === "battery" ? onBatteryChange : undefined}
         />
       ))}
     </section>

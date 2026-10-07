@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ALL_SECTIONS } from "./checklist";
 import {
+  BATTERY_TARGET,
   blankDraft,
   computeStats,
   describeFailures,
@@ -122,5 +123,16 @@ describe("falha por item", () => {
     ]);
     expect(describeFailures({ "tela-e-touch": "fail" })).toEqual(["Tela e touch"]);
     expect(describeFailures({ cameras: "ok", frontal: "fail" })).toEqual([]);
+  });
+});
+
+describe("bateria", () => {
+  it("is saved with the checklist", () => {
+    const draft = { ...blankDraft(), bateria: BATTERY_TARGET };
+    expect(toDeviceDoc(draft, "2026-02-01T00:00:00.000Z").bateria).toBe(85);
+  });
+
+  it("stays empty when the box is not checked", () => {
+    expect(toDeviceDoc(blankDraft(), "2026-02-01T00:00:00.000Z").bateria).toBeUndefined();
   });
 });

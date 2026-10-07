@@ -44,6 +44,7 @@ export type Database = {
       devices: {
         Row: {
           asset_short_id: string | null
+          battery_health: number | null
           concluded_at: string | null
           created_at: string
           failed_items: string[]
@@ -60,6 +61,7 @@ export type Database = {
         }
         Insert: {
           asset_short_id?: string | null
+          battery_health?: number | null
           concluded_at?: string | null
           created_at?: string
           failed_items?: string[]
@@ -76,6 +78,7 @@ export type Database = {
         }
         Update: {
           asset_short_id?: string | null
+          battery_health?: number | null
           concluded_at?: string | null
           created_at?: string
           failed_items?: string[]

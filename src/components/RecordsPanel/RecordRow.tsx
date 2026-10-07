@@ -34,6 +34,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
           {record.modelo || "Sem modelo"} · {record.serial || "sem serial"}
         </div>
         <div className={styles.meta}>
+          {record.bateria !== undefined && `Bateria ${record.bateria}% · `}
           {record.ativo && `Unit ${splitAssetId(record.ativo).code || record.ativo} · `}
           {formatDateTime(record.atualizado)}
           {record.tec && ` · ${record.tec}`}

@@ -40,6 +40,7 @@ export default function App() {
     setField,
     toggleResult,
     toggleItemFail,
+    setBattery,
     openRecord,
     restartRecord,
     startNew,
@@ -210,7 +211,14 @@ export default function App() {
               </div>
             )}
 
-            <Checklist results={draft.r} onToggle={toggleResult} onToggleItem={toggleItemFail} disabled={!editable} />
+            <Checklist
+              results={draft.r}
+              onToggle={toggleResult}
+              onToggleItem={toggleItemFail}
+              battery={draft.bateria}
+              onBatteryChange={setBattery}
+              disabled={!editable}
+            />
 
             <RecordsPanel
               records={records}

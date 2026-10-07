@@ -18,6 +18,7 @@ export function toRecord(row: DeviceRowWithOwner): DeviceRecord {
     r: (row.results ?? {}) as Results,
     fase: row.phase,
     ativo: row.asset_short_id ?? undefined,
+    bateria: row.battery_health ?? undefined,
     status: row.status,
     falhas: row.failed_items,
     testados: row.tested_count,
@@ -36,6 +37,7 @@ function toRow(id: string, userId: string, doc: DeviceDoc): TablesInsert<"device
     model: doc.modelo,
     serial: doc.serial,
     asset_short_id: doc.ativo ?? null,
+    battery_health: doc.bateria ?? null,
     technician: doc.tec,
     results: doc.r,
     // O banco só aceita criar como pendente; concluir é um segundo passo.
