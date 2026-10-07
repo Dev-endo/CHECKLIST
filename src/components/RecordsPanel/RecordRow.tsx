@@ -17,6 +17,9 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
   const stats = computeStats(record.r);
   const pending = isPending(record);
   const failures = describeFailures(record.r);
+  // O técnico já é o nome do usuário; o colaborador só aparece se for outra pessoa.
+  const sameName = (a?: string, b?: string) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+  const showCollaborator = Boolean(record.colaborador) && !sameName(record.colaborador, record.tec);
   const badge =
     stats.status === "liberado"
       ? { className: styles.ok, label: "Liberado" }
@@ -34,7 +37,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
           {record.ativo && `Unit ${splitAssetId(record.ativo).code || record.ativo} · `}
           {formatDateTime(record.atualizado)}
           {record.tec && ` · ${record.tec}`}
-          {showOwner && record.colaborador && ` · ${record.colaborador}`}
+          {showOwner && showCollaborator && ` · ${record.colaborador}`}
         </div>
         {failures.length > 0 && (
           <ul className={styles.failures} aria-label="Falhas">
