@@ -170,11 +170,15 @@
 .footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 11px 14px;
   border-top: 1px solid var(--line);
+}
+
+.footer .buttons {
+  order: -1;
 }
 
 .footerLabel {
