@@ -1,4 +1,4 @@
-import { ALL_SECTIONS, CHECKLIST } from "./checklist";
+import { ALL_SECTIONS, CHECKLIST, type ChecklistItem as CatalogItem } from "./checklist";
 
 /** Tópico do checklist (a unidade que recebe OK ou Falha). */
 export type ChecklistItem = (typeof ALL_SECTIONS)[number];
@@ -132,6 +132,27 @@ export function describeFailures(results: Results = {}): string[] {
   });
 }
 
+/** Chave, dentro de results, da confirmação obrigatória de um item (não confunde com a falha do item). */
+export const confirmKey = (itemId: string) => `confirm:${itemId}`;
+
+export function isConfirmed(results: Results, itemId: string): boolean {
+  return results[confirmKey(itemId)] === "ok";
+}
+
+export function setConfirmation(results: Results, itemId: string, checked: boolean): Results {
+  const updated: Results = { ...results };
+  if (checked) updated[confirmKey(itemId)] = "ok";
+  else delete updated[confirmKey(itemId)];
+  return updated;
+}
+
+/** Confirmações obrigatórias que ainda não foram marcadas; enquanto houver, não dá para concluir. */
+export function missingConfirmations(results: Results = {}): CatalogItem[] {
+  return CHECKLIST.flatMap((block) => block.items).filter(
+    (item) => item.field === "confirm" && !isConfirmed(results, item.id),
+  );
+}
+
 /** Saúde da bateria exigida: a caixa do item marca que o ativo está com esse valor. */
 export const BATTERY_TARGET = 85;
 
@@ -183,6 +204,15 @@ export function findDuplicate(draft: DeviceDraft, records: readonly DeviceRecord
   if (!serial) return undefined;
   const matches = records.filter((r) => r.id !== draft.id && normalizeSerial(r.serial) === serial);
   return matches.find(isPending) ?? matches[0];
+}
+
+/** Mesmo dia no horário local de quem usa o app. */
+export function isSameLocalDay(iso: string | undefined, now = new Date()): boolean {
+  if (!iso) return false;
+  const date = new Date(iso);
+  return (
+    date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+  );
 }
 
 export function matchesSearch(record: DeviceRecord, query: string): boolean {

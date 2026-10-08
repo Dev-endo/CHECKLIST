@@ -53,7 +53,7 @@ export function DuplicateHint({ draft, records, onOpen, onRestart }: DuplicateHi
   }
 
   if (hasContent(draft) && !isIdentified(draft)) {
-    return <div className={styles.hint}>Preencha modelo, IMEI / nº de série e técnico para o checklist ser salvo.</div>;
+    return <div className={styles.hint}>Preencha serial, modelo e técnico para o checklist ser salvo.</div>;
   }
 
   return null;

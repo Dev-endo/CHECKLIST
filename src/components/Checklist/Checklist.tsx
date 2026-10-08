@@ -9,10 +9,11 @@ interface ChecklistProps {
   onToggleItem: (sectionId: string, itemId: string) => void;
   battery?: number;
   onBatteryChange: (value: number | undefined) => void;
+  onConfirm: (itemId: string, checked: boolean) => void;
   disabled?: boolean;
 }
 
-export function Checklist({ results, onToggle, onToggleItem, battery, onBatteryChange, disabled }: ChecklistProps) {
+export function Checklist({ results, onToggle, onToggleItem, battery, onBatteryChange, onConfirm, disabled }: ChecklistProps) {
   return (
     <div className={styles.list}>
       {CHECKLIST.map((block, i) => (
@@ -25,6 +26,7 @@ export function Checklist({ results, onToggle, onToggleItem, battery, onBatteryC
           onToggleItem={onToggleItem}
           battery={battery}
           onBatteryChange={onBatteryChange}
+          onConfirm={onConfirm}
           disabled={disabled}
         />
       ))}

@@ -16,6 +16,7 @@ import {
   isEditable,
   isIdentified,
   isPending,
+  missingConfirmations,
   splitAssetId,
   type DeviceRecord,
 } from "./domain/device";
@@ -41,6 +42,7 @@ export default function App() {
     toggleResult,
     toggleItemFail,
     setBattery,
+    setConfirm,
     openRecord,
     restartRecord,
     startNew,
@@ -138,6 +140,11 @@ export default function App() {
       toast("Retome ou reinicie o checklist pendente deste serial");
       return;
     }
+    const unconfirmed = missingConfirmations(draft.r);
+    if (unconfirmed.length) {
+      toast(`Confirme para concluir: ${unconfirmed.map((item) => item.title).join(", ")}`);
+      return;
+    }
     const missing = computeStats(draft.r).pending.length;
     if (
       missing &&
@@ -217,6 +224,7 @@ export default function App() {
               onToggleItem={toggleItemFail}
               battery={draft.bateria}
               onBatteryChange={setBattery}
+              onConfirm={setConfirm}
               disabled={!editable}
             />
 

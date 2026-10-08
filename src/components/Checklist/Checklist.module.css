@@ -166,3 +166,52 @@
   padding: 0;
   accent-color: var(--accent);
 }
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.footerLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ok .footer {
+  background: var(--ok-soft);
+}
+
+.fail .footer {
+  background: var(--crit-soft);
+}
+
+@media (max-width: 480px) {
+  .footer .buttons {
+    width: 100%;
+  }
+
+  .footer .buttons button {
+    flex: 1;
+    padding-block: 9px;
+  }
+}
+
+.side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.required {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--crit);
+}

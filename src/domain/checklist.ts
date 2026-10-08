@@ -2,7 +2,7 @@ export interface ChecklistItem {
   id: string;
   title: string;
   /** Campo extra preenchido neste item, além da instrução. */
-  field?: "battery";
+  field?: "battery" | "confirm";
   /** Instrução do teste. */
   details?: string;
   /** Critério de reprovação, exibido em destaque. */
@@ -83,6 +83,7 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
     items: [
       { id: "bateria", title: "Saúde da bateria", field: "battery", details: "Ajustes › Bateria › Saúde: sem aviso de manutenção ou bateria desconhecida." },
       { id: "pecas", title: "Peças e histórico de serviço", details: "Ajustes › Geral › Sobre: mensagens de peça de acordo com o serviço feito." },
+      { id: "imei", title: "Conferir IMEI", field: "confirm", details: "Conferir se o IMEI da caixa é igual ao do ativo. Confirmação obrigatória para concluir." },
       { id: "panic", title: "Registros de travamento", details: "Ajustes › Privacidade e Segurança › Análise e Melhorias › Dados de Análise.", failure: "arquivo “panic-full” com a data de hoje." },
     ],
   },

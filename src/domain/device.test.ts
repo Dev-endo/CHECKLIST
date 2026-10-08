@@ -6,7 +6,11 @@ import {
   computeStats,
   describeFailures,
   findDuplicate,
+  isConfirmed,
   isEditable,
+  missingConfirmations,
+  setConfirmation,
+  isSameLocalDay,
   isIdentified,
   toDeviceDoc,
   toggleItemFailure,
@@ -134,5 +138,37 @@ describe("bateria", () => {
 
   it("stays empty when the box is not checked", () => {
     expect(toDeviceDoc(blankDraft(), "2026-02-01T00:00:00.000Z").bateria).toBeUndefined();
+  });
+});
+
+describe("isSameLocalDay", () => {
+  it("compares the local calendar day", () => {
+    const now = new Date(2026, 9, 8, 15, 0);
+    expect(isSameLocalDay(new Date(2026, 9, 8, 0, 5).toISOString(), now)).toBe(true);
+    expect(isSameLocalDay(new Date(2026, 9, 8, 23, 59).toISOString(), now)).toBe(true);
+    expect(isSameLocalDay(new Date(2026, 9, 7, 23, 59).toISOString(), now)).toBe(false);
+    expect(isSameLocalDay(undefined, now)).toBe(false);
+  });
+});
+
+describe("confirmação obrigatória do IMEI", () => {
+  it("blocks concluding until the IMEI is confirmed", () => {
+    expect(missingConfirmations({}).map((item) => item.id)).toEqual(["imei"]);
+    const confirmed = setConfirmation({}, "imei", true);
+    expect(isConfirmed(confirmed, "imei")).toBe(true);
+    expect(missingConfirmations(confirmed)).toEqual([]);
+    expect(missingConfirmations(setConfirmation(confirmed, "imei", false))).toHaveLength(1);
+  });
+
+  it("survives changing the result of the topic", () => {
+    const confirmed = setConfirmation({}, "imei", true);
+    const failed = toggleSectionResult(confirmed, "sistema", "fail");
+    expect(isConfirmed(toggleSectionResult(failed, "sistema", "ok"), "imei")).toBe(true);
+  });
+
+  it("does not count as a failed item and does not change the stats", () => {
+    const confirmed = setConfirmation({}, "imei", true);
+    expect(computeStats(confirmed).done).toBe(0);
+    expect(describeFailures(toggleSectionResult(confirmed, "sistema", "fail"))).toEqual(["Sistema"]);
   });
 });

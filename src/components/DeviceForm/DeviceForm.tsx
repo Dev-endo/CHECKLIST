@@ -2,7 +2,7 @@ import type { DeviceDraft, DraftField } from "../../domain/device";
 import styles from "./DeviceForm.module.css";
 
 const FIELDS: { field: DraftField; label: string; placeholder?: string }[] = [
-  { field: "serial", label: "IMEI / nº de série", placeholder: "Bipe ou digite o serial" },
+  { field: "serial", label: "Serial", placeholder: "Bipe ou digite o serial" },
   { field: "modelo", label: "Modelo", placeholder: "ex.: iPhone 13" },
   { field: "tec", label: "Técnico" },
 ];

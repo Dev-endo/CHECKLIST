@@ -117,7 +117,7 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
         </label>
         <label className={styles.field}>
           Serial
-          <input value={serialInput} placeholder="IMEI / nº de série" onChange={(e) => setSerialInput(e.target.value)} />
+          <input value={serialInput} placeholder="Serial" onChange={(e) => setSerialInput(e.target.value)} />
         </label>
       </div>
       {body}

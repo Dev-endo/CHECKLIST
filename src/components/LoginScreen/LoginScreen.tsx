@@ -10,9 +10,15 @@ interface LoginScreenProps {
   children?: ReactNode;
 }
 
+/** O Supabase devolve o motivo na URL quando o login é recusado (por exemplo, e-mail de outro domínio). */
+function readRedirectError(): string | null {
+  const params = new URLSearchParams(window.location.search + "&" + window.location.hash.replace(/^#/, ""));
+  return params.get("error_description") ? "Você não tem acesso a este sistema." : null;
+}
+
 export function LoginScreen({ busy = false, message, children }: LoginScreenProps) {
   const { signIn } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(readRedirectError);
   const [redirecting, setRedirecting] = useState(false);
 
   const handleSignIn = async () => {
@@ -43,7 +49,7 @@ export function LoginScreen({ busy = false, message, children }: LoginScreenProp
             {children}
             {error && (
               <p className={styles.error} role="alert">
-                Não foi possível entrar: {error}
+                {error}
               </p>
             )}
           </>

@@ -1,5 +1,5 @@
 import type { ChecklistBlock } from "../../domain/checklist";
-import type { Results, TestResult } from "../../domain/device";
+import { isConfirmed, type Results, type TestResult } from "../../domain/device";
 import { ChecklistItemRow } from "./ChecklistItemRow";
 import styles from "./Checklist.module.css";
 
@@ -11,6 +11,7 @@ interface ChecklistSectionProps {
   onToggleItem: (sectionId: string, itemId: string) => void;
   battery?: number;
   onBatteryChange: (value: number | undefined) => void;
+  onConfirm: (itemId: string, checked: boolean) => void;
   disabled?: boolean;
 }
 
@@ -27,6 +28,7 @@ export function ChecklistSection({
   onToggleItem,
   battery,
   onBatteryChange,
+  onConfirm,
   disabled,
 }: ChecklistSectionProps) {
   const result = results[block.id] || undefined;
@@ -38,6 +40,25 @@ export function ChecklistSection({
           <span className={styles.number}>{number}</span>
           {block.title}
         </h2>
+      </div>
+      {result === "fail" && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
+      {block.items.map((item) => (
+        <ChecklistItemRow
+          key={item.id}
+          item={item}
+          sectionId={block.id}
+          selectable={result === "fail"}
+          failed={results[item.id] === "fail"}
+          disabled={disabled}
+          onToggleFail={onToggleItem}
+          battery={item.field === "battery" ? battery : undefined}
+          onBatteryChange={item.field === "battery" ? onBatteryChange : undefined}
+          confirmed={item.field === "confirm" ? isConfirmed(results, item.id) : undefined}
+          onConfirmChange={item.field === "confirm" ? (checked) => onConfirm(item.id, checked) : undefined}
+        />
+      ))}
+      <div className={styles.footer}>
+        <span className={styles.footerLabel}>Resultado do tópico</span>
         <div className={styles.buttons}>
           {OPTIONS.map(({ value, label }) => (
             <button
@@ -54,20 +75,6 @@ export function ChecklistSection({
           ))}
         </div>
       </div>
-      {result === "fail" && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
-      {block.items.map((item) => (
-        <ChecklistItemRow
-          key={item.id}
-          item={item}
-          sectionId={block.id}
-          selectable={result === "fail"}
-          failed={results[item.id] === "fail"}
-          disabled={disabled}
-          onToggleFail={onToggleItem}
-          battery={item.field === "battery" ? battery : undefined}
-          onBatteryChange={item.field === "battery" ? onBatteryChange : undefined}
-        />
-      ))}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import type { UserRole } from "../domain/roles";
+import { ALLOWED_EMAIL_DOMAIN } from "./allowedDomain";
 import { getSupabaseClient, type AppSupabaseClient } from "../services/supabase/client";
 import { fetchProfile, type Profile } from "../services/supabase/profilesService";
 
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider: "google",
       options: {
         redirectTo: window.location.origin + import.meta.env.BASE_URL,
-        queryParams: { prompt: "select_account" },
+        queryParams: { prompt: "select_account", hd: ALLOWED_EMAIL_DOMAIN },
       },
     });
     return error ? error.message : null;

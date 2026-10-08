@@ -4,6 +4,7 @@ import {
   draftFromRecord,
   type DeviceDraft,
   type DeviceRecord,
+  setConfirmation,
   toggleItemFailure,
   toggleSectionResult,
   type DraftField,
@@ -22,6 +23,7 @@ type DraftAction =
   | { type: "toggleResult"; sectionId: string; result: TestResult }
   | { type: "toggleItemFail"; sectionId: string; itemId: string }
   | { type: "setBattery"; value: number | undefined }
+  | { type: "setConfirm"; itemId: string; checked: boolean }
   | { type: "replace"; draft: DeviceDraft }
   /** Abre o registro com as marcações zeradas e grava isso. */
   | { type: "restart"; draft: DeviceDraft }
@@ -42,6 +44,11 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
       const r = toggleItemFailure(state.draft.r, action.sectionId, action.itemId);
       return r === state.draft.r ? state : { draft: { ...state.draft, r }, revision: state.revision + 1 };
     }
+    case "setConfirm":
+      return {
+        draft: { ...state.draft, r: setConfirmation(state.draft.r, action.itemId, action.checked) },
+        revision: state.revision + 1,
+      };
     case "setBattery":
       return { draft: { ...state.draft, bateria: action.value }, revision: state.revision + 1 };
     case "replace":
@@ -103,6 +110,14 @@ export function useDeviceDraft(defaultTec: string) {
     [draft.id, draft.tec, rememberEdit],
   );
 
+  const setConfirm = useCallback(
+    (itemId: string, checked: boolean) => {
+      dispatch({ type: "setConfirm", itemId, checked });
+      rememberEdit(draft.id, draft.tec);
+    },
+    [draft.id, draft.tec, rememberEdit],
+  );
+
   const openRecord = useCallback((record: DeviceRecord) => {
     dispatch({ type: "replace", draft: draftFromRecord(record) });
     preferences.setCurrentDeviceId(record.id);
@@ -139,6 +154,7 @@ export function useDeviceDraft(defaultTec: string) {
       toggleResult,
       toggleItemFail,
       setBattery,
+      setConfirm,
       openRecord,
       restartRecord,
       startNew,
@@ -146,6 +162,6 @@ export function useDeviceDraft(defaultTec: string) {
       clearAsset,
       markCreated,
     }),
-    [draft, revision, setField, toggleResult, toggleItemFail, setBattery, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
+    [draft, revision, setField, toggleResult, toggleItemFail, setBattery, setConfirm, openRecord, restartRecord, startNew, applyAsset, clearAsset, markCreated],
   );
 }
