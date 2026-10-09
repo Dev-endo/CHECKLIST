@@ -154,6 +154,7 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
         <Stat label="Ativos liberados" value={found?.released ?? 0} hint="aprovados na montagem, serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
         <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens" />
+        <Stat label="Liberados para revenda" value={report.releasedResale} hint="Face ID com defeito: laudo e revenda" />
         <Stat label="Checklists de manutenção concluídos" value={report.checklists} />
       </div>
       {assembly === "error" && (

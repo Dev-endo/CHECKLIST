@@ -25,7 +25,7 @@ interface StatusBarProps {
 
 export function StatusBar({ kind = "manutencao", results, saveState, mode, busy = false, onConclude, onNewDevice }: StatusBarProps) {
   const total = totalTests(kind);
-  const { done, fails, status } = computeStats(results, kind);
+  const { done, fails, status, faceIdDefect } = computeStats(results, kind);
 
   const summary =
     status === "reprovado"
@@ -34,7 +34,12 @@ export function StatusBar({ kind = "manutencao", results, saveState, mode, busy 
           text: `Reprovado · ${fails.length} falha${fails.length > 1 ? "s" : ""} · ${done}/${total}`,
         }
       : status === "liberado"
-        ? { className: styles.ok, text: `Liberado · ${total}/${total} OK` }
+        ? {
+            className: styles.ok,
+            text: faceIdDefect
+              ? "Liberado com Face ID com defeito · laudo e revenda"
+              : `Liberado · ${total}/${total} OK`,
+          }
         : { className: undefined, text: `${done} de ${total} tópicos` };
 
   return (

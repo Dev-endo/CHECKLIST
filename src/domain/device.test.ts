@@ -6,6 +6,7 @@ import {
   computeStats,
   describeFailures,
   findDuplicate,
+  hasFaceIdDefect,
   isConfirmed,
   latestReleasingId,
   isEditable,
@@ -201,5 +202,31 @@ describe("latestReleasingId", () => {
   it("ignores pending checklists and works with no history", () => {
     expect(latestReleasingId([rec("a", "2026-10-08T09:00:00Z", "liberado"), rec("p", "2026-10-08T12:00:00Z", "reprovado", "pendente")])).toBe("a");
     expect(latestReleasingId([])).toBeUndefined();
+  });
+});
+
+describe("Face ID com defeito", () => {
+  const sensors = "sensores-e-biometria";
+  const all = (extra: Results): Results => ({ ...Object.fromEntries(ALL_SECTIONS.map((s) => [s.id, "ok" as const])), ...extra });
+
+  it("does not reject the device when only Face ID failed", () => {
+    const results = all({ [sensors]: "fail", faceid: "fail" });
+    expect(hasFaceIdDefect(results)).toBe(true);
+    expect(computeStats(results)).toMatchObject({ status: "liberado", faceIdDefect: true });
+  });
+
+  it("still rejects when the sensors topic failed without pointing Face ID", () => {
+    expect(computeStats(all({ [sensors]: "fail" })).status).toBe("reprovado");
+    expect(computeStats(all({ [sensors]: "fail", prox: "fail" })).status).toBe("reprovado");
+  });
+
+  it("still rejects when anything else failed, or when Face ID plus another item failed", () => {
+    expect(computeStats(all({ [sensors]: "fail", faceid: "fail", cameras: "fail" })).status).toBe("reprovado");
+    expect(computeStats(all({ [sensors]: "fail", faceid: "fail", nfc: "fail" })).status).toBe("reprovado");
+  });
+
+  it("is incomplete while topics are pending, and does not apply to the assembly checklist", () => {
+    expect(computeStats({ [sensors]: "fail", faceid: "fail" }).status).toBe("incompleto");
+    expect(hasFaceIdDefect({ [sensors]: "fail", faceid: "fail" }, "montagem")).toBe(false);
   });
 });

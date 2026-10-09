@@ -19,6 +19,8 @@ export interface MaintenanceReport {
   /** Ativos (seriais) liberados para montagem e para vidro no período. */
   releasedAssembly: number;
   releasedGlass: number;
+  /** Face ID com defeito: liberados para montagem e depois laudo e revenda. */
+  releasedResale: number;
   byTechnician: { name: string; assembly: number; glass: number; rejected: number }[];
   /** Total de manutenções registradas (uma por item marcado). */
   maintenancesTotal: number;
@@ -51,6 +53,7 @@ export async function fetchMaintenanceReport(
     assets_with_maintenance: number;
     released_assembly: number;
     released_glass: number;
+    released_resale?: number;
     by_technician: { name: string; assembly: number; glass: number; rejected: number }[];
     maintenances_total: number;
     by_item: { item: string; count: number; assets: number }[];
@@ -63,6 +66,7 @@ export async function fetchMaintenanceReport(
     assetsWithMaintenance: raw.assets_with_maintenance,
     releasedAssembly: raw.released_assembly ?? 0,
     releasedGlass: raw.released_glass ?? 0,
+    releasedResale: raw.released_resale ?? 0,
     byTechnician: raw.by_technician ?? [],
     maintenancesTotal: raw.maintenances_total,
     byItem: raw.by_item,

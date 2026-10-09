@@ -15,6 +15,7 @@ import {
   computeStats,
   findDuplicate,
   hasContent,
+  hasFaceIdDefect,
   isEditable,
   isIdentified,
   isPending,
@@ -281,6 +282,7 @@ export default function App() {
       <MaintenanceDialog
         open={maintenanceOpen}
         busy={concluding}
+        faceIdDefect={hasFaceIdDefect(draft.r, draft.tipo)}
         onCancel={() => setMaintenanceOpen(false)}
         onConfirm={(maintenances, destination) => void finishConclude(maintenances, destination)}
       />

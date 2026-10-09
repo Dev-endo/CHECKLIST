@@ -18,12 +18,16 @@ interface MaintenanceDialogProps {
   busy?: boolean;
   onCancel: () => void;
   onConfirm: (maintenances: Maintenance[], destination: Destination) => void;
+  /** Face ID com defeito: o aparelho segue para a montagem e depois para laudo e revenda. */
+  faceIdDefect?: boolean;
 }
 
 /** Aparece ao concluir um checklist com tudo OK: quais manutenções foram feitas no aparelho. */
-export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm }: MaintenanceDialogProps) {
+export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, faceIdDefect = false }: MaintenanceDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState<Maintenance[]>([]);
+  // Escolha explícita de que nenhuma manutenção foi executada.
+  const [none, setNone] = useState(false);
   const [destination, setDestination] = useState<Destination | undefined>();
 
   useEffect(() => {
@@ -31,6 +35,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm }: M
     if (!element) return;
     if (open && !element.open) {
       setSelected([]);
+      setNone(false);
       setDestination(undefined);
       element.showModal();
     }
@@ -39,6 +44,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm }: M
 
   const placa = selected.find((m) => m.item === PLACA_ITEM);
   const complete = isMaintenanceComplete(selected);
+  // Ou marca as manutenções feitas, ou diz que nenhuma foi executada.
+  const chosen = none || selected.length > 0;
 
   return (
     <dialog
@@ -54,7 +61,25 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm }: M
       <h2 id="maintenance-title" className={styles.title}>
         Manutenções realizadas
       </h2>
-      <p className={styles.help}>Marque o que foi feito neste aparelho. Se nada foi feito, deixe em branco.</p>
+      <p className={styles.help}>Marque o que foi feito neste aparelho, ou marque que nenhuma manutenção foi executada.</p>
+      {faceIdDefect && (
+        <p className={styles.notice}>
+          Face ID com defeito: o aparelho não é reprovado. Ele segue para a montagem e depois para laudo e revenda.
+        </p>
+      )}
+
+      <label className={[styles.option, styles.none].join(" ")}>
+        <input
+          type="checkbox"
+          checked={none}
+          disabled={busy}
+          onChange={(e) => {
+            setNone(e.target.checked);
+            if (e.target.checked) setSelected([]);
+          }}
+        />
+        <span>Nenhuma manutenção executada</span>
+      </label>
 
       <div className={styles.grid}>
         {MAINTENANCE_ITEMS.map((item) => (
@@ -63,7 +88,10 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm }: M
               type="checkbox"
               checked={selected.some((m) => m.item === item)}
               disabled={busy}
-              onChange={() => setSelected((prev) => toggleMaintenance(prev, item))}
+              onChange={() => {
+                setNone(false);
+                setSelected((prev) => toggleMaintenance(prev, item));
+              }}
             />
             <span>{item}</span>
           </label>
@@ -115,12 +143,15 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm }: M
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
           Voltar
         </Button>
-        <Button onClick={() => destination && onConfirm(selected, destination)} disabled={busy || !complete || !destination}>
+        <Button onClick={() => destination && onConfirm(selected, destination)} disabled={busy || !complete || !chosen || !destination}>
           {busy ? "Concluindo…" : "Concluir checklist"}
         </Button>
       </div>
       {!complete && <p className={styles.warn}>Informe o serviço feito na placa para concluir.</p>}
-      {complete && !destination && <p className={styles.warn}>Escolha para onde o aparelho vai.</p>}
+      {complete && !chosen && (
+        <p className={styles.warn}>Marque as manutenções feitas ou "Nenhuma manutenção executada".</p>
+      )}
+      {complete && chosen && !destination && <p className={styles.warn}>Escolha para onde o aparelho vai.</p>}
     </dialog>
   );
 }

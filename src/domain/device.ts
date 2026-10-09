@@ -75,6 +75,8 @@ export interface DeviceRecord extends Partial<DeviceDoc> {
 }
 
 export interface DeviceStats {
+  /** Só o Face ID falhou: o aparelho segue para a montagem e depois para laudo e revenda. */
+  faceIdDefect: boolean;
   done: number;
   fails: ChecklistItem[];
   pending: ChecklistItem[];
@@ -128,13 +130,35 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
   };
 }
 
+/** Tópico e item do Face ID no checklist de manutenção. */
+const FACE_ID_SECTION = "sensores-e-biometria";
+const FACE_ID_ITEM = "faceid";
+
+/**
+ * Face ID com defeito é uma exceção: o aparelho não reprova. Vale quando a única falha do
+ * checklist de manutenção é o tópico de sensores, com o Face ID apontado ("Falhou aqui") e
+ * nenhum outro item apontado. Ele segue para a montagem e depois para laudo e revenda.
+ */
+export function hasFaceIdDefect(results: Results = {}, kind: ChecklistKind = "manutencao"): boolean {
+  if (kind !== "manutencao") return false;
+  const failedSections = testedSections(kind).filter((section) => results[section.id] === "fail");
+  if (failedSections.length !== 1 || failedSections[0]?.id !== FACE_ID_SECTION) return false;
+  if (results[FACE_ID_ITEM] !== "fail") return false;
+  const others = catalogFor(kind)
+    .find((block) => block.id === FACE_ID_SECTION)
+    ?.items.filter((item) => item.id !== FACE_ID_ITEM);
+  return (others ?? []).every((item) => results[item.id] !== "fail");
+}
+
 export function computeStats(results: Results = {}, kind: ChecklistKind = "manutencao"): DeviceStats {
   const sections = testedSections(kind);
   const fails = sections.filter((item) => results[item.id] === "fail");
   const pending = sections.filter((item) => !results[item.id]);
   const done = sections.length - pending.length;
-  const status: DeviceStatus = fails.length ? "reprovado" : pending.length ? "incompleto" : "liberado";
-  return { done, fails, pending, status };
+  const faceIdDefect = hasFaceIdDefect(results, kind);
+  const rejected = fails.length > 0 && !faceIdDefect;
+  const status: DeviceStatus = rejected ? "reprovado" : pending.length ? "incompleto" : "liberado";
+  return { faceIdDefect, done, fails, pending, status };
 }
 
 /** Marca ou desmarca o resultado de um tópico; sair de "Falha" limpa os itens apontados. */

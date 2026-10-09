@@ -1,4 +1,4 @@
-import { computeStats, describeFailures, isPending, splitAssetId, totalTests, type DeviceRecord } from "../../domain/device";
+import { computeStats, describeFailures, hasFaceIdDefect, isPending, splitAssetId, totalTests, type DeviceRecord } from "../../domain/device";
 import { describeMaintenance, destinationLabel } from "../../domain/maintenance";
 import { formatDateTime } from "../../utils/format";
 import { Button } from "../Button/Button";
@@ -66,6 +66,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
         {pending ? "Pendente" : "Concluído"}
       </span>
       <span className={[styles.badge, badge.className].filter(Boolean).join(" ")}>{badge.label}</span>
+      {hasFaceIdDefect(record.r, record.tipo) && <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>}
       {isCurrent ? (
         <span className={styles.meta}>aberto</span>
       ) : (
