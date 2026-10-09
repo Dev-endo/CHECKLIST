@@ -7,10 +7,12 @@ import {
   describeFailures,
   findDuplicate,
   isConfirmed,
+  latestReleasingId,
   isEditable,
   missingConfirmations,
   setConfirmation,
   isSameLocalDay,
+  toDateInputValue,
   isIdentified,
   toDeviceDoc,
   toggleItemFailure,
@@ -170,5 +172,34 @@ describe("confirmação obrigatória do IMEI", () => {
     const confirmed = setConfirmation({}, "imei", true);
     expect(computeStats(confirmed).done).toBe(0);
     expect(describeFailures(toggleSectionResult(confirmed, "sistema", "fail"))).toEqual(["Sistema"]);
+  });
+});
+
+describe("toDateInputValue", () => {
+  it("formats the local date for the date input", () => {
+    expect(toDateInputValue(new Date(2026, 9, 8, 23, 59))).toBe("2026-10-08");
+    expect(toDateInputValue(new Date(2026, 0, 5, 0, 1))).toBe("2026-01-05");
+  });
+});
+
+describe("latestReleasingId", () => {
+  const rec = (id: string, atualizado: string, status: "liberado" | "reprovado", fase: "pendente" | "concluido" = "concluido") => ({
+    id,
+    atualizado,
+    status,
+    fase,
+  });
+
+  it("is the last concluded checklist when it was released", () => {
+    expect(latestReleasingId([rec("a", "2026-10-08T09:00:00Z", "liberado"), rec("b", "2026-10-08T11:00:00Z", "liberado")])).toBe("b");
+  });
+
+  it("releases nothing when the last one to close failed", () => {
+    expect(latestReleasingId([rec("a", "2026-10-08T09:00:00Z", "liberado"), rec("b", "2026-10-08T11:00:00Z", "reprovado")])).toBeUndefined();
+  });
+
+  it("ignores pending checklists and works with no history", () => {
+    expect(latestReleasingId([rec("a", "2026-10-08T09:00:00Z", "liberado"), rec("p", "2026-10-08T12:00:00Z", "reprovado", "pendente")])).toBe("a");
+    expect(latestReleasingId([])).toBeUndefined();
   });
 });

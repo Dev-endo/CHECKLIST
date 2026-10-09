@@ -1,4 +1,6 @@
-import { ALL_SECTIONS, CHECKLIST, type ChecklistItem as CatalogItem } from "./checklist";
+import { catalogFor } from "./catalogs";
+import { ALL_SECTIONS, type ChecklistItem as CatalogItem, type ChecklistKind } from "./checklist";
+import type { Blame, Destination, Maintenance } from "./maintenance";
 
 /** Tópico do checklist (a unidade que recebe OK ou Falha). */
 export type ChecklistItem = (typeof ALL_SECTIONS)[number];
@@ -20,10 +22,21 @@ export interface DeviceDraft {
   tec: string;
   r: Results;
   fase: DevicePhase;
+  /** Qual checklist: manutenção ou montagem. */
+  tipo: ChecklistKind;
   /** asset_short_id do ativo, preenchido ao bipar um serial da planilha de ativos. */
   ativo?: string;
   /** Saúde da bateria em %; só guarda BATTERY_TARGET (caixa marcada) ou fica vazio. */
   bateria?: number;
+  /** Manutenções informadas ao concluir um checklist liberado. */
+  manutencoes?: Maintenance[];
+  /** Destino escolhido ao concluir um checklist liberado. */
+  destino?: Destination;
+  /** Montagem reprovada: de quem foi o erro e em quais peças. */
+  culpa?: Blame;
+  pecas?: Maintenance[];
+  /** Checklist de manutenção que liberou o aparelho para esta montagem. */
+  origem?: string;
   criado?: string;
   /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
   autor?: string;
@@ -42,6 +55,12 @@ export interface DeviceDoc {
   fase: DevicePhase;
   ativo?: string;
   bateria?: number;
+  manutencoes?: Maintenance[];
+  destino?: Destination;
+  tipo?: ChecklistKind;
+  culpa?: Blame;
+  pecas?: Maintenance[];
+  origem?: string;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -65,6 +84,12 @@ export interface DeviceStats {
 /** Total de tópicos a marcar. */
 export const TOTAL_TESTS = ALL_SECTIONS.length;
 
+/** Total de tópicos do checklist do tipo informado. */
+/** Tópicos que recebem OK ou Falha (os que só têm caixa de confirmação não entram). */
+const testedSections = (kind: ChecklistKind) => catalogFor(kind).filter((block) => !block.confirmOnly);
+
+export const totalTests = (kind: ChecklistKind = "manutencao"): number => testedSections(kind).length;
+
 /** "iPhone 14 128GB-2386" vira modelo "iPhone 14 128GB" e unit id "2386" (separa no último hífen). */
 export function splitAssetId(assetShortId: string): { model: string; code: string } {
   const cut = assetShortId.lastIndexOf("-");
@@ -76,8 +101,8 @@ export function newDeviceId(): string {
   return crypto.randomUUID();
 }
 
-export function blankDraft(tec = ""): DeviceDraft {
-  return { id: newDeviceId(), modelo: "", serial: "", tec, r: {}, fase: "pendente" };
+export function blankDraft(tec = "", kind: ChecklistKind = "manutencao"): DeviceDraft {
+  return { id: newDeviceId(), modelo: "", serial: "", tec, r: {}, fase: "pendente", tipo: kind };
 }
 
 export function draftFromRecord(record: DeviceRecord): DeviceDraft {
@@ -91,26 +116,38 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     fase: record.fase ?? "pendente",
     ativo: record.ativo,
     bateria: record.bateria,
+    manutencoes: record.manutencoes,
+    tipo: record.tipo ?? "manutencao",
+    destino: record.destino,
+    culpa: record.culpa,
+    pecas: record.pecas,
+    origem: record.origem,
     criado: record.criado,
     autor: record.autor,
     colaborador: record.colaborador,
   };
 }
 
-export function computeStats(results: Results = {}): DeviceStats {
-  const fails = ALL_SECTIONS.filter((item) => results[item.id] === "fail");
-  const pending = ALL_SECTIONS.filter((item) => !results[item.id]);
-  const done = TOTAL_TESTS - pending.length;
+export function computeStats(results: Results = {}, kind: ChecklistKind = "manutencao"): DeviceStats {
+  const sections = testedSections(kind);
+  const fails = sections.filter((item) => results[item.id] === "fail");
+  const pending = sections.filter((item) => !results[item.id]);
+  const done = sections.length - pending.length;
   const status: DeviceStatus = fails.length ? "reprovado" : pending.length ? "incompleto" : "liberado";
   return { done, fails, pending, status };
 }
 
 /** Marca ou desmarca o resultado de um tópico; sair de "Falha" limpa os itens apontados. */
-export function toggleSectionResult(results: Results, sectionId: string, result: TestResult): Results {
+export function toggleSectionResult(
+  results: Results,
+  sectionId: string,
+  result: TestResult,
+  kind: ChecklistKind = "manutencao",
+): Results {
   const next: TestResult | "" = results[sectionId] === result ? "" : result;
   const updated: Results = { ...results, [sectionId]: next };
   if (next !== "fail") {
-    for (const item of CHECKLIST.find((block) => block.id === sectionId)?.items ?? []) delete updated[item.id];
+    for (const item of catalogFor(kind).find((block) => block.id === sectionId)?.items ?? []) delete updated[item.id];
   }
   return updated;
 }
@@ -125,8 +162,8 @@ export function toggleItemFailure(results: Results, sectionId: string, itemId: s
 }
 
 /** Texto das falhas: "Tópico: item" para cada item apontado, ou só o tópico se nenhum foi apontado. */
-export function describeFailures(results: Results = {}): string[] {
-  return CHECKLIST.filter((block) => results[block.id] === "fail").flatMap((block) => {
+export function describeFailures(results: Results = {}, kind: ChecklistKind = "manutencao"): string[] {
+  return catalogFor(kind).filter((block) => results[block.id] === "fail").flatMap((block) => {
     const items = block.items.filter((item) => results[item.id] === "fail");
     return items.length ? items.map((item) => `${block.title}: ${item.title}`) : [block.title];
   });
@@ -147,8 +184,8 @@ export function setConfirmation(results: Results, itemId: string, checked: boole
 }
 
 /** Confirmações obrigatórias que ainda não foram marcadas; enquanto houver, não dá para concluir. */
-export function missingConfirmations(results: Results = {}): CatalogItem[] {
-  return CHECKLIST.flatMap((block) => block.items).filter(
+export function missingConfirmations(results: Results = {}, kind: ChecklistKind = "manutencao"): CatalogItem[] {
+  return catalogFor(kind).flatMap((block) => block.items).filter(
     (item) => item.field === "confirm" && !isConfirmed(results, item.id),
   );
 }
@@ -175,7 +212,7 @@ export function isPending(record: DeviceRecord): boolean {
 }
 
 export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
-  const stats = computeStats(draft.r);
+  const stats = computeStats(draft.r, draft.tipo);
   return {
     modelo: draft.modelo.trim(),
     serial: draft.serial.trim(),
@@ -184,8 +221,14 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     fase: draft.fase,
     ativo: draft.ativo,
     bateria: draft.bateria,
+    manutencoes: draft.manutencoes ?? [],
+    destino: draft.destino,
+    tipo: draft.tipo,
+    culpa: draft.culpa,
+    pecas: draft.pecas ?? [],
+    origem: draft.origem,
     status: stats.status,
-    falhas: describeFailures(draft.r),
+    falhas: describeFailures(draft.r, draft.tipo),
     testados: stats.done,
     criado: draft.criado ?? now,
     atualizado: now,
@@ -206,6 +249,13 @@ export function findDuplicate(draft: DeviceDraft, records: readonly DeviceRecord
   return matches.find(isPending) ?? matches[0];
 }
 
+/** Data local no formato do campo de data do navegador (YYYY-MM-DD). */
+export function toDateInputValue(date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 /** Mesmo dia no horário local de quem usa o app. */
 export function isSameLocalDay(iso: string | undefined, now = new Date()): boolean {
   if (!iso) return false;
@@ -213,6 +263,19 @@ export function isSameLocalDay(iso: string | undefined, now = new Date()): boole
   return (
     date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
   );
+}
+
+/**
+ * Dos checklists de UM serial, o que libera o aparelho: o último concluído, se estiver liberado.
+ * Se quem fechou por último reprovou, nenhum libera.
+ */
+export function latestReleasingId(history: readonly DeviceRecord[]): string | undefined {
+  const concluded = history.filter((r) => r.fase === "concluido" && r.tipo !== "montagem");
+  const last = concluded.reduce<DeviceRecord | undefined>(
+    (best, r) => (!best || (r.atualizado ?? "") >= (best.atualizado ?? "") ? r : best),
+    undefined,
+  );
+  return last?.status === "liberado" ? last.id : undefined;
 }
 
 export function matchesSearch(record: DeviceRecord, query: string): boolean {

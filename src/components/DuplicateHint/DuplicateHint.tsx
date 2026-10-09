@@ -4,7 +4,7 @@ import {
   hasContent,
   isIdentified,
   isPending,
-  TOTAL_TESTS,
+  totalTests,
   type DeviceDraft,
   type DeviceRecord,
 } from "../../domain/device";
@@ -24,11 +24,11 @@ export function DuplicateHint({ draft, records, onOpen, onRestart }: DuplicateHi
   const duplicate = findDuplicate(draft, records);
 
   if (duplicate && isPending(duplicate)) {
-    const { done } = computeStats(duplicate.r);
+    const { done } = computeStats(duplicate.r, duplicate.tipo);
     return (
       <div className={styles.hint}>
         <span>
-          Já existe um checklist <b>pendente</b> deste serial ({done}/{TOTAL_TESTS} tópicos,{" "}
+          Já existe um checklist <b>pendente</b> deste serial ({done}/{totalTests(duplicate.tipo)} tópicos,{" "}
           {formatDateTime(duplicate.atualizado)}). O salvamento deste aparelho fica pausado até você escolher.
         </span>
         <Button variant="small" onClick={() => onOpen(duplicate)}>

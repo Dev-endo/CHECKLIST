@@ -43,15 +43,21 @@ Com o Supabase configurado, o app só abre para quem entra com a **conta Google*
 (não há login por e-mail e senha). O papel de cada usuário fica em
 `public.profiles.role` (enum `user_role`):
 
-| Papel         | Faz e vê os próprios checklists | Vê os checklists de todos (filtro por data, colaborador e serial) | Atribui papéis |
-| ------------- | :-: | :-: | :-: |
-| `colaborador` | sim | não | não |
-| `supervisor`  | sim | sim, só leitura | não |
-| `admin`       | sim | sim, só leitura | sim (aba Administração) |
+| Papel         | Checklist de manutenção | Checklist de montagem | Registros e análise (todos) | Atribui papéis |
+| ------------- | :-: | :-: | :-: | :-: |
+| `tecnico`     | sim | não | não | não |
+| `montador`    | não | sim | não | não |
+| `supervisor`  | não | não | sim, só leitura | não |
+| `admin`       | sim | sim | sim | sim (aba Administração) |
+| `colaborador` | não | não | não | não (aguardando função) |
 
-Todo novo login entra como `colaborador`. Para já nascer com outro papel, cadastre
-o e-mail (minúsculo) em `public.role_presets`; o trigger aplica no primeiro login.
-O admin inicial é `lucasdosanjos1830@gmail.com`.
+Só entram e-mails `@allugator.com` (trigger `enforce_email_domain`). Todo novo login
+entra como `colaborador` ("Sem função") e o admin define o papel na aba Administração.
+O checklist de manutenção libera o aparelho **para montagem** (a única liberação) ou o envia **para vidro** (continua em manutenção); o de montagem
+só aceita seriais liberados para montagem pelo último checklist de manutenção. Se a
+montagem reprova, informa-se a peça e se o erro foi de montagem (conta para o montador)
+ou de manutenção (conta para o técnico que liberou). Os dois checklists usam a tabela
+`devices` (coluna `kind`); as análises ficam na aba Registros > Análise.
 
 #### Configuração única no Supabase
 

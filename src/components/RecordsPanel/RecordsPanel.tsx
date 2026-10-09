@@ -9,9 +9,11 @@ interface RecordsPanelProps {
   currentId: string;
   onOpen: (record: DeviceRecord) => void;
   onRestart: (record: DeviceRecord) => void;
+  /** Checklists que deixaram o aparelho liberado para montagem. */
+  releasedIds?: ReadonlySet<string>;
 }
 
-export function RecordsPanel({ records, loaded, currentId, onOpen, onRestart }: RecordsPanelProps) {
+export function RecordsPanel({ records, loaded, currentId, onOpen, onRestart, releasedIds }: RecordsPanelProps) {
   const [query, setQuery] = useState("");
   // Sem busca, só o que foi mexido hoje; digitando, procura em todos os aparelhos.
   const searching = query.trim() !== "";
@@ -34,6 +36,7 @@ export function RecordsPanel({ records, loaded, currentId, onOpen, onRestart }: 
         isCurrent={record.id === currentId}
         onOpen={onOpen}
         onRestart={onRestart}
+        released={releasedIds?.has(record.id)}
       />
     ));
 

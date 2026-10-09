@@ -9,8 +9,10 @@ interface ChecklistSectionProps {
   results: Results;
   onToggle: (sectionId: string, result: TestResult) => void;
   onToggleItem: (sectionId: string, itemId: string) => void;
+  /** Em "Falha", deixa apontar qual item falhou (só na manutenção). */
+  allowPointing?: boolean;
   battery?: number;
-  onBatteryChange: (value: number | undefined) => void;
+  onBatteryChange?: (value: number | undefined) => void;
   onConfirm: (itemId: string, checked: boolean) => void;
   disabled?: boolean;
 }
@@ -26,6 +28,7 @@ export function ChecklistSection({
   results,
   onToggle,
   onToggleItem,
+  allowPointing = true,
   battery,
   onBatteryChange,
   onConfirm,
@@ -41,13 +44,13 @@ export function ChecklistSection({
           {block.title}
         </h2>
       </div>
-      {result === "fail" && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
+      {result === "fail" && allowPointing && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
       {block.items.map((item) => (
         <ChecklistItemRow
           key={item.id}
           item={item}
           sectionId={block.id}
-          selectable={result === "fail"}
+          selectable={result === "fail" && allowPointing}
           failed={results[item.id] === "fail"}
           disabled={disabled}
           onToggleFail={onToggleItem}
@@ -57,6 +60,7 @@ export function ChecklistSection({
           onConfirmChange={item.field === "confirm" ? (checked) => onConfirm(item.id, checked) : undefined}
         />
       ))}
+      {!block.confirmOnly && (
       <div className={styles.footer}>
         <span className={styles.footerLabel}>Resultado do tópico</span>
         <div className={styles.buttons}>
@@ -75,6 +79,7 @@ export function ChecklistSection({
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }

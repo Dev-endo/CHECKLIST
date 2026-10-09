@@ -1,7 +1,9 @@
 import type { DeviceDoc, DeviceRecord, Results } from "../../domain/device";
 import { RECORDS_LIMIT, type DeviceRepository } from "../deviceRepository";
 import type { AppSupabaseClient } from "./client";
-import type { Tables, TablesInsert } from "./database.types";
+import type { ChecklistKind } from "../../domain/checklist";
+import { parseBlame, parseDestination, parseMaintenances } from "../../domain/maintenance";
+import type { Json, Tables, TablesInsert } from "./database.types";
 
 type DeviceRow = Tables<"devices">;
 /** Linha com o perfil do dono, quando a consulta traz `profiles(...)`. */
@@ -19,6 +21,12 @@ export function toRecord(row: DeviceRowWithOwner): DeviceRecord {
     fase: row.phase,
     ativo: row.asset_short_id ?? undefined,
     bateria: row.battery_health ?? undefined,
+    manutencoes: parseMaintenances(row.maintenances),
+    destino: parseDestination(row.destination),
+    tipo: row.kind === "montagem" ? "montagem" : "manutencao",
+    culpa: parseBlame(row.blame),
+    pecas: parseMaintenances(row.faulty_parts),
+    origem: row.source_device_id ?? undefined,
     status: row.status,
     falhas: row.failed_items,
     testados: row.tested_count,
@@ -38,6 +46,12 @@ function toRow(id: string, userId: string, doc: DeviceDoc): TablesInsert<"device
     serial: doc.serial,
     asset_short_id: doc.ativo ?? null,
     battery_health: doc.bateria ?? null,
+    maintenances: (doc.manutencoes ?? []) as unknown as Json,
+    destination: doc.destino ?? null,
+    kind: doc.tipo ?? "manutencao",
+    blame: doc.culpa ?? null,
+    faulty_parts: (doc.pecas ?? []) as unknown as Json,
+    source_device_id: doc.origem ?? null,
     technician: doc.tec,
     results: doc.r,
     // O banco só aceita criar como pendente; concluir é um segundo passo.
@@ -69,6 +83,8 @@ export class SupabaseRepository implements DeviceRepository {
   constructor(
     private readonly client: AppSupabaseClient,
     private readonly userId: string,
+    /** Cada checklist (manutenção ou montagem) enxerga só os seus registros. */
+    private readonly checklistKind: ChecklistKind = "manutencao",
   ) {}
 
   subscribe(onChange: (records: DeviceRecord[]) => void, onError: (error: unknown) => void) {
@@ -86,6 +102,7 @@ export class SupabaseRepository implements DeviceRepository {
         .from(TABLE)
         .select("*")
         .eq("user_id", this.userId)
+        .eq("kind", this.checklistKind)
         .order("updated_at", { ascending: false })
         .limit(RECORDS_LIMIT);
       if (!active) return;
@@ -104,7 +121,7 @@ export class SupabaseRepository implements DeviceRepository {
         (payload) => {
           if (payload.eventType === "DELETE") {
             apply(records.filter((r) => r.id !== payload.old.id));
-          } else {
+          } else if (payload.new.kind === this.checklistKind) {
             apply(merge(records, [toRecord(payload.new)]));
           }
         },

@@ -45,6 +45,12 @@ export type Database = {
         Row: {
           asset_short_id: string | null
           battery_health: number | null
+          blame: string | null
+          destination: string | null
+          faulty_parts: Json
+          kind: string
+          maintenances: Json
+          source_device_id: string | null
           concluded_at: string | null
           created_at: string
           failed_items: string[]
@@ -62,6 +68,12 @@ export type Database = {
         Insert: {
           asset_short_id?: string | null
           battery_health?: number | null
+          blame?: string | null
+          destination?: string | null
+          faulty_parts?: Json
+          kind?: string
+          maintenances?: Json
+          source_device_id?: string | null
           concluded_at?: string | null
           created_at?: string
           failed_items?: string[]
@@ -79,6 +91,12 @@ export type Database = {
         Update: {
           asset_short_id?: string | null
           battery_health?: number | null
+          blame?: string | null
+          destination?: string | null
+          faulty_parts?: Json
+          kind?: string
+          maintenances?: Json
+          source_device_id?: string | null
           concluded_at?: string | null
           created_at?: string
           failed_items?: string[]
@@ -155,11 +173,33 @@ export type Database = {
         Args: { rows: Json }
         Returns: Json
       }
+      release_flags: {
+        Args: { p_ids: string[] }
+        Returns: { device_id: string; released: boolean }[]
+      }
+      assembly_source: {
+        Args: { p_serial: string }
+        Returns: {
+          device_id: string
+          destination: string | null
+          status: Database["public"]["Enums"]["device_status"]
+          technician: string
+          concluded_at: string | null
+        }[]
+      }
+      assembly_report: {
+        Args: { p_from?: string; p_to?: string; p_user?: string }
+        Returns: Json
+      }
+      maintenance_report: {
+        Args: { p_from?: string; p_to?: string; p_user?: string }
+        Returns: Json
+      }
     }
     Enums: {
       device_phase: "pendente" | "concluido"
       device_status: "incompleto" | "liberado" | "reprovado"
-      user_role: "admin" | "supervisor" | "colaborador"
+      user_role: "admin" | "supervisor" | "colaborador" | "tecnico" | "montador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -289,7 +329,7 @@ export const Constants = {
     Enums: {
       device_phase: ["pendente", "concluido"],
       device_status: ["incompleto", "liberado", "reprovado"],
-      user_role: ["admin", "supervisor", "colaborador"],
+      user_role: ["admin", "supervisor", "colaborador", "tecnico", "montador"],
     },
   },
 } as const

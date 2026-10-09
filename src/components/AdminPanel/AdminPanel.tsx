@@ -85,8 +85,9 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
           <h2>Usuários e acessos</h2>
         </div>
         <p className={styles.note}>
-          Quem entra com o Google começa como Colaborador. Supervisor e Administrador veem os checklists de todos; só o
-          Administrador altera papéis.
+          Quem entra com o Google começa Sem função e não acessa nada até você definir o papel. Técnico faz o checklist de
+          manutenção; Montador faz o checklist de montagem; Supervisor só consulta os registros. O Administrador acessa
+          tudo e é o único que altera papéis.
         </p>
         {body}
       </section>

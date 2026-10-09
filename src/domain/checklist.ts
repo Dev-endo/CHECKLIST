@@ -13,10 +13,15 @@ export interface ChecklistItem {
 export interface ChecklistBlock {
   id: string;
   title: string;
+  /** Só tem a caixa de confirmação: sem OK nem Falha, e não conta como tópico a testar. */
+  confirmOnly?: boolean;
   items: readonly ChecklistItem[];
 }
 
-const slug = (text: string) =>
+/** Qual checklist: o de manutenção (técnico) ou o de montagem (montador). */
+export type ChecklistKind = "manutencao" | "montagem";
+
+export const slug = (text: string) =>
   text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -30,7 +35,6 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
     items: [
       { id: "tela-branca", title: "Tela branca, brilho máximo", details: "Procurar manchas, pontos claros, amarelado ou sombra nas bordas." },
       { id: "tela-preta", title: "Tela preta", failure: "linha ou pixel aceso." },
-      { id: "touch", title: "Arrastar um ícone pela tela toda", details: "Modo de edição, arrastar devagar por bordas, cantos e centro.", failure: "ícone solta sozinho." },
       { id: "teclado", title: "Digitar rápido no teclado", details: "Cobrir Q, P, espaço e apagar (extremidades)." },
       { id: "truetone", title: "True Tone e brilho automático", details: "True Tone aparece na Central de Controle; cobrir o topo baixa o brilho." },
       { id: "freeform", title: "Freeform", details: "Abrir o aplicativo, clicar no lápis no canto inferior esquerdo e rabiscar a tela inteira." },
@@ -89,7 +93,11 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
   },
 ];
 
-export const CHECKLIST: readonly ChecklistBlock[] = BLOCKS.map((block) => ({ ...block, id: slug(block.title) }));
+/** Dá a cada tópico um id estável, a partir do título. */
+export const buildCatalog = (blocks: readonly Omit<ChecklistBlock, "id">[]): readonly ChecklistBlock[] =>
+  blocks.map((block) => ({ ...block, id: slug(block.title) }));
+
+export const CHECKLIST: readonly ChecklistBlock[] = buildCatalog(BLOCKS);
 
 /** Unidades que recebem resultado: os tópicos. */
 export const ALL_SECTIONS: readonly { id: string; title: string }[] = CHECKLIST.map(({ id, title }) => ({ id, title }));

@@ -2,10 +2,13 @@ import { ROLE_LABELS, type UserRole } from "../../domain/roles";
 import { Button } from "../Button/Button";
 import styles from "./AppHeader.module.css";
 
-export type AppTab = "checklist" | "registros" | "admin";
+import type { TabId } from "../../domain/roles";
+
+export type AppTab = TabId;
 
 const TAB_LABELS: Record<AppTab, string> = {
-  checklist: "Checklist",
+  checklist: "Checklist de manutenção",
+  montagem: "Checklist de montagem",
   registros: "Registros",
   admin: "Administração",
 };

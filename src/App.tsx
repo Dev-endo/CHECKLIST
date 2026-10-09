@@ -6,7 +6,9 @@ import { Checklist } from "./components/Checklist/Checklist";
 import { DeviceForm } from "./components/DeviceForm/DeviceForm";
 import { DuplicateHint } from "./components/DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "./components/RecordsPanel/RecordsPanel";
-import { ReviewPanel } from "./components/ReviewPanel/ReviewPanel";
+import { AssemblyChecklist } from "./components/AssemblyChecklist/AssemblyChecklist";
+import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
+import { ReviewSection } from "./components/ReviewSection/ReviewSection";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useToast } from "./components/Toast/ToastProvider";
 import {
@@ -20,10 +22,12 @@ import {
   splitAssetId,
   type DeviceRecord,
 } from "./domain/device";
-import { canManageUsers, canReviewAll } from "./domain/roles";
+import type { Destination, Maintenance } from "./domain/maintenance";
+import { accessibleTabs } from "./domain/roles";
 import { useAutosave } from "./hooks/useAutosave";
 import { useDeviceDraft } from "./hooks/useDeviceDraft";
 import { useDeviceRecords } from "./hooks/useDeviceRecords";
+import { useReleasedIds } from "./hooks/useReleasedIds";
 import { useRepository } from "./hooks/useRepository";
 import { preferences } from "./services/preferences";
 import { lookupAsset } from "./services/supabase/assetsService";
@@ -35,6 +39,7 @@ export default function App() {
   const userId = user?.id ?? "";
   const repository = useRepository(userId);
   const { records, loaded, failed } = useDeviceRecords(repository);
+  const releasedIds = useReleasedIds(client, records);
   const {
     draft,
     revision,
@@ -53,8 +58,12 @@ export default function App() {
 
   // missing: o serial não está na planilha de ativos (segue permitido, só avisa).
   const [assetState, setAssetState] = useState<"idle" | "found" | "missing">("idle");
-  const [tab, setTab] = useState<AppTab>("checklist");
+  // Cada papel abre na primeira aba a que tem acesso (sem login, no modo local, só há o checklist).
+  const allowedTabs: AppTab[] = user ? accessibleTabs(user.role) : ["checklist"];
+  const [tab, setTab] = useState<AppTab>(allowedTabs[0] ?? "checklist");
   const [concluding, setConcluding] = useState(false);
+  // Checklist com tudo OK: antes de concluir, pergunta as manutenções realizadas.
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
 
   // Pendente do próprio usuário pode ser alterado; concluído e de outros, só consulta.
   const editable = isEditable(draft, userId);
@@ -102,10 +111,10 @@ export default function App() {
     onCreated: markCreated,
   });
 
-  const tabs: AppTab[] = ["checklist"];
-  if (client && user && canReviewAll(user.role)) tabs.push("registros");
-  if (client && user && canManageUsers(user.role)) tabs.push("admin");
-  const activeTab = tabs.includes(tab) ? tab : "checklist";
+  // Quem só consulta (supervisor) vê o checklist de manutenção aberto a partir do registro, só leitura.
+  const tabs: AppTab[] = tab === "checklist" && !allowedTabs.includes("checklist") && allowedTabs.length ? ["checklist", ...allowedTabs] : allowedTabs;
+  const activeTab: AppTab | undefined = tabs.includes(tab) ? tab : tabs[0];
+  const noAccess = tabs.length === 0;
 
   const handleOpen = useCallback(
     (record: DeviceRecord) => {
@@ -152,9 +161,18 @@ export default function App() {
     ) {
       return;
     }
+    if (computeStats(draft.r).status === "liberado") {
+      setMaintenanceOpen(true);
+      return;
+    }
+    await finishConclude([]);
+  };
+
+  const finishConclude = async (maintenances: Maintenance[], destino?: Destination) => {
     setConcluding(true);
-    const ok = await conclude(draft);
+    const ok = await conclude({ ...draft, manutencoes: maintenances, destino });
     setConcluding(false);
+    setMaintenanceOpen(false);
     if (ok) {
       startNew();
       window.scrollTo(0, 0);
@@ -186,19 +204,22 @@ export default function App() {
 
   return (
     <>
-      <AppHeader tabs={tabs} active={activeTab} onChange={setTab} user={user} onSignOut={() => void signOut()} />
+      <AppHeader tabs={tabs} active={activeTab ?? "checklist"} onChange={setTab} user={user} onSignOut={() => void signOut()} />
 
       <main className={styles.wrap}>
-        {activeTab === "registros" && client && <ReviewPanel client={client} onOpen={handleOpen} />}
+        {noAccess && (
+          <div className={styles.banner} role="alert">
+            Seu acesso ainda não foi liberado. Peça ao administrador para definir o seu papel.
+          </div>
+        )}
+        {activeTab === "montagem" && <AssemblyChecklist />}
+        {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 
         {activeTab === "checklist" && (
           <>
             <header>
-              <h1 className={styles.title}>Checklist de testes · iPhone</h1>
-              <p className={styles.subtitle}>
-                Testes funcionais com o aparelho aberto. Marque OK ou Falha em cada tópico; qualquer falha reprova.
-              </p>
+              <h1 className={styles.title}>Checklist de manutenção · iPhone</h1>
               <DeviceForm
                 draft={draft}
                 onChange={setField}
@@ -234,6 +255,7 @@ export default function App() {
               currentId={draft.id}
               onOpen={handleOpen}
               onRestart={handleRestart}
+              releasedIds={releasedIds}
             />
 
             <p className={styles.note}>
@@ -256,6 +278,12 @@ export default function App() {
           onNewDevice={handleNew}
         />
       )}
+      <MaintenanceDialog
+        open={maintenanceOpen}
+        busy={concluding}
+        onCancel={() => setMaintenanceOpen(false)}
+        onConfirm={(maintenances, destination) => void finishConclude(maintenances, destination)}
+      />
     </>
   );
 }

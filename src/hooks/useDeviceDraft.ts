@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useReducer } from "react";
+import type { ChecklistKind } from "../domain/checklist";
 import {
   blankDraft,
   draftFromRecord,
@@ -37,7 +38,7 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
     case "setField":
       return { draft: { ...state.draft, [action.field]: action.value }, revision: state.revision + 1 };
     case "toggleResult": {
-      const r = toggleSectionResult(state.draft.r, action.sectionId, action.result);
+      const r = toggleSectionResult(state.draft.r, action.sectionId, action.result, state.draft.tipo);
       return { draft: { ...state.draft, r }, revision: state.revision + 1 };
     }
     case "toggleItemFail": {
@@ -65,13 +66,13 @@ function draftReducer(state: DraftState, action: DraftAction): DraftState {
   }
 }
 
-function initState(tec: string): DraftState {
-  return { draft: blankDraft(tec), revision: 0 };
+function initState({ tec, kind }: { tec: string; kind: ChecklistKind }): DraftState {
+  return { draft: blankDraft(tec, kind), revision: 0 };
 }
 
 /** `defaultTec`: técnico dos checklists novos (o usuário logado, ou o último digitado no modo local). */
-export function useDeviceDraft(defaultTec: string) {
-  const [{ draft, revision }, dispatch] = useReducer(draftReducer, defaultTec, initState);
+export function useDeviceDraft(defaultTec: string, kind: ChecklistKind = "manutencao") {
+  const [{ draft, revision }, dispatch] = useReducer(draftReducer, { tec: defaultTec, kind }, initState);
 
   const rememberEdit = useCallback((id: string, tec: string) => {
     preferences.setCurrentDeviceId(id);
@@ -129,10 +130,10 @@ export function useDeviceDraft(defaultTec: string) {
   }, []);
 
   const startNew = useCallback(() => {
-    const next = blankDraft(defaultTec);
+    const next = blankDraft(defaultTec, kind);
     dispatch({ type: "replace", draft: next });
     preferences.setCurrentDeviceId(next.id);
-  }, [defaultTec]);
+  }, [defaultTec, kind]);
 
   const applyAsset = useCallback((ativo: string, modelo: string) => {
     dispatch({ type: "applyAsset", ativo, modelo });

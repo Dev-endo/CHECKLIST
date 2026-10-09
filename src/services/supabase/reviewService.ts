@@ -29,6 +29,7 @@ export async function fetchReviewRecords(client: AppSupabaseClient, filters: Rev
   let query = client
     .from("devices")
     .select("*, profiles(name, email)", { count: "exact" })
+    .eq("kind", "manutencao")
     .order("created_at", { ascending: false })
     .limit(REVIEW_LIMIT);
 

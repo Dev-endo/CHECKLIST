@@ -1,4 +1,5 @@
-import { computeStats, describeFailures, isPending, splitAssetId, TOTAL_TESTS, type DeviceRecord } from "../../domain/device";
+import { computeStats, describeFailures, isPending, splitAssetId, totalTests, type DeviceRecord } from "../../domain/device";
+import { describeMaintenance, destinationLabel } from "../../domain/maintenance";
 import { formatDateTime } from "../../utils/format";
 import { Button } from "../Button/Button";
 import styles from "./RecordsPanel.module.css";
@@ -11,21 +12,31 @@ interface RecordRowProps {
   onRestart?: (record: DeviceRecord) => void;
   /** Mostra quem fez o checklist (consulta de supervisor e admin). */
   showOwner?: boolean;
+  /** Este checklist deixou o aparelho liberado para montagem (último concluído do serial). */
+  released?: boolean;
+  /** Abre o histórico do serial (consulta de supervisor e admin). */
+  onHistory?: (record: DeviceRecord) => void;
 }
 
-export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = false }: RecordRowProps) {
-  const stats = computeStats(record.r);
+export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = false, released = false, onHistory }: RecordRowProps) {
+  const stats = computeStats(record.r, record.tipo);
   const pending = isPending(record);
-  const failures = describeFailures(record.r);
+  const failures = describeFailures(record.r, record.tipo);
   // O técnico já é o nome do usuário; o colaborador só aparece se for outra pessoa.
   const sameName = (a?: string, b?: string) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
   const showCollaborator = Boolean(record.colaborador) && !sameName(record.colaborador, record.tec);
   const badge =
     stats.status === "liberado"
-      ? { className: styles.ok, label: "Liberado" }
+      ? record.destino === "vidro"
+        ? // Vidro não é liberação: o aparelho segue em manutenção.
+          { className: styles.pending, label: destinationLabel("vidro") }
+        : {
+            className: released && record.destino === "montagem" ? `${styles.ok} ${styles.assembly}` : styles.ok,
+            label: record.destino ? destinationLabel(record.destino) : "Liberado",
+          }
       : stats.status === "reprovado"
         ? { className: styles.fail, label: `Reprovado · ${stats.fails.length}` }
-        : { className: undefined, label: `${stats.done}/${TOTAL_TESTS}` };
+        : { className: undefined, label: `${stats.done}/${totalTests(record.tipo)}` };
 
   return (
     <div className={[styles.row, isCurrent && styles.current].filter(Boolean).join(" ")}>
@@ -47,6 +58,9 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
             ))}
           </ul>
         )}
+        {record.manutencoes && record.manutencoes.length > 0 && (
+          <p className={styles.maintenances}>Manutenções: {record.manutencoes.map(describeMaintenance).join(" · ")}</p>
+        )}
       </div>
       <span className={[styles.badge, pending && styles.pending].filter(Boolean).join(" ")}>
         {pending ? "Pendente" : "Concluído"}
@@ -59,6 +73,11 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
           <Button variant="small" onClick={() => onOpen(record)}>
             {pending && onRestart ? "Retomar" : "Abrir"}
           </Button>
+          {onHistory && record.serial && (
+            <Button variant="small" onClick={() => onHistory(record)}>
+              Histórico
+            </Button>
+          )}
           {pending && onRestart && (
             <Button variant="small" onClick={() => onRestart(record)}>
               Reiniciar
