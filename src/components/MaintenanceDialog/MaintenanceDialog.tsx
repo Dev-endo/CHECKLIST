@@ -48,6 +48,10 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
     if (!open && element.open) element.close();
   }, [open]);
 
+  // Com Face ID com defeito (uma recusa), "enviar para análise técnica" também é um destino.
+  const destinations: readonly { id: Destination; label: string }[] = faceIdDefect
+    ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }]
+    : DESTINATIONS;
   const placa = selected.find((m) => m.item === PLACA_ITEM);
   const complete = isMaintenanceComplete(selected);
   // Ou marca as manutenções feitas, ou diz que nenhuma foi executada.
@@ -72,7 +76,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
           : "Marque o que foi feito neste aparelho, ou marque que nenhuma manutenção foi executada."}</p>
       {faceIdDefect && (
         <p className={styles.notice}>
-          Face ID com defeito: o aparelho não é reprovado. Ele segue para a montagem e depois para laudo e revenda.
+          Face ID com defeito: o aparelho não é reprovado. Ele segue para a montagem e depois para laudo e revenda, ou você pode enviá-lo para análise técnica.
         </p>
       )}
 
@@ -143,7 +147,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
         <>
           <fieldset className={styles.destination} disabled={busy}>
             <legend>Para onde o aparelho vai?</legend>
-            {DESTINATIONS.map(({ id, label }) => (
+            {destinations.map(({ id, label }) => (
               <label key={id} className={styles.option}>
                 <input type="radio" name="destination" checked={destination === id} onChange={() => setDestination(id)} />
                 <span>{label}</span>
@@ -151,7 +155,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
             ))}
           </fieldset>
           <p className={styles.help}>
-            Só "Liberado para montagem" tira o aparelho da manutenção. Enviado para vidro, ele continua em manutenção.
+            Só "Liberado para montagem" tira o aparelho da manutenção. Enviado para vidro ou para análise técnica, ele continua em manutenção.
           </p>
         </>
       )}
