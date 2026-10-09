@@ -66,6 +66,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
         {pending ? "Pendente" : "Concluído"}
       </span>
       <span className={[styles.badge, badge.className].filter(Boolean).join(" ")}>{badge.label}</span>
+      {record.destino === "analise" && <span className={[styles.badge, styles.pending].join(" ")}>Análise técnica</span>}
       {hasFaceIdDefect(record.r, record.tipo) && <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>}
       {isCurrent ? (
         <span className={styles.meta}>aberto</span>

@@ -39,7 +39,8 @@ export const PLACA_ITEM = "Placa";
 export const PLACA_SERVICES: readonly string[] = [];
 
 /** Para onde o aparelho vai depois da manutenção, quando o checklist sai todo OK. */
-export type Destination = "montagem" | "vidro";
+/** "analise": checklist reprovado enviado para análise técnica (sem isso, continua em manutenção). */
+export type Destination = "montagem" | "vidro" | "analise";
 
 export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "montagem", label: "Liberado para montagem" },
@@ -47,12 +48,16 @@ export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "vidro", label: "Enviado para vidro" },
 ];
 
+/** Escolha de um checklist reprovado que segue para análise técnica. */
+export const ANALYSIS_LABEL = "Enviado para análise técnica";
+
 export function destinationLabel(destination: Destination): string {
+  if (destination === "analise") return ANALYSIS_LABEL;
   return DESTINATIONS.find((d) => d.id === destination)?.label ?? destination;
 }
 
 export function parseDestination(value: unknown): Destination | undefined {
-  return value === "montagem" || value === "vidro" ? value : undefined;
+  return value === "montagem" || value === "vidro" || value === "analise" ? value : undefined;
 }
 
 /** De quem foi o erro de um aparelho reprovado na montagem. */

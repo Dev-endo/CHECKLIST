@@ -100,5 +100,6 @@ describe("describeAssemblyBlock", () => {
     expect(describeAssemblyBlock(null)).toMatch(/não passou/);
     expect(describeAssemblyBlock({ ...ok, status: "reprovado" })).toMatch(/não o liberou/);
     expect(describeAssemblyBlock({ ...ok, destination: "vidro" })).toMatch(/vidro/);
+    expect(describeAssemblyBlock({ ...ok, status: "reprovado", destination: "analise" })).toMatch(/análise técnica/);
   });
 });

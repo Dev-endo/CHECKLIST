@@ -162,7 +162,8 @@ export default function App() {
     ) {
       return;
     }
-    if (computeStats(draft.r).status === "liberado") {
+    const outcome = computeStats(draft.r, draft.tipo).status;
+    if (outcome === "liberado" || outcome === "reprovado") {
       setMaintenanceOpen(true);
       return;
     }
@@ -283,6 +284,7 @@ export default function App() {
         open={maintenanceOpen}
         busy={concluding}
         faceIdDefect={hasFaceIdDefect(draft.r, draft.tipo)}
+        rejected={computeStats(draft.r, draft.tipo).status === "reprovado"}
         onCancel={() => setMaintenanceOpen(false)}
         onConfirm={(maintenances, destination) => void finishConclude(maintenances, destination)}
       />

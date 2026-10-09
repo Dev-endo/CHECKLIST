@@ -21,6 +21,7 @@ export async function fetchAssemblySource(client: AppSupabaseClient, serial: str
 /** O aparelho pode ser montado? Só se o último checklist de manutenção o liberou para montagem. */
 export function describeAssemblyBlock(source: AssemblySource | null): string | null {
   if (!source) return "Este aparelho não passou pelo checklist de manutenção.";
+  if (source.destination === "analise") return "Este aparelho foi enviado para análise técnica.";
   if (source.status !== "liberado") return "O último checklist de manutenção deste aparelho não o liberou.";
   if (source.destination !== "montagem") return "Este aparelho foi enviado para vidro e ainda está em manutenção.";
   return null;

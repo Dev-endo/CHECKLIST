@@ -64,6 +64,8 @@ describe("destino", () => {
     expect(destinationLabel("montagem")).toBe("Liberado para montagem");
     expect(destinationLabel("vidro")).toBe("Enviado para vidro");
     expect(parseDestination("vidro")).toBe("vidro");
+    expect(parseDestination("analise")).toBe("analise");
+    expect(destinationLabel("analise")).toBe("Enviado para análise técnica");
     expect(parseDestination("outro")).toBeUndefined();
     expect(parseDestination(null)).toBeUndefined();
   });

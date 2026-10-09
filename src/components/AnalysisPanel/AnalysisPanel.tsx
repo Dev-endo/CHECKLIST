@@ -155,6 +155,7 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
         <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
         <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens" />
         <Stat label="Liberados para revenda" value={report.releasedResale} hint="Face ID com defeito: laudo e revenda" />
+        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
         <Stat label="Checklists de manutenção concluídos" value={report.checklists} />
       </div>
       {assembly === "error" && (
@@ -180,6 +181,7 @@ function MaintenancesView({ report }: { report: MaintenanceReport }) {
         <Stat label="Ativos com manutenção" value={report.assetsWithMaintenance} />
         <Stat label="Manutenções feitas" value={report.maintenancesTotal} hint="soma de todos os itens" />
         <Stat label="Enviados para vidro" value={report.releasedGlass} hint="continuam em manutenção" />
+        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Manutenções por tipo</h3>

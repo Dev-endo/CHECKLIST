@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  ANALYSIS_LABEL,
   DESTINATIONS,
   isMaintenanceComplete,
   MAINTENANCE_ITEMS,
@@ -17,18 +18,22 @@ interface MaintenanceDialogProps {
   open: boolean;
   busy?: boolean;
   onCancel: () => void;
-  onConfirm: (maintenances: Maintenance[], destination: Destination) => void;
+  onConfirm: (maintenances: Maintenance[], destination?: Destination) => void;
   /** Face ID com defeito: o aparelho segue para a montagem e depois para laudo e revenda. */
   faceIdDefect?: boolean;
+  /** Checklist reprovado: marca as manutenções feitas e, se quiser, envia para análise técnica. */
+  rejected?: boolean;
 }
 
 /** Aparece ao concluir um checklist com tudo OK: quais manutenções foram feitas no aparelho. */
-export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, faceIdDefect = false }: MaintenanceDialogProps) {
+export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, faceIdDefect = false, rejected = false }: MaintenanceDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState<Maintenance[]>([]);
   // Escolha explícita de que nenhuma manutenção foi executada.
   const [none, setNone] = useState(false);
   const [destination, setDestination] = useState<Destination | undefined>();
+  // Só no checklist reprovado: envia o aparelho para análise técnica.
+  const [analysis, setAnalysis] = useState(false);
 
   useEffect(() => {
     const element = dialog.current;
@@ -36,6 +41,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
     if (open && !element.open) {
       setSelected([]);
       setNone(false);
+      setAnalysis(false);
       setDestination(undefined);
       element.showModal();
     }
@@ -61,7 +67,9 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       <h2 id="maintenance-title" className={styles.title}>
         Manutenções realizadas
       </h2>
-      <p className={styles.help}>Marque o que foi feito neste aparelho, ou marque que nenhuma manutenção foi executada.</p>
+      <p className={styles.help}>{rejected
+          ? "Aparelho reprovado. Marque as manutenções feitas (ou nenhuma) e, se for o caso, envie para análise técnica."
+          : "Marque o que foi feito neste aparelho, ou marque que nenhuma manutenção foi executada."}</p>
       {faceIdDefect && (
         <p className={styles.notice}>
           Face ID com defeito: o aparelho não é reprovado. Ele segue para a montagem e depois para laudo e revenda.
@@ -126,24 +134,39 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
         </label>
       )}
 
-      <fieldset className={styles.destination} disabled={busy}>
-        <legend>Para onde o aparelho vai?</legend>
-        {DESTINATIONS.map(({ id, label }) => (
-          <label key={id} className={styles.option}>
-            <input type="radio" name="destination" checked={destination === id} onChange={() => setDestination(id)} />
-            <span>{label}</span>
-          </label>
-        ))}
-      </fieldset>
-      <p className={styles.help}>
-        Só "Liberado para montagem" tira o aparelho da manutenção. Enviado para vidro, ele continua em manutenção.
-      </p>
+      {rejected ? (
+        <label className={[styles.option, styles.none].join(" ")}>
+          <input type="checkbox" checked={analysis} disabled={busy} onChange={(e) => setAnalysis(e.target.checked)} />
+          <span>Enviar para análise técnica</span>
+        </label>
+      ) : (
+        <>
+          <fieldset className={styles.destination} disabled={busy}>
+            <legend>Para onde o aparelho vai?</legend>
+            {DESTINATIONS.map(({ id, label }) => (
+              <label key={id} className={styles.option}>
+                <input type="radio" name="destination" checked={destination === id} onChange={() => setDestination(id)} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <p className={styles.help}>
+            Só "Liberado para montagem" tira o aparelho da manutenção. Enviado para vidro, ele continua em manutenção.
+          </p>
+        </>
+      )}
+      {rejected && !analysis && (
+        <p className={styles.help}>Sem "{ANALYSIS_LABEL}", o aparelho reprovado continua em manutenção.</p>
+      )}
 
       <div className={styles.actions}>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
           Voltar
         </Button>
-        <Button onClick={() => destination && onConfirm(selected, destination)} disabled={busy || !complete || !chosen || !destination}>
+        <Button
+          onClick={() => onConfirm(selected, rejected ? (analysis ? "analise" : undefined) : destination)}
+          disabled={busy || !complete || !chosen || (!rejected && !destination)}
+        >
           {busy ? "Concluindo…" : "Concluir checklist"}
         </Button>
       </div>
@@ -151,7 +174,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       {complete && !chosen && (
         <p className={styles.warn}>Marque as manutenções feitas ou "Nenhuma manutenção executada".</p>
       )}
-      {complete && chosen && !destination && <p className={styles.warn}>Escolha para onde o aparelho vai.</p>}
+      {complete && chosen && !rejected && !destination && <p className={styles.warn}>Escolha para onde o aparelho vai.</p>}
     </dialog>
   );
 }
