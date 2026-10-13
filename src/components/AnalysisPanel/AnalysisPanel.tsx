@@ -154,8 +154,7 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
         <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
         <Stat label="Liberados para vidro" value={report.releasedGlass} hint="pela manutenção; cada liberação conta" />
         <Stat label="Liberados para bloqueio" value={found?.releasedBlock ?? 0} hint="pela montagem; serial = 1 ativo" />
-        <Stat label="Liberados para laudo" value={found?.releasedReport ?? 0} hint="pela montagem; serial = 1 ativo" />
-        <Stat label="Aparelhos que foram para montagem" value={found?.checklists ?? 0} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
+        <Stat label="Aparelhos montados" value={found?.checklists ?? 0} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
         <Stat label="Ativos liberados" value={found?.released ?? 0} hint="aprovados na montagem, serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
         <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens" />
@@ -236,10 +235,9 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Aparelhos que foram para montagem" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
+        <Stat label="Aparelhos montados" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
         <Stat label="Liberados na montagem" value={assembly.released} hint="serial = 1 ativo" />
         <Stat label="Liberados para bloqueio" value={assembly.releasedBlock} hint="serial = 1 ativo" />
-        <Stat label="Liberados para laudo" value={assembly.releasedReport} hint="serial = 1 ativo" />
         <Stat label="Retorno para manutenção" value={assembly.returnedMaintenance} hint="reprovados na montagem; serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
       </div>
