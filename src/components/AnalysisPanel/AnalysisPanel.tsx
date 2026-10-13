@@ -150,6 +150,9 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
   return (
     <>
       <div className={styles.stats}>
+        <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
+        <Stat label="Liberados para bloqueio" value={found?.releasedBlock ?? 0} hint="pela montagem; serial = 1 ativo" />
+        <Stat label="Liberados para laudo" value={found?.releasedReport ?? 0} hint="pela montagem; serial = 1 ativo" />
         <Stat label="Aparelhos que foram para montagem" value={found?.checklists ?? 0} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
         <Stat label="Ativos liberados" value={found?.released ?? 0} hint="aprovados na montagem, serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
