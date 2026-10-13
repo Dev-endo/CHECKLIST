@@ -41,7 +41,7 @@ export const PLACA_SERVICES: readonly string[] = [];
 /** Para onde o aparelho vai depois da manutenção, quando o checklist sai todo OK. */
 /** "analise": checklist reprovado enviado para análise técnica (sem isso, continua em manutenção). */
 /** "bloqueio" e "laudo": para onde segue uma montagem aprovada. */
-export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "laudo";
+export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "laudo" | "manutencao";
 
 export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "montagem", label: "Liberado para montagem" },
@@ -55,11 +55,18 @@ export const ASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[
   { id: "laudo", label: "Liberado para laudo" },
 ];
 
+/** Direcionamento ao reprovar uma montagem. */
+export const ASSEMBLY_REJECT_DESTINATIONS: readonly { id: Destination; label: string }[] = [
+  { id: "analise", label: "Liberado para análise técnica" },
+  { id: "manutencao", label: "Retorno para manutenção" },
+];
+
 /** Escolha de um checklist reprovado que segue para análise técnica. */
 export const ANALYSIS_LABEL = "Enviado para análise técnica";
 
 export function destinationLabel(destination: Destination): string {
   if (destination === "analise") return ANALYSIS_LABEL;
+  if (destination === "manutencao") return "Retorno para manutenção";
   return [...DESTINATIONS, ...ASSEMBLY_DESTINATIONS].find((d) => d.id === destination)?.label ?? destination;
 }
 
@@ -68,7 +75,8 @@ export function parseDestination(value: unknown): Destination | undefined {
     value === "vidro" ||
     value === "analise" ||
     value === "bloqueio" ||
-    value === "laudo"
+    value === "laudo" ||
+    value === "manutencao"
     ? value
     : undefined;
 }

@@ -20,10 +20,12 @@ interface StatusBarProps {
   mode: "edit" | "view";
   busy?: boolean;
   onConclude: () => void;
+  /** Reprovar direto, sem precisar marcar falha nos tópicos (montagem). */
+  onReject?: () => void;
   onNewDevice: () => void;
 }
 
-export function StatusBar({ kind = "manutencao", results, saveState, mode, busy = false, onConclude, onNewDevice }: StatusBarProps) {
+export function StatusBar({ kind = "manutencao", results, saveState, mode, busy = false, onConclude, onReject, onNewDevice }: StatusBarProps) {
   const total = totalTests(kind);
   const { done, fails, status, faceIdDefect } = computeStats(results, kind);
 
@@ -62,9 +64,16 @@ export function StatusBar({ kind = "manutencao", results, saveState, mode, busy 
         </div>
         <div className={styles.actions}>
           {mode === "edit" ? (
-            <Button onClick={onConclude} disabled={busy}>
-              {busy ? "Concluindo…" : "Concluir"}
-            </Button>
+            <>
+              {onReject && (
+                <Button variant="danger" onClick={onReject} disabled={busy}>
+                  Reprovar
+                </Button>
+              )}
+              <Button onClick={onConclude} disabled={busy}>
+                {busy ? "Concluindo…" : "Concluir"}
+              </Button>
+            </>
           ) : (
             <Button variant="ghost" onClick={onNewDevice}>
               Novo checklist

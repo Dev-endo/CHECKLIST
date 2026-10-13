@@ -103,3 +103,28 @@ describe("describeAssemblyBlock", () => {
     expect(describeAssemblyBlock({ ...ok, status: "reprovado", destination: "analise" })).toMatch(/análise técnica/);
   });
 });
+
+describe("reprovar na montagem", () => {
+  const allOk = () =>
+    Object.fromEntries(ASSEMBLY_CHECKLIST.filter((b) => !b.confirmOnly).map((b) => [b.id, "ok" as const]));
+
+  it("rejects even with every topic OK, and keeps the note", () => {
+    const draft = {
+      ...blankDraft("Ana", "montagem"),
+      r: allOk(),
+      reprovado: true,
+      observacao: "Tela soltou",
+      destino: "manutencao" as const,
+    };
+    expect(toDeviceDoc(draft, "2026-02-01T00:00:00.000Z")).toMatchObject({
+      status: "reprovado",
+      observacao: "Tela soltou",
+      destino: "manutencao",
+    });
+  });
+
+  it("is not rejected when the button was not used and the topics are OK", () => {
+    const draft = { ...blankDraft("Ana", "montagem"), r: allOk() };
+    expect(toDeviceDoc(draft, "2026-02-01T00:00:00.000Z").status).toBe("liberado");
+  });
+});

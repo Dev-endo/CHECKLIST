@@ -38,6 +38,9 @@ export interface AssemblyRejection {
   /** Tópicos reprovados e peças marcadas. */
   reasons: string[];
   parts: string[];
+  /** Para onde seguiu (analise ou manutencao) e a observação escrita. */
+  destination?: string | null;
+  note?: string | null;
 }
 
 export interface AssemblyReport {
@@ -48,6 +51,8 @@ export interface AssemblyReport {
   /** Aprovados que seguiram para bloqueio e para laudo (cada serial uma vez). */
   releasedBlock: number;
   releasedReport: number;
+  /** Reprovados na montagem que voltaram para a manutenção (cada serial uma vez). */
+  returnedMaintenance: number;
   rejected: number;
   byAssembler: { name: string; released: number; rejected: number }[];
   byPart: { part: string; count: number }[];
@@ -84,6 +89,7 @@ export async function fetchAssemblyReport(
     released: number;
     released_block?: number;
     released_report?: number;
+    returned_maintenance?: number;
     rejected: number;
     by_assembler: { name: string; released: number; rejected: number }[];
     by_part: { part: string; count: number }[];
@@ -94,6 +100,7 @@ export async function fetchAssemblyReport(
     released: raw.released,
     releasedBlock: raw.released_block ?? 0,
     releasedReport: raw.released_report ?? 0,
+    returnedMaintenance: raw.returned_maintenance ?? 0,
     rejected: raw.rejected,
     byAssembler: raw.by_assembler,
     byPart: raw.by_part,

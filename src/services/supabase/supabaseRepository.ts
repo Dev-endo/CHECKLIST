@@ -27,6 +27,7 @@ export function toRecord(row: DeviceRowWithOwner): DeviceRecord {
     culpa: parseBlame(row.blame),
     pecas: parseMaintenances(row.faulty_parts),
     origem: row.source_device_id ?? undefined,
+    observacao: row.notes ?? undefined,
     status: row.status,
     falhas: row.failed_items,
     testados: row.tested_count,
@@ -52,6 +53,7 @@ function toRow(id: string, userId: string, doc: DeviceDoc): TablesInsert<"device
     blame: doc.culpa ?? null,
     faulty_parts: (doc.pecas ?? []) as unknown as Json,
     source_device_id: doc.origem ?? null,
+    notes: doc.observacao ?? null,
     technician: doc.tec,
     results: doc.r,
     // O banco só aceita criar como pendente; concluir é um segundo passo.

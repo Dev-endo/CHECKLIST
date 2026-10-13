@@ -133,10 +133,17 @@ export function AssemblyChecklist() {
     toast("Novo checklist em branco");
   };
 
-  const finishConclude = async (parts: Maintenance[] = [], destino?: Destination) => {
+  const finishConclude = async (parts: Maintenance[] = [], destino?: Destination, observacao?: string, rejected = false) => {
     if (source.state !== "ok") return;
     setConcluding(true);
-    const ok = await conclude({ ...draft, pecas: parts, destino, origem: source.deviceId });
+    const ok = await conclude({
+      ...draft,
+      pecas: parts,
+      destino,
+      observacao: observacao || undefined,
+      reprovado: rejected || undefined,
+      origem: source.deviceId,
+    });
     setConcluding(false);
     setFailureOpen(false);
     setReleaseOpen(false);
@@ -148,6 +155,23 @@ export function AssemblyChecklist() {
     } else {
       toast("Não foi possível concluir. Tente de novo.");
     }
+  };
+
+  // Reprovar direto: não precisa marcar falha nos tópicos, só identificar o aparelho.
+  const handleReject = () => {
+    if (!isIdentified(draft)) {
+      toast("Preencha serial, modelo e técnico para reprovar");
+      return;
+    }
+    if (source.state !== "ok") {
+      toast("Só aparelhos liberados para montagem podem ser montados");
+      return;
+    }
+    if (blockedByDuplicate) {
+      toast("Retome ou reinicie o checklist pendente deste serial");
+      return;
+    }
+    setFailureOpen(true);
   };
 
   const handleConclude = async () => {
@@ -259,6 +283,7 @@ export function AssemblyChecklist() {
         mode={editable ? "edit" : "view"}
         busy={concluding}
         onConclude={() => void handleConclude()}
+        onReject={handleReject}
         onNewDevice={handleNew}
       />
       <AssemblyReleaseDialog
@@ -271,7 +296,7 @@ export function AssemblyChecklist() {
         open={failureOpen}
         busy={concluding}
         onCancel={() => setFailureOpen(false)}
-        onConfirm={(parts) => void finishConclude(parts)}
+        onConfirm={(parts, destination, note) => void finishConclude(parts, destination, note, true)}
       />
     </>
   );

@@ -37,6 +37,10 @@ export interface DeviceDraft {
   pecas?: Maintenance[];
   /** Checklist de manutenção que liberou o aparelho para esta montagem. */
   origem?: string;
+  /** Observação escrita ao reprovar na montagem. */
+  observacao?: string;
+  /** Reprovado manualmente (botão Reprovar), mesmo sem falha marcada nos tópicos. */
+  reprovado?: boolean;
   criado?: string;
   /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
   autor?: string;
@@ -61,6 +65,7 @@ export interface DeviceDoc {
   culpa?: Blame;
   pecas?: Maintenance[];
   origem?: string;
+  observacao?: string;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -124,6 +129,7 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     culpa: record.culpa,
     pecas: record.pecas,
     origem: record.origem,
+    observacao: record.observacao,
     criado: record.criado,
     autor: record.autor,
     colaborador: record.colaborador,
@@ -251,7 +257,8 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     culpa: draft.culpa,
     pecas: draft.pecas ?? [],
     origem: draft.origem,
-    status: stats.status,
+    observacao: draft.observacao,
+    status: draft.reprovado ? "reprovado" : stats.status,
     falhas: describeFailures(draft.r, draft.tipo),
     testados: stats.done,
     criado: draft.criado ?? now,

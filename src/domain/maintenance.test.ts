@@ -67,6 +67,8 @@ describe("destino", () => {
     expect(parseDestination("analise")).toBe("analise");
     expect(parseDestination("bloqueio")).toBe("bloqueio");
     expect(parseDestination("laudo")).toBe("laudo");
+    expect(parseDestination("manutencao")).toBe("manutencao");
+    expect(destinationLabel("manutencao")).toBe("Retorno para manutenção");
     expect(destinationLabel("bloqueio")).toBe("Liberado para bloqueio");
     expect(destinationLabel("laudo")).toBe("Liberado para laudo");
     expect(destinationLabel("analise")).toBe("Enviado para análise técnica");

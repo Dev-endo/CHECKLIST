@@ -32,3 +32,16 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.danger {
+  font-size: 14px;
+  border-radius: 5px;
+  padding: 8px 13px;
+  background: var(--surface);
+  color: var(--crit);
+  border-color: var(--crit);
+}
+
+.danger:disabled {
+  opacity: 0.55;
+}

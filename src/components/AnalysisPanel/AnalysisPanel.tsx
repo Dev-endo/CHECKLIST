@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { splitAssetId, toDateInputValue } from "../../domain/device";
+import { destinationLabel, type Destination } from "../../domain/maintenance";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchProfiles, type Profile } from "../../services/supabase/profilesService";
 import {
@@ -87,7 +88,7 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   else if (failed) body = <div className={recordStyles.empty}>Não foi possível carregar a análise. Tente atualizar.</div>;
   else if (!report) body = <div className={recordStyles.empty}>Carregando análise…</div>;
   else if (view === "liberacoes") body = <ReleasesView report={report} assembly={assembly} />;
-  else body = <MaintenancesView report={report} />;
+  else body = <MaintenancesView report={report} assembly={assembly} />;
 
   return (
     <section className={recordStyles.panel} aria-label="Análise">
@@ -151,6 +152,7 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
     <>
       <div className={styles.stats}>
         <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
+        <Stat label="Liberados para vidro" value={report.releasedGlass} hint="pela manutenção; cada liberação conta" />
         <Stat label="Liberados para bloqueio" value={found?.releasedBlock ?? 0} hint="pela montagem; serial = 1 ativo" />
         <Stat label="Liberados para laudo" value={found?.releasedReport ?? 0} hint="pela montagem; serial = 1 ativo" />
         <Stat label="Aparelhos que foram para montagem" value={found?.checklists ?? 0} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
@@ -159,6 +161,7 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
         <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens" />
         <Stat label="Liberados para revenda" value={report.releasedResale} hint="Face ID com defeito: laudo e revenda" />
         <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
+        <Stat label="Retorno para manutenção" value={found?.returnedMaintenance ?? 0} hint="reprovados na montagem; serial = 1 ativo" />
         <Stat label="Checklists de manutenção concluídos" value={report.checklists} />
       </div>
       {assembly === "error" && (
@@ -175,7 +178,7 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
   );
 }
 
-function MaintenancesView({ report }: { report: MaintenanceReport }) {
+function MaintenancesView({ report, assembly }: { report: MaintenanceReport; assembly: AssemblyReport | null | "error" }) {
   const max = Math.max(1, ...report.byItem.map((row) => row.count));
   const placaMax = Math.max(1, ...report.placaDetails.map((row) => row.count));
   return (
@@ -185,6 +188,7 @@ function MaintenancesView({ report }: { report: MaintenanceReport }) {
         <Stat label="Manutenções feitas" value={report.maintenancesTotal} hint="soma de todos os itens" />
         <Stat label="Enviados para vidro" value={report.releasedGlass} hint="continuam em manutenção" />
         <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
+        <Stat label="Retorno para manutenção" value={assembly && assembly !== "error" ? assembly.returnedMaintenance : 0} hint="reprovados na montagem; serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Manutenções por tipo</h3>
@@ -236,6 +240,7 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
         <Stat label="Liberados na montagem" value={assembly.released} hint="serial = 1 ativo" />
         <Stat label="Liberados para bloqueio" value={assembly.releasedBlock} hint="serial = 1 ativo" />
         <Stat label="Liberados para laudo" value={assembly.releasedReport} hint="serial = 1 ativo" />
+        <Stat label="Retorno para manutenção" value={assembly.returnedMaintenance} hint="reprovados na montagem; serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
       </div>
 
@@ -258,6 +263,7 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
                 <th>Manutenção</th>
                 <th>Montagem</th>
                 <th>Motivo</th>
+                <th>Direcionamento</th>
               </tr>
             </thead>
             <tbody>
@@ -267,7 +273,10 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
                   <td>{row.unit ? splitAssetId(row.unit).code || row.unit : row.serial}</td>
                   <td>{row.technician ?? "—"}</td>
                   <td>{row.assembler}</td>
-                  <td>{[...row.reasons, ...row.parts.map((part) => `peça: ${part}`)].join(" · ") || "—"}</td>
+                  <td>
+                    {[...row.reasons, ...row.parts.map((part) => `peça: ${part}`), ...(row.note ? [`obs.: ${row.note}`] : [])].join(" · ") || "—"}
+                  </td>
+                  <td>{row.destination ? destinationLabel(row.destination as Destination) : "—"}</td>
                 </tr>
               ))}
             </tbody>

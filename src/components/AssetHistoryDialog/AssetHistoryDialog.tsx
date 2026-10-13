@@ -111,6 +111,8 @@ export function AssetHistoryDialog({ client, serial, onClose }: AssetHistoryDial
                     <p className={styles.maintenances}>
                       {record.culpa ? `${blameLabel(record.culpa)}` : "Reprovado na montagem"}
                       {record.pecas && record.pecas.length > 0 && ` · Peças: ${record.pecas.map(describeMaintenance).join(", ")}`}
+                      {record.destino && ` · ${destinationLabel(record.destino)}`}
+                      {record.observacao && ` · Obs.: ${record.observacao}`}
                     </p>
                   )}
                   {record.manutencoes && record.manutencoes.length > 0 && (

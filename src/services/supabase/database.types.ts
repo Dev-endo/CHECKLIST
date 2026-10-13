@@ -50,6 +50,7 @@ export type Database = {
           faulty_parts: Json
           kind: string
           maintenances: Json
+          notes: string | null
           source_device_id: string | null
           concluded_at: string | null
           created_at: string
@@ -73,6 +74,7 @@ export type Database = {
           faulty_parts?: Json
           kind?: string
           maintenances?: Json
+          notes?: string | null
           source_device_id?: string | null
           concluded_at?: string | null
           created_at?: string
@@ -96,6 +98,7 @@ export type Database = {
           faulty_parts?: Json
           kind?: string
           maintenances?: Json
+          notes?: string | null
           source_device_id?: string | null
           concluded_at?: string | null
           created_at?: string

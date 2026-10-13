@@ -19,7 +19,9 @@ interface RecordRowProps {
 }
 
 export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = false, released = false, onHistory }: RecordRowProps) {
-  const stats = computeStats(record.r, record.tipo);
+  const computed = computeStats(record.r, record.tipo);
+  // Concluído vale o resultado gravado (inclui a reprovação manual da montagem).
+  const stats = isPending(record) || !record.status ? computed : { ...computed, status: record.status };
   const pending = isPending(record);
   const failures = describeFailures(record.r, record.tipo);
   // O técnico já é o nome do usuário; o colaborador só aparece se for outra pessoa.
@@ -58,6 +60,10 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
             ))}
           </ul>
         )}
+        {record.tipo === "montagem" && record.status === "reprovado" && record.pecas && record.pecas.length > 0 && (
+          <p className={styles.maintenances}>Peças com erro: {record.pecas.map(describeMaintenance).join(" · ")}</p>
+        )}
+        {record.observacao && <p className={styles.maintenances}>Obs.: {record.observacao}</p>}
         {record.manutencoes && record.manutencoes.length > 0 && (
           <p className={styles.maintenances}>Manutenções: {record.manutencoes.map(describeMaintenance).join(" · ")}</p>
         )}
@@ -66,6 +72,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
         {pending ? "Pendente" : "Concluído"}
       </span>
       <span className={[styles.badge, badge.className].filter(Boolean).join(" ")}>{badge.label}</span>
+      {record.destino === "manutencao" && <span className={[styles.badge, styles.pending].join(" ")}>Retorno para manutenção</span>}
       {record.destino === "analise" && <span className={[styles.badge, styles.pending].join(" ")}>Análise técnica</span>}
       {record.destino === "montagem" && hasFaceIdDefect(record.r, record.tipo) && <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>}
       {isCurrent ? (
