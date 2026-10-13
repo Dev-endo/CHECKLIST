@@ -12,7 +12,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   colaborador: "Sem função",
 };
 
-export type TabId = "checklist" | "montagem" | "registros" | "admin";
+export type TabId = "checklist" | "montagem" | "quarentena" | "registros" | "admin";
 
 /** Supervisor e admin enxergam os checklists de todos. */
 export function canReviewAll(role: UserRole): boolean {
@@ -39,6 +39,7 @@ export function accessibleTabs(role: UserRole): TabId[] {
   const tabs: TabId[] = [];
   if (canDoMaintenance(role)) tabs.push("checklist");
   if (canDoAssembly(role)) tabs.push("montagem");
+  if (canDoAssembly(role)) tabs.push("quarentena");
   if (canReviewAll(role)) tabs.push("registros");
   if (canManageUsers(role)) tabs.push("admin");
   return tabs;

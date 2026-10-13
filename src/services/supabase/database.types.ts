@@ -148,6 +148,33 @@ export type Database = {
         }
         Relationships: []
       }
+      quarantine_checks: {
+        Row: {
+          asset_short_id: string | null
+          created_at: string
+          id: string
+          result: string
+          serial: string
+          user_id: string
+        }
+        Insert: {
+          asset_short_id?: string | null
+          created_at?: string
+          id?: string
+          result: string
+          serial: string
+          user_id?: string
+        }
+        Update: {
+          asset_short_id?: string | null
+          created_at?: string
+          id?: string
+          result?: string
+          serial?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       role_presets: {
         Row: {
           email: string

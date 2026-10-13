@@ -66,11 +66,11 @@ describe("destino", () => {
     expect(parseDestination("vidro")).toBe("vidro");
     expect(parseDestination("analise")).toBe("analise");
     expect(parseDestination("bloqueio")).toBe("bloqueio");
-    expect(parseDestination("laudo")).toBe("laudo");
+    expect(parseDestination("quarentena")).toBe("quarentena");
     expect(parseDestination("manutencao")).toBe("manutencao");
     expect(destinationLabel("manutencao")).toBe("Retorno para manutenção");
     expect(destinationLabel("bloqueio")).toBe("Liberado para bloqueio");
-    expect(destinationLabel("laudo")).toBe("Liberado para laudo");
+    expect(destinationLabel("quarentena")).toBe("Liberado para quarentena");
     expect(destinationLabel("analise")).toBe("Enviado para análise técnica");
     expect(parseDestination("outro")).toBeUndefined();
     expect(parseDestination(null)).toBeUndefined();

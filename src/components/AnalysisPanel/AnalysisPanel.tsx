@@ -153,14 +153,17 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
       <div className={styles.stats}>
         <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
         <Stat label="Liberados para vidro" value={report.releasedGlass} hint="pela manutenção; cada liberação conta" />
-        <Stat label="Liberados para bloqueio" value={found?.releasedBlock ?? 0} hint="pela montagem; serial = 1 ativo" />
         <Stat label="Aparelhos montados" value={found?.checklists ?? 0} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
-        <Stat label="Ativos liberados" value={found?.released ?? 0} hint="aprovados na montagem, serial = 1 ativo" />
+        <Stat label="Bloqueados" value={found?.releasedBlock ?? 0} hint="pela montagem; serial = 1 ativo" />
+        <Stat label="Ativos liberados para quarentena" value={found?.releasedQuarantine ?? 0} hint="aprovados na montagem, serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
+        <Stat label="Aprovados na quarentena" value={found?.quarantineApproved ?? 0} hint="cada registro conta" />
+        <Stat label="Reprovados na quarentena" value={found?.quarantineRejected ?? 0} hint="cada registro conta" />
         <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens" />
         <Stat label="Liberados para revenda" value={report.releasedResale} hint="Face ID com defeito: laudo e revenda" />
         <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
         <Stat label="Retorno para manutenção" value={found?.returnedMaintenance ?? 0} hint="reprovados na montagem; serial = 1 ativo" />
+        <Stat label="Retorno para análise" value={found?.returnedAnalysis ?? 0} hint="reprovados na montagem; serial = 1 ativo" />
         <Stat label="Checklists de manutenção concluídos" value={report.checklists} />
       </div>
       {assembly === "error" && (
@@ -237,8 +240,12 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
       <div className={styles.stats}>
         <Stat label="Aparelhos montados" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
         <Stat label="Liberados na montagem" value={assembly.released} hint="serial = 1 ativo" />
-        <Stat label="Liberados para bloqueio" value={assembly.releasedBlock} hint="serial = 1 ativo" />
+        <Stat label="Bloqueados" value={assembly.releasedBlock} hint="serial = 1 ativo" />
+        <Stat label="Liberados para quarentena" value={assembly.releasedQuarantine} hint="serial = 1 ativo" />
+        <Stat label="Aprovados na quarentena" value={assembly.quarantineApproved} hint="cada registro conta" />
+        <Stat label="Reprovados na quarentena" value={assembly.quarantineRejected} hint="cada registro conta" />
         <Stat label="Retorno para manutenção" value={assembly.returnedMaintenance} hint="reprovados na montagem; serial = 1 ativo" />
+        <Stat label="Retorno para análise" value={assembly.returnedAnalysis} hint="reprovados na montagem; serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
       </div>
 

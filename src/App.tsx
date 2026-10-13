@@ -7,6 +7,7 @@ import { DeviceForm } from "./components/DeviceForm/DeviceForm";
 import { DuplicateHint } from "./components/DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "./components/RecordsPanel/RecordsPanel";
 import { AssemblyChecklist } from "./components/AssemblyChecklist/AssemblyChecklist";
+import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
 import { ReviewSection } from "./components/ReviewSection/ReviewSection";
 import { StatusBar } from "./components/StatusBar/StatusBar";
@@ -215,6 +216,7 @@ export default function App() {
           </div>
         )}
         {activeTab === "montagem" && <AssemblyChecklist />}
+        {activeTab === "quarentena" && client && <QuarantinePanel client={client} userId={userId} />}
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 

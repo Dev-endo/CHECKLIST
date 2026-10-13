@@ -48,11 +48,16 @@ export interface AssemblyReport {
   checklists: number;
   /** Aprovados (cada serial uma vez) e reprovados (cada reprovação) na montagem no período. */
   released: number;
-  /** Aprovados que seguiram para bloqueio e para laudo (cada serial uma vez). */
+  /** Aprovados que seguiram para bloqueio e para quarentena (cada serial uma vez). */
   releasedBlock: number;
-  releasedReport: number;
+  releasedQuarantine: number;
   /** Reprovados na montagem que voltaram para a manutenção (cada serial uma vez). */
   returnedMaintenance: number;
+  /** Reprovados na montagem enviados de volta para análise técnica (cada serial uma vez). */
+  returnedAnalysis: number;
+  /** Registros da aba Quarentena no período. */
+  quarantineApproved: number;
+  quarantineRejected: number;
   rejected: number;
   byAssembler: { name: string; released: number; rejected: number }[];
   byPart: { part: string; count: number }[];
@@ -88,8 +93,11 @@ export async function fetchAssemblyReport(
     checklists: number;
     released: number;
     released_block?: number;
-    released_report?: number;
+    released_quarantine?: number;
     returned_maintenance?: number;
+    returned_analysis?: number;
+    quarantine_approved?: number;
+    quarantine_rejected?: number;
     rejected: number;
     by_assembler: { name: string; released: number; rejected: number }[];
     by_part: { part: string; count: number }[];
@@ -99,8 +107,11 @@ export async function fetchAssemblyReport(
     checklists: raw.checklists,
     released: raw.released,
     releasedBlock: raw.released_block ?? 0,
-    releasedReport: raw.released_report ?? 0,
+    releasedQuarantine: raw.released_quarantine ?? 0,
     returnedMaintenance: raw.returned_maintenance ?? 0,
+    returnedAnalysis: raw.returned_analysis ?? 0,
+    quarantineApproved: raw.quarantine_approved ?? 0,
+    quarantineRejected: raw.quarantine_rejected ?? 0,
     rejected: raw.rejected,
     byAssembler: raw.by_assembler,
     byPart: raw.by_part,

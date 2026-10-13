@@ -4,11 +4,11 @@ import { accessibleTabs, canDoAssembly, canDoMaintenance } from "./roles";
 describe("accessibleTabs", () => {
   it("gives each role only its own checklist", () => {
     expect(accessibleTabs("tecnico")).toEqual(["checklist"]);
-    expect(accessibleTabs("montador")).toEqual(["montagem"]);
+    expect(accessibleTabs("montador")).toEqual(["montagem", "quarentena"]);
   });
 
   it("lets the admin open both checklists and manage users", () => {
-    expect(accessibleTabs("admin")).toEqual(["checklist", "montagem", "registros", "admin"]);
+    expect(accessibleTabs("admin")).toEqual(["checklist", "montagem", "quarentena", "registros", "admin"]);
   });
 
   it("lets the supervisor only consult", () => {

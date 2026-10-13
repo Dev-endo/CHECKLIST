@@ -40,8 +40,8 @@ export const PLACA_SERVICES: readonly string[] = [];
 
 /** Para onde o aparelho vai depois da manutenção, quando o checklist sai todo OK. */
 /** "analise": checklist reprovado enviado para análise técnica (sem isso, continua em manutenção). */
-/** "bloqueio" e "laudo": para onde segue uma montagem aprovada. */
-export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "laudo" | "manutencao";
+/** "bloqueio" e "quarentena": para onde segue uma montagem aprovada. */
+export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "quarentena" | "manutencao";
 
 export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "montagem", label: "Liberado para montagem" },
@@ -52,7 +52,7 @@ export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
 /** Direcionamento ao concluir uma montagem aprovada. */
 export const ASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "bloqueio", label: "Liberado para bloqueio" },
-  { id: "laudo", label: "Liberado para laudo" },
+  { id: "quarentena", label: "Liberado para quarentena" },
 ];
 
 /** Direcionamento ao reprovar uma montagem. */
@@ -75,7 +75,7 @@ export function parseDestination(value: unknown): Destination | undefined {
     value === "vidro" ||
     value === "analise" ||
     value === "bloqueio" ||
-    value === "laudo" ||
+    value === "quarentena" ||
     value === "manutencao"
     ? value
     : undefined;
