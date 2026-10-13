@@ -45,6 +45,9 @@ export interface AssemblyReport {
   checklists: number;
   /** Aprovados (cada serial uma vez) e reprovados (cada reprovação) na montagem no período. */
   released: number;
+  /** Aprovados que seguiram para bloqueio e para laudo (cada serial uma vez). */
+  releasedBlock: number;
+  releasedReport: number;
   rejected: number;
   byAssembler: { name: string; released: number; rejected: number }[];
   byPart: { part: string; count: number }[];
@@ -79,6 +82,8 @@ export async function fetchAssemblyReport(
   const raw = data as unknown as {
     checklists: number;
     released: number;
+    released_block?: number;
+    released_report?: number;
     rejected: number;
     by_assembler: { name: string; released: number; rejected: number }[];
     by_part: { part: string; count: number }[];
@@ -87,6 +92,8 @@ export async function fetchAssemblyReport(
   return {
     checklists: raw.checklists,
     released: raw.released,
+    releasedBlock: raw.released_block ?? 0,
+    releasedReport: raw.released_report ?? 0,
     rejected: raw.rejected,
     byAssembler: raw.by_assembler,
     byPart: raw.by_part,

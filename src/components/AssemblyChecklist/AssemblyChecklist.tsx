@@ -10,7 +10,7 @@ import {
   splitAssetId,
   type DeviceRecord,
 } from "../../domain/device";
-import type { Maintenance } from "../../domain/maintenance";
+import type { Destination, Maintenance } from "../../domain/maintenance";
 import { useAutosave } from "../../hooks/useAutosave";
 import { useDeviceDraft } from "../../hooks/useDeviceDraft";
 import { useDeviceRecords } from "../../hooks/useDeviceRecords";
@@ -19,6 +19,7 @@ import { lookupAsset } from "../../services/supabase/assetsService";
 import { describeAssemblyBlock, fetchAssemblySource } from "../../services/supabase/assemblyService";
 import appStyles from "../../App.module.css";
 import { AssemblyFailureDialog } from "../AssemblyFailureDialog/AssemblyFailureDialog";
+import { AssemblyReleaseDialog } from "../AssemblyReleaseDialog/AssemblyReleaseDialog";
 import { Checklist } from "../Checklist/Checklist";
 import { DeviceForm } from "../DeviceForm/DeviceForm";
 import { DuplicateHint } from "../DuplicateHint/DuplicateHint";
@@ -59,6 +60,8 @@ export function AssemblyChecklist() {
   const [concluding, setConcluding] = useState(false);
   // Montagem reprovada: antes de concluir, pergunta a peça e de quem foi o erro.
   const [failureOpen, setFailureOpen] = useState(false);
+  // Montagem aprovada: antes de concluir, pergunta para onde o aparelho segue.
+  const [releaseOpen, setReleaseOpen] = useState(false);
 
   const editable = isEditable(draft, userId);
   const duplicate = findDuplicate(draft, records);
@@ -130,12 +133,13 @@ export function AssemblyChecklist() {
     toast("Novo checklist em branco");
   };
 
-  const finishConclude = async (parts: Maintenance[] = []) => {
+  const finishConclude = async (parts: Maintenance[] = [], destino?: Destination) => {
     if (source.state !== "ok") return;
     setConcluding(true);
-    const ok = await conclude({ ...draft, pecas: parts, origem: source.deviceId });
+    const ok = await conclude({ ...draft, pecas: parts, destino, origem: source.deviceId });
     setConcluding(false);
     setFailureOpen(false);
+    setReleaseOpen(false);
     if (ok) {
       startNew();
       setSource({ state: "idle" });
@@ -175,6 +179,10 @@ export function AssemblyChecklist() {
     }
     if (stats.status === "reprovado") {
       setFailureOpen(true);
+      return;
+    }
+    if (stats.status === "liberado") {
+      setReleaseOpen(true);
       return;
     }
     await finishConclude();
@@ -252,6 +260,12 @@ export function AssemblyChecklist() {
         busy={concluding}
         onConclude={() => void handleConclude()}
         onNewDevice={handleNew}
+      />
+      <AssemblyReleaseDialog
+        open={releaseOpen}
+        busy={concluding}
+        onCancel={() => setReleaseOpen(false)}
+        onConfirm={(destination) => void finishConclude([], destination)}
       />
       <AssemblyFailureDialog
         open={failureOpen}

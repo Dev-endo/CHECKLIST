@@ -4,11 +4,13 @@ import App from "./App";
 import { AuthGate } from "./auth/AuthGate";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ToastProvider } from "./components/Toast/ToastProvider";
+import { UpdateBanner } from "./components/UpdateBanner/UpdateBanner";
 import "./styles/global.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ToastProvider>
+      <UpdateBanner />
       <AuthProvider>
         <AuthGate>
           <App />

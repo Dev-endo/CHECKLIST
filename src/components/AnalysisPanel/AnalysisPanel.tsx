@@ -231,6 +231,8 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
       <div className={styles.stats}>
         <Stat label="Aparelhos que foram para montagem" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
         <Stat label="Liberados na montagem" value={assembly.released} hint="serial = 1 ativo" />
+        <Stat label="Liberados para bloqueio" value={assembly.releasedBlock} hint="serial = 1 ativo" />
+        <Stat label="Liberados para laudo" value={assembly.releasedReport} hint="serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
       </div>
 

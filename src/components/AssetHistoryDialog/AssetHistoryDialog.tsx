@@ -80,6 +80,9 @@ export function AssetHistoryDialog({ client, serial, onClose }: AssetHistoryDial
                     <span className={styles.badge}>{record.tipo === "montagem" ? "Montagem" : "Manutenção"}</span>
                     <span className={styles.badge}>{isPending(record) ? "Pendente" : "Concluído"}</span>
                     {record.destino === "analise" && <span className={styles.badge}>Análise técnica</span>}
+                    {record.tipo === "montagem" && record.destino && record.status === "liberado" && (
+                      <span className={[styles.badge, styles.ok].join(" ")}>{destinationLabel(record.destino)}</span>
+                    )}
                     {record.destino === "montagem" && hasFaceIdDefect(record.r, record.tipo) && (
                       <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>
                     )}

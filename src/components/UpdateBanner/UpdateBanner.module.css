@@ -1,0 +1,32 @@
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  /* O body tem 16px de margem lateral: a faixa ocupa a largura toda. */
+  margin: 0 -16px;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reload {
+  font: inherit;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--surface);
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.reload:hover {
+  filter: brightness(0.95);
+}
