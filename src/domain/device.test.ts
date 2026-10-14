@@ -8,6 +8,7 @@ import {
   findDuplicate,
   hasFaceIdDefect,
   isConfirmed,
+  isResale,
   latestReleasingId,
   isEditable,
   missingConfirmations,
@@ -228,5 +229,18 @@ describe("Face ID com defeito", () => {
   it("is incomplete while topics are pending, and does not apply to the assembly checklist", () => {
     expect(computeStats({ [sensors]: "fail", faceid: "fail" }).status).toBe("incompleto");
     expect(hasFaceIdDefect({ [sensors]: "fail", faceid: "fail" }, "montagem")).toBe(false);
+  });
+});
+
+describe("isResale", () => {
+  it("follows the technician's choice when it was made", () => {
+    expect(isResale({ destino: "montagem", revenda: true, r: {}, tipo: "manutencao" })).toBe(true);
+    expect(isResale({ destino: "montagem", revenda: false, r: {}, tipo: "manutencao" })).toBe(false);
+    expect(isResale({ destino: "vidro", revenda: true, r: {}, tipo: "manutencao" })).toBe(false);
+  });
+
+  it("keeps old records with a Face ID defect as resale", () => {
+    expect(isResale({ destino: "montagem", r: { "sensores-e-biometria": "fail", faceid: "fail" }, tipo: "manutencao" })).toBe(true);
+    expect(isResale({ destino: "montagem", r: {}, tipo: "manutencao" })).toBe(false);
   });
 });

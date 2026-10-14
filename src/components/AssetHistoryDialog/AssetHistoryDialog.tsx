@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { describeFailures, hasFaceIdDefect, isPending, latestReleasingId, type DeviceRecord } from "../../domain/device";
+import { describeFailures, isPending, isResale, latestReleasingId, type DeviceRecord } from "../../domain/device";
 import { blameLabel, describeMaintenance, destinationLabel } from "../../domain/maintenance";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchAssetHistory } from "../../services/supabase/releaseService";
@@ -91,7 +91,7 @@ export function AssetHistoryDialog({ client, serial, onClose }: AssetHistoryDial
                     {record.tipo === "montagem" && record.destino && record.status === "liberado" && (
                       <span className={[styles.badge, styles.ok].join(" ")}>{destinationLabel(record.destino)}</span>
                     )}
-                    {record.destino === "montagem" && hasFaceIdDefect(record.r, record.tipo) && (
+                    {isResale(record) && (
                       <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>
                     )}
                     <span

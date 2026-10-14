@@ -172,9 +172,9 @@ export default function App() {
     await finishConclude([]);
   };
 
-  const finishConclude = async (maintenances: Maintenance[], destino?: Destination, bloqueado?: boolean) => {
+  const finishConclude = async (maintenances: Maintenance[], destino?: Destination, bloqueado?: boolean, revenda?: boolean) => {
     setConcluding(true);
-    const ok = await conclude({ ...draft, manutencoes: maintenances, destino, bloqueado });
+    const ok = await conclude({ ...draft, manutencoes: maintenances, destino, bloqueado, revenda });
     setConcluding(false);
     setMaintenanceOpen(false);
     if (ok) {
@@ -291,7 +291,7 @@ export default function App() {
         faceIdDefect={hasFaceIdDefect(draft.r, draft.tipo)}
         rejected={computeStats(draft.r, draft.tipo).status === "reprovado"}
         onCancel={() => setMaintenanceOpen(false)}
-        onConfirm={(maintenances, destination, blocked) => void finishConclude(maintenances, destination, blocked)}
+        onConfirm={(maintenances, destination, blocked, resale) => void finishConclude(maintenances, destination, blocked, resale)}
       />
     </>
   );

@@ -43,6 +43,8 @@ export interface DeviceDraft {
   reprovado?: boolean;
   /** Ativo bloqueado (manutenção, desmontagem e desmontagem técnica). */
   bloqueado?: boolean;
+  /** Manutenção: o técnico marcou que o aparelho vai para revenda (segue para a montagem). */
+  revenda?: boolean;
   /** Desmontagem: aparelho com tampa ou tela alta. */
   tampaAlta?: boolean;
   /** Desmontagem técnica: não liga ou em looping. */
@@ -79,6 +81,7 @@ export interface DeviceDoc {
   origem?: string;
   observacao?: string;
   bloqueado?: boolean;
+  revenda?: boolean;
   tampaAlta?: boolean;
   defeito?: BootIssue;
   consumo?: boolean;
@@ -150,6 +153,7 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     origem: record.origem,
     observacao: record.observacao,
     bloqueado: record.bloqueado,
+    revenda: record.revenda,
     tampaAlta: record.tampaAlta,
     defeito: record.defeito,
     consumo: record.consumo,
@@ -180,6 +184,14 @@ export function hasFaceIdDefect(results: Results = {}, kind: ChecklistKind = "ma
     .find((block) => block.id === FACE_ID_SECTION)
     ?.items.filter((item) => item.id !== FACE_ID_ITEM);
   return (others ?? []).every((item) => results[item.id] !== "fail");
+}
+
+/**
+ * Liberado para revenda: o técnico marcou revenda ao concluir a manutenção. Registros antigos,
+ * sem a marcação, valem como revenda quando o Face ID estava com defeito.
+ */
+export function isResale(record: Pick<DeviceRecord, "destino" | "revenda" | "r" | "tipo">): boolean {
+  return record.destino === "montagem" && (record.revenda ?? hasFaceIdDefect(record.r, record.tipo));
 }
 
 export function computeStats(results: Results = {}, kind: ChecklistKind = "manutencao"): DeviceStats {
@@ -285,6 +297,7 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     origem: draft.origem,
     observacao: draft.observacao,
     bloqueado: draft.bloqueado,
+    revenda: draft.revenda,
     tampaAlta: draft.tampaAlta,
     defeito: draft.defeito,
     consumo: draft.consumo,

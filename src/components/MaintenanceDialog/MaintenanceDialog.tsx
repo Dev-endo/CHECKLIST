@@ -18,7 +18,7 @@ interface MaintenanceDialogProps {
   open: boolean;
   busy?: boolean;
   onCancel: () => void;
-  onConfirm: (maintenances: Maintenance[], destination?: Destination, blocked?: boolean) => void;
+  onConfirm: (maintenances: Maintenance[], destination?: Destination, blocked?: boolean, resale?: boolean) => void;
   /** Face ID com defeito: o aparelho segue para a montagem e depois para laudo e revenda. */
   faceIdDefect?: boolean;
   /** Checklist reprovado: marca as manutenções feitas e, se quiser, envia para análise técnica. */
@@ -36,6 +36,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
   const [analysis, setAnalysis] = useState(false);
   // Ativo aberto e bloqueado: conta como bloqueado na análise (cada serial uma vez).
   const [blocked, setBlocked] = useState(false);
+  // Aparelho vai para revenda? Sim leva direto para a montagem. Com Face ID com defeito já vem em Sim.
+  const [resale, setResale] = useState<boolean | undefined>();
 
   useEffect(() => {
     const element = dialog.current;
@@ -45,6 +47,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       setNone(false);
       setAnalysis(false);
       setBlocked(false);
+      setResale(faceIdDefect ? true : undefined);
       setDestination(undefined);
       element.showModal();
     }
@@ -55,6 +58,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
   const destinations: readonly { id: Destination; label: string }[] = faceIdDefect
     ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }]
     : DESTINATIONS;
+  // Revenda: o aparelho segue para a montagem automaticamente.
+  const chosenDestination: Destination | undefined = !rejected && resale ? "montagem" : destination;
   const placa = selected.find((m) => m.item === PLACA_ITEM);
   const complete = isMaintenanceComplete(selected);
   // Ou marca as manutenções feitas, ou diz que nenhuma foi executada.
@@ -154,10 +159,23 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       ) : (
         <>
           <fieldset className={styles.destination} disabled={busy}>
+            <legend>Aparelho vai para revenda?</legend>
+            {[
+              { label: "Sim", value: true },
+              { label: "Não", value: false },
+            ].map((option) => (
+              <label key={option.label} className={styles.option}>
+                <input type="radio" name="resale" checked={resale === option.value} onChange={() => setResale(option.value)} />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </fieldset>
+          {resale && <p className={styles.help}>Revenda: o aparelho segue para a montagem automaticamente.</p>}
+          <fieldset className={styles.destination} disabled={busy || Boolean(resale)}>
             <legend>Para onde o aparelho vai?</legend>
             {destinations.map(({ id, label }) => (
               <label key={id} className={styles.option}>
-                <input type="radio" name="destination" checked={destination === id} onChange={() => setDestination(id)} />
+                <input type="radio" name="destination" checked={chosenDestination === id} onChange={() => setDestination(id)} />
                 <span>{label}</span>
               </label>
             ))}
@@ -176,8 +194,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
           Voltar
         </Button>
         <Button
-          onClick={() => onConfirm(selected, rejected ? (analysis ? "analise" : undefined) : destination, blocked)}
-          disabled={busy || !complete || !chosen || (!rejected && !destination)}
+          onClick={() => onConfirm(selected, rejected ? (analysis ? "analise" : undefined) : chosenDestination, blocked, rejected ? undefined : resale)}
+          disabled={busy || !complete || !chosen || (!rejected && (resale === undefined || !chosenDestination))}
         >
           {busy ? "Concluindo…" : "Concluir checklist"}
         </Button>
@@ -186,7 +204,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       {complete && !chosen && (
         <p className={styles.warn}>Marque as manutenções feitas ou "Nenhuma manutenção executada".</p>
       )}
-      {complete && chosen && !rejected && !destination && <p className={styles.warn}>Escolha para onde o aparelho vai.</p>}
+      {complete && chosen && !rejected && resale === undefined && <p className={styles.warn}>Informe se o aparelho vai para revenda.</p>}
+      {complete && chosen && !rejected && resale !== undefined && !chosenDestination && <p className={styles.warn}>Escolha para onde o aparelho vai.</p>}
     </dialog>
   );
 }

@@ -52,6 +52,7 @@ export type Database = {
           consumption_note: string | null
           pt_flagged: boolean | null
           pt_note: string | null
+          resale: boolean | null
           high_lid: boolean | null
           destination: string | null
           faulty_parts: Json
@@ -83,6 +84,7 @@ export type Database = {
           consumption_note?: string | null
           pt_flagged?: boolean | null
           pt_note?: string | null
+          resale?: boolean | null
           high_lid?: boolean | null
           destination?: string | null
           faulty_parts?: Json
@@ -114,6 +116,7 @@ export type Database = {
           consumption_note?: string | null
           pt_flagged?: boolean | null
           pt_note?: string | null
+          resale?: boolean | null
           high_lid?: boolean | null
           destination?: string | null
           faulty_parts?: Json
