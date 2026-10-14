@@ -170,6 +170,7 @@ function ReleasesView({
     <>
       <div className={styles.stats}>
         <Stat label="Desmontados" value={dis?.total ?? 0} hint="desmontagem normal + técnica; cada checklist conta" />
+        <Stat label="Enviados para vidro" value={report.releasedGlass} hint="pela manutenção; cada envio conta" />
         <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
         <Stat
           label="Enviados para montagem"
@@ -220,6 +221,7 @@ function MaintenancesView({ report }: { report: MaintenanceReport }) {
     <>
       <div className={styles.stats}>
         <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
+        <Stat label="Enviados para vidro" value={report.releasedGlass} hint="continuam em manutenção; cada envio conta" />
         <Stat label="Manutenções feitas" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
         <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
         <Stat label="Enviados para PT" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />

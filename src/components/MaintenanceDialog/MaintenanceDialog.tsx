@@ -61,6 +61,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
   const destinations: readonly { id: Destination | typeof STAYS; label: string }[] = rejected
     ? [
         { id: "montagem", label: "Enviar para montagem" },
+        { id: "vidro", label: "Enviado para vidro" },
         { id: "analise", label: ANALYSIS_LABEL },
         PT_OPTION,
         { id: STAYS, label: "Continua em manutenção" },
