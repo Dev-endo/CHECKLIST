@@ -36,9 +36,15 @@ export function ChecklistSection({
 }: ChecklistSectionProps) {
   const result = results[block.id] || undefined;
   const pointing = allowPointing && !block.noPointing;
+  const options = block.choice
+    ? [
+        { value: "ok" as const, label: block.choice.first },
+        { value: "fail" as const, label: block.choice.second },
+      ]
+    : OPTIONS;
 
   return (
-    <section className={[styles.block, result && styles[result]].filter(Boolean).join(" ")}>
+    <section className={[styles.block, result && (block.choice && result === "fail" ? styles.alt : styles[result])].filter(Boolean).join(" ")}>
       <div className={styles.header}>
         <h2>
           <span className={styles.number}>{number}</span>
@@ -65,11 +71,11 @@ export function ChecklistSection({
       <div className={styles.footer}>
         <span className={styles.footerLabel}>Resultado do tópico</span>
         <div className={styles.buttons}>
-          {OPTIONS.map(({ value, label }) => (
+          {options.map(({ value, label }) => (
             <button
               key={value}
               type="button"
-              className={styles[`toggle-${value}`]}
+              className={styles[block.choice && value === "fail" ? "toggle-alt" : `toggle-${value}`]}
               aria-pressed={result === value}
               aria-label={`${label}: ${block.title}`}
               disabled={disabled}

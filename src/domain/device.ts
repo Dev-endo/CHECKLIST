@@ -196,7 +196,8 @@ export function isResale(record: Pick<DeviceRecord, "destino" | "revenda" | "r" 
 
 export function computeStats(results: Results = {}, kind: ChecklistKind = "manutencao"): DeviceStats {
   const sections = testedSections(kind);
-  const fails = sections.filter((item) => results[item.id] === "fail");
+  // Respostas de escolha (ex.: original ou paralelo) não contam como falha.
+  const fails = sections.filter((item) => results[item.id] === "fail" && !item.choice);
   const pending = sections.filter((item) => !results[item.id]);
   const done = sections.length - pending.length;
   const faceIdDefect = hasFaceIdDefect(results, kind);
@@ -231,7 +232,7 @@ export function toggleItemFailure(results: Results, sectionId: string, itemId: s
 
 /** Texto das falhas: "Tópico: item" para cada item apontado, ou só o tópico se nenhum foi apontado. */
 export function describeFailures(results: Results = {}, kind: ChecklistKind = "manutencao"): string[] {
-  return catalogFor(kind).filter((block) => results[block.id] === "fail").flatMap((block) => {
+  return catalogFor(kind).filter((block) => results[block.id] === "fail" && !block.choice).flatMap((block) => {
     const items = block.items.filter((item) => results[item.id] === "fail");
     return items.length ? items.map((item) => `${block.title}: ${item.title}`) : [block.title];
   });

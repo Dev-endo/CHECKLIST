@@ -25,6 +25,18 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
     ],
   },
   {
+    title: "Vidro Traseiro",
+    noPointing: true,
+    choice: { first: "Original", second: "Paralelo" },
+    items: [
+      {
+        id: "d-vidro-traseiro",
+        title: "Vidro Traseiro",
+        details: "Conferir se o vidro traseiro é paralelo ou original nos modelos que não são de encaixe.",
+      },
+    ],
+  },
+  {
     title: "Confirmar serial",
     confirmOnly: true,
     items: [
@@ -57,6 +69,18 @@ export const TECHNICAL_DISASSEMBLY_CHECKLIST: readonly ChecklistBlock[] = [
           id: "d-reinicio",
           title: "Teste de reinício",
           details: "Testar o aparelho por 5 minutos para garantir que ele não reinicia.",
+        },
+      ],
+    },
+    {
+      title: "Vidro Traseiro",
+      noPointing: true,
+      choice: { first: "Original", second: "Paralelo" },
+      items: [
+        {
+          id: "d-vidro-traseiro",
+          title: "Vidro Traseiro",
+          details: "Conferir se o vidro traseiro é paralelo ou original nos modelos que não são de encaixe.",
         },
       ],
     },

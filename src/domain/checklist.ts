@@ -17,6 +17,8 @@ export interface ChecklistBlock {
   confirmOnly?: boolean;
   /** Só OK ou Falha no tópico: sem apontar o item em que a falha ocorreu. */
   noPointing?: boolean;
+  /** Duas respostas que não são falha (ex.: original ou paralelo): a segunda não reprova o checklist. */
+  choice?: { first: string; second: string };
   items: readonly ChecklistItem[];
 }
 

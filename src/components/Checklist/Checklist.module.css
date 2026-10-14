@@ -219,3 +219,14 @@
   font-weight: 600;
   color: var(--crit);
 }
+
+.alt .header,
+.alt .footer {
+  background: var(--accent-soft);
+}
+
+.toggle-alt[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+}

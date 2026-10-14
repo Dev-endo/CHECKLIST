@@ -244,3 +244,11 @@ describe("isResale", () => {
     expect(isResale({ destino: "montagem", r: {}, tipo: "manutencao" })).toBe(false);
   });
 });
+
+describe("vidro traseiro", () => {
+  it("treats original and paralelo as answers, not as a failure", () => {
+    const results = { "d-display": "ok", "d-prox": "ok", "vidro-traseiro": "fail" } as const;
+    expect(computeStats(results, "desmontagem").status).not.toBe("reprovado");
+    expect(describeFailures(results, "desmontagem")).toEqual([]);
+  });
+});
