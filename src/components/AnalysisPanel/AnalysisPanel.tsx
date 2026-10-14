@@ -12,6 +12,7 @@ import {
   fetchAssemblyReport,
   type AssemblyReport,
 } from "../../services/supabase/assemblyService";
+import { fetchDisassemblyReport, type DisassemblyReport } from "../../services/supabase/disassemblyService";
 import { Button } from "../Button/Button";
 import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
 import reviewStyles from "../ReviewPanel/ReviewPanel.module.css";
@@ -21,10 +22,11 @@ interface AnalysisPanelProps {
   client: AppSupabaseClient;
 }
 
-type View = "liberacoes" | "manutencoes" | "montagem";
+type View = "liberacoes" | "desmontagem" | "manutencoes" | "montagem";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "liberacoes", label: "Liberações" },
+  { id: "desmontagem", label: "Desmontagem" },
   { id: "manutencoes", label: "Manutenções" },
   { id: "montagem", label: "Montagem" },
 ];
@@ -51,6 +53,8 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   const [report, setReport] = useState<MaintenanceReport | null>(null);
   // Análise da montagem; null enquanto carrega, "error" se a consulta falhar (ex.: SQL da montagem ainda não rodado).
   const [assembly, setAssembly] = useState<AssemblyReport | null | "error">(null);
+  // Análise da desmontagem; mesma convenção do assembly.
+  const [disassembly, setDisassembly] = useState<DisassemblyReport | null | "error">(null);
   const [failed, setFailed] = useState(false);
   const [reloads, setReloads] = useState(0);
 
@@ -71,6 +75,7 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
     let active = true;
     setReport(null);
     setAssembly(null);
+    setDisassembly(null);
     setFailed(false);
     fetchMaintenanceReport(client, filters)
       .then((data) => active && setReport(data))
@@ -78,6 +83,9 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
     fetchAssemblyReport(client, filters)
       .then((data) => active && setAssembly(data))
       .catch(() => active && setAssembly("error"));
+    fetchDisassemblyReport(client, filters)
+      .then((data) => active && setDisassembly(data))
+      .catch(() => active && setDisassembly("error"));
     return () => {
       active = false;
     };
@@ -85,10 +93,11 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
 
   let body: ReactNode;
   if (view === "montagem") body = <AssemblyView assembly={assembly} />;
+  else if (view === "desmontagem") body = <DisassemblyView disassembly={disassembly} />;
   else if (failed) body = <div className={recordStyles.empty}>Não foi possível carregar a análise. Tente atualizar.</div>;
   else if (!report) body = <div className={recordStyles.empty}>Carregando análise…</div>;
-  else if (view === "liberacoes") body = <ReleasesView report={report} assembly={assembly} />;
-  else body = <MaintenancesView report={report} assembly={assembly} />;
+  else if (view === "liberacoes") body = <ReleasesView report={report} assembly={assembly} disassembly={disassembly} />;
+  else body = <MaintenancesView report={report} />;
 
   return (
     <section className={recordStyles.panel} aria-label="Análise">
@@ -145,29 +154,38 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   );
 }
 
-function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembly: AssemblyReport | null | "error" }) {
+function ReleasesView({
+  report,
+  assembly,
+  disassembly,
+}: {
+  report: MaintenanceReport;
+  assembly: AssemblyReport | null | "error";
+  disassembly: DisassemblyReport | null | "error";
+}) {
   const rows = report.byTechnician;
   const found = assembly && assembly !== "error" ? assembly : null;
+  const dis = disassembly && disassembly !== "error" ? disassembly : null;
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
-        <Stat label="Liberados para vidro" value={report.releasedGlass} hint="pela manutenção; cada liberação conta" />
-        <Stat label="Aparelhos montados" value={found?.checklists ?? 0} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
-        <Stat label="Bloqueados" value={found?.releasedBlock ?? 0} hint="pela montagem; serial = 1 ativo" />
-        <Stat label="Ativos liberados para quarentena" value={found?.releasedQuarantine ?? 0} hint="aprovados na montagem, serial = 1 ativo" />
+        <Stat label="Desmontados" value={dis?.total ?? 0} hint="desmontagem normal + técnica; cada checklist conta" />
+        <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
+        <Stat
+          label="Enviados para montagem"
+          value={report.releasedAssembly + (dis?.toAssembly ?? 0)}
+          hint="liberados pela manutenção + enviados pela desmontagem; cada envio conta"
+        />
+        <Stat label="Aprovados na montagem" value={found?.released ?? 0} hint="serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
         <Stat label="Aprovados na quarentena" value={found?.quarantineApproved ?? 0} hint="cada registro conta" />
         <Stat label="Reprovados na quarentena" value={found?.quarantineRejected ?? 0} hint="cada registro conta" />
-        <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens" />
-        <Stat label="Liberados para revenda" value={report.releasedResale} hint="Face ID com defeito: laudo e revenda" />
-        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
-        <Stat label="Retorno para manutenção" value={found?.returnedMaintenance ?? 0} hint="reprovados na montagem; serial = 1 ativo" />
-        <Stat label="Retorno para análise" value={found?.returnedAnalysis ?? 0} hint="reprovados na montagem; serial = 1 ativo" />
-        <Stat label="Checklists de manutenção concluídos" value={report.checklists} />
+        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Bloqueados" value={found?.releasedBlock ?? 0} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Enviados para PT" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
       </div>
-      {assembly === "error" && (
-        <div className={recordStyles.empty}>Não foi possível carregar os números da montagem.</div>
+      {(assembly === "error" || disassembly === "error") && (
+        <div className={recordStyles.empty}>Não foi possível carregar todos os números.</div>
       )}
       <h3 className={styles.subtitle}>Liberações por técnico</h3>
       <TechnicianTable
@@ -180,17 +198,32 @@ function ReleasesView({ report, assembly }: { report: MaintenanceReport; assembl
   );
 }
 
-function MaintenancesView({ report, assembly }: { report: MaintenanceReport; assembly: AssemblyReport | null | "error" }) {
+/** Desmontagem: quantos foram desmontados e para onde cada um seguiu. */
+function DisassemblyView({ disassembly }: { disassembly: DisassemblyReport | null | "error" }) {
+  if (disassembly === "error") return <div className={recordStyles.empty}>Não foi possível carregar a análise da desmontagem.</div>;
+  if (!disassembly) return <div className={recordStyles.empty}>Carregando análise…</div>;
+  return (
+    <div className={styles.stats}>
+      <Stat label="Desmontados" value={disassembly.total} hint="desmontagem normal + técnica; cada checklist conta" />
+      <Stat label="Enviados para montagem" value={disassembly.toAssembly} hint="cada envio conta" />
+      <Stat label="Enviados para manutenção" value={disassembly.toMaintenance} hint="cada envio conta" />
+      <Stat label="Enviados para análise" value={disassembly.toAnalysis} hint="cada envio conta" />
+      <Stat label="Viraram PT" value={disassembly.toPt} hint="desmontagem técnica; cada envio conta" />
+    </div>
+  );
+}
+
+function MaintenancesView({ report }: { report: MaintenanceReport }) {
   const max = Math.max(1, ...report.byItem.map((row) => row.count));
   const placaMax = Math.max(1, ...report.placaDetails.map((row) => row.count));
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Ativos com manutenção" value={report.assetsWithMaintenance} />
-        <Stat label="Manutenções feitas" value={report.maintenancesTotal} hint="soma de todos os itens" />
-        <Stat label="Enviados para vidro" value={report.releasedGlass} hint="continuam em manutenção" />
-        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="ativos, serial = 1 ativo" />
-        <Stat label="Retorno para manutenção" value={assembly && assembly !== "error" ? assembly.returnedMaintenance : 0} hint="reprovados na montagem; serial = 1 ativo" />
+        <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
+        <Stat label="Manutenções feitas" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
+        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Enviados para PT" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
+        <Stat label="Bloqueados" value={report.blockedMaintenance} hint="marcados bloqueados na manutenção; serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Manutenções por tipo</h3>
@@ -239,14 +272,10 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
     <>
       <div className={styles.stats}>
         <Stat label="Aparelhos montados" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
-        <Stat label="Liberados na montagem" value={assembly.released} hint="serial = 1 ativo" />
-        <Stat label="Bloqueados" value={assembly.releasedBlock} hint="serial = 1 ativo" />
-        <Stat label="Liberados para quarentena" value={assembly.releasedQuarantine} hint="serial = 1 ativo" />
-        <Stat label="Aprovados na quarentena" value={assembly.quarantineApproved} hint="cada registro conta" />
-        <Stat label="Reprovados na quarentena" value={assembly.quarantineRejected} hint="cada registro conta" />
-        <Stat label="Retorno para manutenção" value={assembly.returnedMaintenance} hint="reprovados na montagem; serial = 1 ativo" />
-        <Stat label="Retorno para análise" value={assembly.returnedAnalysis} hint="reprovados na montagem; serial = 1 ativo" />
+        <Stat label="Aprovados na montagem" value={assembly.released} hint="serial = 1 ativo" />
         <Stat label="Reprovados na montagem" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
+        <Stat label="Montagem enviada para análise" value={assembly.returnedAnalysis} hint="reprovados na montagem; serial = 1 ativo" />
+        <Stat label="Enviados para quarentena" value={assembly.releasedQuarantine} hint="aprovados na montagem; serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Por montador</h3>

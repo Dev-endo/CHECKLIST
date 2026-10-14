@@ -1,6 +1,6 @@
 import { catalogFor } from "./catalogs";
 import { ALL_SECTIONS, type ChecklistItem as CatalogItem, type ChecklistKind } from "./checklist";
-import type { Blame, Destination, Maintenance } from "./maintenance";
+import type { Blame, BootIssue, Destination, Maintenance } from "./maintenance";
 
 /** Tópico do checklist (a unidade que recebe OK ou Falha). */
 export type ChecklistItem = (typeof ALL_SECTIONS)[number];
@@ -41,6 +41,12 @@ export interface DeviceDraft {
   observacao?: string;
   /** Reprovado manualmente (botão Reprovar), mesmo sem falha marcada nos tópicos. */
   reprovado?: boolean;
+  /** Ativo bloqueado (manutenção, desmontagem e desmontagem técnica). */
+  bloqueado?: boolean;
+  /** Desmontagem: aparelho com tampa ou tela alta. */
+  tampaAlta?: boolean;
+  /** Desmontagem técnica: não liga ou em looping. */
+  defeito?: BootIssue;
   criado?: string;
   /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
   autor?: string;
@@ -66,6 +72,9 @@ export interface DeviceDoc {
   pecas?: Maintenance[];
   origem?: string;
   observacao?: string;
+  bloqueado?: boolean;
+  tampaAlta?: boolean;
+  defeito?: BootIssue;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -130,6 +139,9 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     pecas: record.pecas,
     origem: record.origem,
     observacao: record.observacao,
+    bloqueado: record.bloqueado,
+    tampaAlta: record.tampaAlta,
+    defeito: record.defeito,
     criado: record.criado,
     autor: record.autor,
     colaborador: record.colaborador,
@@ -258,6 +270,9 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     pecas: draft.pecas ?? [],
     origem: draft.origem,
     observacao: draft.observacao,
+    bloqueado: draft.bloqueado,
+    tampaAlta: draft.tampaAlta,
+    defeito: draft.defeito,
     status: draft.reprovado ? "reprovado" : stats.status,
     falhas: describeFailures(draft.r, draft.tipo),
     testados: stats.done,
@@ -301,7 +316,7 @@ export function isSameLocalDay(iso: string | undefined, now = new Date()): boole
  * Se quem fechou por último reprovou, nenhum libera.
  */
 export function latestReleasingId(history: readonly DeviceRecord[]): string | undefined {
-  const concluded = history.filter((r) => r.fase === "concluido" && r.tipo !== "montagem");
+  const concluded = history.filter((r) => r.fase === "concluido" && (r.tipo ?? "manutencao") === "manutencao");
   const last = concluded.reduce<DeviceRecord | undefined>(
     (best, r) => (!best || (r.atualizado ?? "") >= (best.atualizado ?? "") ? r : best),
     undefined,

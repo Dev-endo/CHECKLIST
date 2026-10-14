@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { blankDraft, toDeviceDoc } from "./device";
 import {
   describeMaintenance,
+  DISASSEMBLY_DESTINATIONS,
+  parseBootIssue,
+  TECHNICAL_DISASSEMBLY_DESTINATIONS,
   destinationLabel,
   parseDestination,
   isMaintenanceComplete,
@@ -78,5 +81,19 @@ describe("destino", () => {
 
   it("is saved with the checklist", () => {
     expect(toDeviceDoc({ ...blankDraft(), destino: "montagem" }, "2026-02-01T00:00:00.000Z").destino).toBe("montagem");
+  });
+});
+
+describe("desmontagem", () => {
+  it("knows the PT destination and the boot issues", () => {
+    expect(parseDestination("pt")).toBe("pt");
+    expect(destinationLabel("pt")).toBe("Enviado para PT");
+    expect(parseBootIssue("looping")).toBe("looping");
+    expect(parseBootIssue("x")).toBeUndefined();
+  });
+
+  it("offers analysis and PT only in the technical disassembly", () => {
+    expect(DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["manutencao", "montagem"]);
+    expect(TECHNICAL_DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["analise", "manutencao", "montagem", "pt"]);
   });
 });

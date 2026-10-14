@@ -1,18 +1,26 @@
-export type UserRole = "admin" | "supervisor" | "tecnico" | "montador" | "colaborador";
+export type UserRole = "admin" | "supervisor" | "tecnico" | "desmontador" | "montador" | "colaborador";
 
 /** Ordem em que os papéis aparecem na tela de administração. */
-export const ROLES: readonly UserRole[] = ["admin", "supervisor", "tecnico", "montador", "colaborador"];
+export const ROLES: readonly UserRole[] = ["admin", "supervisor", "tecnico", "desmontador", "montador", "colaborador"];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrador",
   supervisor: "Supervisor",
   tecnico: "Técnico",
+  desmontador: "Desmontador",
   montador: "Montador",
   // Quem acabou de entrar: não acessa nada até o admin definir o papel.
   colaborador: "Sem função",
 };
 
-export type TabId = "checklist" | "montagem" | "quarentena" | "registros" | "admin";
+export type TabId =
+  | "checklist"
+  | "desmontagem"
+  | "desmontagem_tecnica"
+  | "montagem"
+  | "quarentena"
+  | "registros"
+  | "admin";
 
 /** Supervisor e admin enxergam os checklists de todos. */
 export function canReviewAll(role: UserRole): boolean {
@@ -29,6 +37,11 @@ export function canDoMaintenance(role: UserRole): boolean {
   return role === "tecnico" || role === "admin";
 }
 
+/** Desmontagem e desmontagem técnica: desmontadores (e o admin). */
+export function canDoDisassembly(role: UserRole): boolean {
+  return role === "desmontador" || role === "admin";
+}
+
 /** Checklist de montagem: montadores (e o admin). */
 export function canDoAssembly(role: UserRole): boolean {
   return role === "montador" || role === "admin";
@@ -38,6 +51,7 @@ export function canDoAssembly(role: UserRole): boolean {
 export function accessibleTabs(role: UserRole): TabId[] {
   const tabs: TabId[] = [];
   if (canDoMaintenance(role)) tabs.push("checklist");
+  if (canDoDisassembly(role)) tabs.push("desmontagem", "desmontagem_tecnica");
   if (canDoAssembly(role)) tabs.push("montagem");
   if (canDoAssembly(role)) tabs.push("quarentena");
   if (canReviewAll(role)) tabs.push("registros");

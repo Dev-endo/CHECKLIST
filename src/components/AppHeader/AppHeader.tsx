@@ -8,6 +8,8 @@ export type AppTab = TabId;
 
 const TAB_LABELS: Record<AppTab, string> = {
   checklist: "Checklist de manutenção",
+  desmontagem: "Desmontagem",
+  desmontagem_tecnica: "Desmontagem técnica",
   montagem: "Checklist de montagem",
   quarentena: "Quarentena",
   registros: "Registros",

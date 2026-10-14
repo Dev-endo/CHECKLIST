@@ -41,7 +41,8 @@ export const PLACA_SERVICES: readonly string[] = [];
 /** Para onde o aparelho vai depois da manutenção, quando o checklist sai todo OK. */
 /** "analise": checklist reprovado enviado para análise técnica (sem isso, continua em manutenção). */
 /** "bloqueio" e "quarentena": para onde segue uma montagem aprovada. */
-export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "quarentena" | "manutencao";
+/** "pt": enviado pela desmontagem técnica. */
+export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "quarentena" | "manutencao" | "pt";
 
 export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "montagem", label: "Liberado para montagem" },
@@ -61,12 +62,38 @@ export const ASSEMBLY_REJECT_DESTINATIONS: readonly { id: Destination; label: st
   { id: "manutencao", label: "Retorno para manutenção" },
 ];
 
+/** Direcionamento ao concluir a desmontagem. */
+export const DISASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[] = [
+  { id: "manutencao", label: "Enviar para manutenção" },
+  { id: "montagem", label: "Enviar para montagem" },
+];
+
+/** Direcionamento ao concluir a desmontagem técnica. */
+export const TECHNICAL_DISASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[] = [
+  { id: "analise", label: "Enviar para análise" },
+  ...DISASSEMBLY_DESTINATIONS,
+  { id: "pt", label: "Enviar para PT" },
+];
+
+/** Defeito de partida do aparelho na desmontagem técnica. */
+export type BootIssue = "nao_liga" | "looping";
+
+export const BOOT_ISSUES: readonly { id: BootIssue; label: string }[] = [
+  { id: "nao_liga", label: "Aparelho não liga" },
+  { id: "looping", label: "Aparelho em looping" },
+];
+
+export function parseBootIssue(value: unknown): BootIssue | undefined {
+  return value === "nao_liga" || value === "looping" ? value : undefined;
+}
+
 /** Escolha de um checklist reprovado que segue para análise técnica. */
 export const ANALYSIS_LABEL = "Enviado para análise técnica";
 
 export function destinationLabel(destination: Destination): string {
   if (destination === "analise") return ANALYSIS_LABEL;
   if (destination === "manutencao") return "Retorno para manutenção";
+  if (destination === "pt") return "Enviado para PT";
   return [...DESTINATIONS, ...ASSEMBLY_DESTINATIONS].find((d) => d.id === destination)?.label ?? destination;
 }
 
@@ -76,7 +103,8 @@ export function parseDestination(value: unknown): Destination | undefined {
     value === "analise" ||
     value === "bloqueio" ||
     value === "quarentena" ||
-    value === "manutencao"
+    value === "manutencao" ||
+    value === "pt"
     ? value
     : undefined;
 }

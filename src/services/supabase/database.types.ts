@@ -46,6 +46,9 @@ export type Database = {
           asset_short_id: string | null
           battery_health: number | null
           blame: string | null
+          blocked: boolean
+          boot_issue: string | null
+          high_lid: boolean | null
           destination: string | null
           faulty_parts: Json
           kind: string
@@ -70,6 +73,9 @@ export type Database = {
           asset_short_id?: string | null
           battery_health?: number | null
           blame?: string | null
+          blocked?: boolean
+          boot_issue?: string | null
+          high_lid?: boolean | null
           destination?: string | null
           faulty_parts?: Json
           kind?: string
@@ -94,6 +100,9 @@ export type Database = {
           asset_short_id?: string | null
           battery_health?: number | null
           blame?: string | null
+          blocked?: boolean
+          boot_issue?: string | null
+          high_lid?: boolean | null
           destination?: string | null
           faulty_parts?: Json
           kind?: string
@@ -211,6 +220,7 @@ export type Database = {
         Args: { p_serial: string }
         Returns: {
           device_id: string
+          kind: string
           destination: string | null
           status: Database["public"]["Enums"]["device_status"]
           technician: string
@@ -218,6 +228,10 @@ export type Database = {
         }[]
       }
       assembly_report: {
+        Args: { p_from?: string; p_to?: string; p_user?: string }
+        Returns: Json
+      }
+      disassembly_report: {
         Args: { p_from?: string; p_to?: string; p_user?: string }
         Returns: Json
       }
@@ -229,7 +243,7 @@ export type Database = {
     Enums: {
       device_phase: "pendente" | "concluido"
       device_status: "incompleto" | "liberado" | "reprovado"
-      user_role: "admin" | "supervisor" | "colaborador" | "tecnico" | "montador"
+      user_role: "admin" | "supervisor" | "colaborador" | "tecnico" | "montador" | "desmontador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -359,7 +373,7 @@ export const Constants = {
     Enums: {
       device_phase: ["pendente", "concluido"],
       device_status: ["incompleto", "liberado", "reprovado"],
-      user_role: ["admin", "supervisor", "colaborador", "tecnico", "montador"],
+      user_role: ["admin", "supervisor", "colaborador", "tecnico", "montador", "desmontador"],
     },
   },
 } as const

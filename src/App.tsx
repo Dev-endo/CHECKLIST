@@ -6,6 +6,7 @@ import { Checklist } from "./components/Checklist/Checklist";
 import { DeviceForm } from "./components/DeviceForm/DeviceForm";
 import { DuplicateHint } from "./components/DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "./components/RecordsPanel/RecordsPanel";
+import { DisassemblyChecklist } from "./components/DisassemblyChecklist/DisassemblyChecklist";
 import { AssemblyChecklist } from "./components/AssemblyChecklist/AssemblyChecklist";
 import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
@@ -171,9 +172,9 @@ export default function App() {
     await finishConclude([]);
   };
 
-  const finishConclude = async (maintenances: Maintenance[], destino?: Destination) => {
+  const finishConclude = async (maintenances: Maintenance[], destino?: Destination, bloqueado?: boolean) => {
     setConcluding(true);
-    const ok = await conclude({ ...draft, manutencoes: maintenances, destino });
+    const ok = await conclude({ ...draft, manutencoes: maintenances, destino, bloqueado });
     setConcluding(false);
     setMaintenanceOpen(false);
     if (ok) {
@@ -215,6 +216,8 @@ export default function App() {
             Seu acesso ainda não foi liberado. Peça ao administrador para definir o seu papel.
           </div>
         )}
+        {activeTab === "desmontagem" && <DisassemblyChecklist kind="desmontagem" />}
+        {activeTab === "desmontagem_tecnica" && <DisassemblyChecklist kind="desmontagem_tecnica" />}
         {activeTab === "montagem" && <AssemblyChecklist />}
         {activeTab === "quarentena" && client && <QuarantinePanel client={client} userId={userId} />}
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
@@ -288,7 +291,7 @@ export default function App() {
         faceIdDefect={hasFaceIdDefect(draft.r, draft.tipo)}
         rejected={computeStats(draft.r, draft.tipo).status === "reprovado"}
         onCancel={() => setMaintenanceOpen(false)}
-        onConfirm={(maintenances, destination) => void finishConclude(maintenances, destination)}
+        onConfirm={(maintenances, destination, blocked) => void finishConclude(maintenances, destination, blocked)}
       />
     </>
   );

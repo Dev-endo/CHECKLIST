@@ -18,8 +18,11 @@ export interface ChecklistBlock {
   items: readonly ChecklistItem[];
 }
 
-/** Qual checklist: o de manutenção (técnico) ou o de montagem (montador). */
-export type ChecklistKind = "manutencao" | "montagem";
+/** Qual checklist: manutenção, montagem, desmontagem ou desmontagem técnica. */
+export type ChecklistKind = "manutencao" | "montagem" | "desmontagem" | "desmontagem_tecnica";
+
+/** As duas desmontagens têm os mesmos testes e não passam pela liberação da manutenção. */
+export const isDisassembly = (kind: ChecklistKind): boolean => kind === "desmontagem" || kind === "desmontagem_tecnica";
 
 export const slug = (text: string) =>
   text

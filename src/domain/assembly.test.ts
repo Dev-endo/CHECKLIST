@@ -93,7 +93,7 @@ describe("culpa", () => {
 });
 
 describe("describeAssemblyBlock", () => {
-  const ok = { deviceId: "d", destination: "montagem", status: "liberado" as const, technician: "Ana" };
+  const ok = { deviceId: "d", kind: "manutencao", destination: "montagem", status: "liberado" as const, technician: "Ana" };
 
   it("lets only devices released for assembly by the last maintenance checklist in", () => {
     expect(describeAssemblyBlock(ok)).toBeNull();
@@ -101,6 +101,15 @@ describe("describeAssemblyBlock", () => {
     expect(describeAssemblyBlock({ ...ok, status: "reprovado" })).toMatch(/não o liberou/);
     expect(describeAssemblyBlock({ ...ok, destination: "vidro" })).toMatch(/vidro/);
     expect(describeAssemblyBlock({ ...ok, status: "reprovado", destination: "analise" })).toMatch(/análise técnica/);
+  });
+
+  it("lets a device in when the last disassembly checklist sent it to assembly, whatever the test results", () => {
+    const disassembled = { ...ok, kind: "desmontagem", status: "reprovado" as const };
+    expect(describeAssemblyBlock(disassembled)).toBeNull();
+    expect(describeAssemblyBlock({ ...disassembled, kind: "desmontagem_tecnica" })).toBeNull();
+    expect(describeAssemblyBlock({ ...disassembled, destination: "manutencao" })).toMatch(/manutenção/);
+    expect(describeAssemblyBlock({ ...disassembled, destination: "pt" })).toMatch(/PT/);
+    expect(describeAssemblyBlock({ ...disassembled, destination: "analise" })).toMatch(/análise técnica/);
   });
 });
 

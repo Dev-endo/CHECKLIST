@@ -5,7 +5,15 @@ import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchAssetHistory } from "../../services/supabase/releaseService";
 import { formatDateTime } from "../../utils/format";
 import { Button } from "../Button/Button";
+import type { ChecklistKind } from "../../domain/checklist";
 import styles from "./AssetHistoryDialog.module.css";
+
+const KIND_LABELS: Record<ChecklistKind, string> = {
+  manutencao: "Manutenção",
+  montagem: "Montagem",
+  desmontagem: "Desmontagem",
+  desmontagem_tecnica: "Desmontagem técnica",
+};
 
 interface AssetHistoryDialogProps {
   client: AppSupabaseClient;
@@ -77,7 +85,7 @@ export function AssetHistoryDialog({ client, serial, onClose }: AssetHistoryDial
                     <span className={styles.when}>{formatDateTime(record.atualizado)}</span>
                   </div>
                   <div className={styles.badges}>
-                    <span className={styles.badge}>{record.tipo === "montagem" ? "Montagem" : "Manutenção"}</span>
+                    <span className={styles.badge}>{KIND_LABELS[record.tipo ?? "manutencao"]}</span>
                     <span className={styles.badge}>{isPending(record) ? "Pendente" : "Concluído"}</span>
                     {record.destino === "analise" && <span className={styles.badge}>Análise técnica</span>}
                     {record.tipo === "montagem" && record.destino && record.status === "liberado" && (

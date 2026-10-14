@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { splitAssetId } from "../../domain/device";
 import { lookupAsset } from "../../services/supabase/assetsService";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
+  fetchQuarantineDaily,
   registerQuarantine,
+  type QuarantineDay,
   type QuarantineEntry,
   type QuarantineResult,
 } from "../../services/supabase/quarantineService";
@@ -29,6 +31,18 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
   const [result, setResult] = useState<QuarantineResult>("aprovado");
   const [entries, setEntries] = useState<QuarantineEntry[]>([]);
   const [saving, setSaving] = useState(false);
+  const [days, setDays] = useState<QuarantineDay[] | "error" | null>(null);
+  const [reloads, setReloads] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    fetchQuarantineDaily(client)
+      .then((data) => active && setDays(data))
+      .catch(() => active && setDays("error"));
+    return () => {
+      active = false;
+    };
+  }, [client, reloads]);
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -62,6 +76,7 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
       await registerQuarantine(client, entries);
       toast(`Quarentena registrada: ${approved} aprovados, ${rejected} reprovados`);
       setEntries([]);
+      setReloads((n) => n + 1);
     } catch {
       toast("Não foi possível registrar. Tente de novo.");
     } finally {
@@ -146,6 +161,40 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
           {saving ? "Registrando…" : "Registrar quarentena"}
         </Button>
       </div>
+
+      <h3 className={styles.subtitle}>Por dia (últimos 30 dias)</h3>
+      {days === "error" && <div className={recordStyles.empty}>Não foi possível carregar os números por dia.</div>}
+      {days === null && <div className={recordStyles.empty}>Carregando…</div>}
+      {Array.isArray(days) &&
+        (days.length ? (
+          <table className={styles.days}>
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Liberados (aprovados)</th>
+                <th>Recusados (reprovados)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days.map((day) => (
+                <tr key={day.date}>
+                  <td>{day.date.split("-").reverse().join("/")}</td>
+                  <td>{day.approved}</td>
+                  <td>{day.rejected}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td>{days.reduce((n, day) => n + day.approved, 0)}</td>
+                <td>{days.reduce((n, day) => n + day.rejected, 0)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        ) : (
+          <div className={recordStyles.empty}>Nenhum registro nos últimos 30 dias.</div>
+        ))}
     </section>
   );
 }

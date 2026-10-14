@@ -2,7 +2,7 @@ import type { DeviceDoc, DeviceRecord, Results } from "../../domain/device";
 import { RECORDS_LIMIT, type DeviceRepository } from "../deviceRepository";
 import type { AppSupabaseClient } from "./client";
 import type { ChecklistKind } from "../../domain/checklist";
-import { parseBlame, parseDestination, parseMaintenances } from "../../domain/maintenance";
+import { parseBlame, parseBootIssue, parseDestination, parseMaintenances } from "../../domain/maintenance";
 import type { Json, Tables, TablesInsert } from "./database.types";
 
 type DeviceRow = Tables<"devices">;
@@ -10,6 +10,10 @@ type DeviceRow = Tables<"devices">;
 export type DeviceRowWithOwner = DeviceRow & { profiles?: { name: string; email: string } | null };
 
 const TABLE = "devices";
+
+function parseKind(kind: string): ChecklistKind {
+  return kind === "montagem" || kind === "desmontagem" || kind === "desmontagem_tecnica" ? kind : "manutencao";
+}
 
 export function toRecord(row: DeviceRowWithOwner): DeviceRecord {
   return {
@@ -23,11 +27,14 @@ export function toRecord(row: DeviceRowWithOwner): DeviceRecord {
     bateria: row.battery_health ?? undefined,
     manutencoes: parseMaintenances(row.maintenances),
     destino: parseDestination(row.destination),
-    tipo: row.kind === "montagem" ? "montagem" : "manutencao",
+    tipo: parseKind(row.kind),
     culpa: parseBlame(row.blame),
     pecas: parseMaintenances(row.faulty_parts),
     origem: row.source_device_id ?? undefined,
     observacao: row.notes ?? undefined,
+    bloqueado: row.blocked ?? undefined,
+    tampaAlta: row.high_lid ?? undefined,
+    defeito: parseBootIssue(row.boot_issue),
     status: row.status,
     falhas: row.failed_items,
     testados: row.tested_count,
@@ -54,6 +61,9 @@ function toRow(id: string, userId: string, doc: DeviceDoc): TablesInsert<"device
     faulty_parts: (doc.pecas ?? []) as unknown as Json,
     source_device_id: doc.origem ?? null,
     notes: doc.observacao ?? null,
+    blocked: doc.bloqueado ?? false,
+    high_lid: doc.tampaAlta ?? null,
+    boot_issue: doc.defeito ?? null,
     technician: doc.tec,
     results: doc.r,
     // O banco só aceita criar como pendente; concluir é um segundo passo.

@@ -3,6 +3,8 @@ import type { AppSupabaseClient } from "./client";
 export interface AssemblySource {
   /** Checklist de manutenção que liberou (ou não) o aparelho. */
   deviceId: string;
+  /** Qual checklist foi o último do serial: manutenção ou uma das desmontagens. */
+  kind: string;
   destination: string | null;
   status: "liberado" | "reprovado" | "incompleto";
   technician: string;
@@ -14,14 +16,19 @@ export async function fetchAssemblySource(client: AppSupabaseClient, serial: str
   if (error) throw error;
   const row = data[0];
   return row
-    ? { deviceId: row.device_id, destination: row.destination, status: row.status, technician: row.technician }
+    ? { deviceId: row.device_id, kind: row.kind, destination: row.destination, status: row.status, technician: row.technician }
     : null;
 }
 
-/** O aparelho pode ser montado? Só se o último checklist de manutenção o liberou para montagem. */
+/** O aparelho pode ser montado? Só se o último checklist (manutenção ou desmontagem) o liberou para montagem. */
 export function describeAssemblyBlock(source: AssemblySource | null): string | null {
   if (!source) return "Este aparelho não passou pelo checklist de manutenção.";
   if (source.destination === "analise") return "Este aparelho foi enviado para análise técnica.";
+  if (source.destination === "pt") return "Este aparelho foi enviado para PT.";
+  // Desmontagem: vale o direcionamento escolhido, não o resultado dos testes.
+  if (source.kind !== "manutencao") {
+    return source.destination === "montagem" ? null : "Este aparelho foi enviado da desmontagem para a manutenção.";
+  }
   if (source.status !== "liberado") return "O último checklist de manutenção deste aparelho não o liberou.";
   if (source.destination !== "montagem") return "Este aparelho foi enviado para vidro e ainda está em manutenção.";
   return null;

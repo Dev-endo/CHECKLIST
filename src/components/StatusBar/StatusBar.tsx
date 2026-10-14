@@ -20,12 +20,14 @@ interface StatusBarProps {
   mode: "edit" | "view";
   busy?: boolean;
   onConclude: () => void;
+  /** Texto do botão de concluir; padrão: "Concluir". */
+  concludeLabel?: string;
   /** Reprovar direto, sem precisar marcar falha nos tópicos (montagem). */
   onReject?: () => void;
   onNewDevice: () => void;
 }
 
-export function StatusBar({ kind = "manutencao", results, saveState, mode, busy = false, onConclude, onReject, onNewDevice }: StatusBarProps) {
+export function StatusBar({ kind = "manutencao", results, saveState, mode, busy = false, onConclude, concludeLabel = "Concluir", onReject, onNewDevice }: StatusBarProps) {
   const total = totalTests(kind);
   const { done, fails, status, faceIdDefect } = computeStats(results, kind);
 
@@ -71,7 +73,7 @@ export function StatusBar({ kind = "manutencao", results, saveState, mode, busy 
                 </Button>
               )}
               <Button onClick={onConclude} disabled={busy}>
-                {busy ? "Concluindo…" : "Concluir"}
+                {busy ? "Concluindo…" : concludeLabel}
               </Button>
             </>
           ) : (

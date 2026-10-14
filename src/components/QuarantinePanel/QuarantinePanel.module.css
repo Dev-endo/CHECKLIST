@@ -101,3 +101,32 @@
   font-size: 13.5px;
   color: var(--muted);
 }
+
+.subtitle {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 14px 6px;
+  border-top: 1px solid var(--line);
+}
+
+.days {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.days th,
+.days td {
+  text-align: right;
+  padding: 7px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.days th:first-child,
+.days td:first-child {
+  text-align: left;
+}
+
+.days tfoot td {
+  font-weight: 600;
+}

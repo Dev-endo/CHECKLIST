@@ -18,7 +18,7 @@ interface MaintenanceDialogProps {
   open: boolean;
   busy?: boolean;
   onCancel: () => void;
-  onConfirm: (maintenances: Maintenance[], destination?: Destination) => void;
+  onConfirm: (maintenances: Maintenance[], destination?: Destination, blocked?: boolean) => void;
   /** Face ID com defeito: o aparelho segue para a montagem e depois para laudo e revenda. */
   faceIdDefect?: boolean;
   /** Checklist reprovado: marca as manutenções feitas e, se quiser, envia para análise técnica. */
@@ -34,6 +34,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
   const [destination, setDestination] = useState<Destination | undefined>();
   // Só no checklist reprovado: envia o aparelho para análise técnica.
   const [analysis, setAnalysis] = useState(false);
+  // Ativo aberto e bloqueado: conta como bloqueado na análise (cada serial uma vez).
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     const element = dialog.current;
@@ -42,6 +44,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       setSelected([]);
       setNone(false);
       setAnalysis(false);
+      setBlocked(false);
       setDestination(undefined);
       element.showModal();
     }
@@ -138,6 +141,11 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
         </label>
       )}
 
+      <label className={[styles.option, styles.none].join(" ")}>
+        <input type="checkbox" checked={blocked} disabled={busy} onChange={(e) => setBlocked(e.target.checked)} />
+        <span>Ativo bloqueado</span>
+      </label>
+
       {rejected ? (
         <label className={[styles.option, styles.none].join(" ")}>
           <input type="checkbox" checked={analysis} disabled={busy} onChange={(e) => setAnalysis(e.target.checked)} />
@@ -168,7 +176,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
           Voltar
         </Button>
         <Button
-          onClick={() => onConfirm(selected, rejected ? (analysis ? "analise" : undefined) : destination)}
+          onClick={() => onConfirm(selected, rejected ? (analysis ? "analise" : undefined) : destination, blocked)}
           disabled={busy || !complete || !chosen || (!rejected && !destination)}
         >
           {busy ? "Concluindo…" : "Concluir checklist"}

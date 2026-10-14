@@ -23,8 +23,14 @@ export interface MaintenanceReport {
   releasedResale: number;
   /** Ativos (seriais) enviados para análise técnica. */
   sentAnalysis: number;
+  /** Ativos (seriais) enviados para PT pela desmontagem técnica. */
+  sentPt: number;
+  /** Desmontagens concluídas (normal + técnica); cada checklist conta. */
+  disassemblies: number;
+  /** Ativos (seriais) marcados como bloqueados na manutenção. */
+  blockedMaintenance: number;
   byTechnician: { name: string; assembly: number; glass: number; rejected: number }[];
-  /** Total de manutenções registradas (uma por item marcado). */
+  /** Total de manutenções registradas (uma por item marcado), incluindo as trocas da desmontagem técnica. */
   maintenancesTotal: number;
   byItem: { item: string; count: number; assets: number }[];
   placaDetails: { detail: string; count: number }[];
@@ -57,6 +63,9 @@ export async function fetchMaintenanceReport(
     released_glass: number;
     released_resale?: number;
     sent_analysis?: number;
+    sent_pt?: number;
+    disassemblies?: number;
+    blocked_maintenance?: number;
     by_technician: { name: string; assembly: number; glass: number; rejected: number }[];
     maintenances_total: number;
     by_item: { item: string; count: number; assets: number }[];
@@ -71,6 +80,9 @@ export async function fetchMaintenanceReport(
     releasedGlass: raw.released_glass ?? 0,
     releasedResale: raw.released_resale ?? 0,
     sentAnalysis: raw.sent_analysis ?? 0,
+    sentPt: raw.sent_pt ?? 0,
+    disassemblies: raw.disassemblies ?? 0,
+    blockedMaintenance: raw.blocked_maintenance ?? 0,
     byTechnician: raw.by_technician ?? [],
     maintenancesTotal: raw.maintenances_total,
     byItem: raw.by_item,

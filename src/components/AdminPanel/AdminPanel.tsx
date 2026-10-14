@@ -86,7 +86,7 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
         </div>
         <p className={styles.note}>
           Quem entra com o Google começa Sem função e não acessa nada até você definir o papel. Técnico faz o checklist de
-          manutenção; Montador faz o checklist de montagem; Supervisor só consulta os registros. O Administrador acessa
+          manutenção; Desmontador faz a desmontagem e a desmontagem técnica; Montador faz o checklist de montagem; Supervisor só consulta os registros. O Administrador acessa
           tudo e é o único que altera papéis.
         </p>
         {body}
