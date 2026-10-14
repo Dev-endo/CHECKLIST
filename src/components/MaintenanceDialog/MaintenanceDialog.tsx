@@ -25,6 +25,8 @@ interface MaintenanceDialogProps {
   rejected?: boolean;
 }
 
+const PT_OPTION = { id: "pt", label: "Enviar para PT" } as const;
+
 /** Escolha de um checklist com falha que segue sem destino: continua em manutenção. */
 const STAYS = "continua";
 
@@ -60,11 +62,12 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
     ? [
         { id: "montagem", label: "Enviar para montagem" },
         { id: "analise", label: ANALYSIS_LABEL },
+        PT_OPTION,
         { id: STAYS, label: "Continua em manutenção" },
       ]
     : faceIdDefect
-      ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }]
-      : DESTINATIONS;
+      ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }, PT_OPTION]
+      : [...DESTINATIONS, PT_OPTION];
   // Revenda: o aparelho segue para a montagem automaticamente.
   const choice: Destination | typeof STAYS | undefined = resale ? "montagem" : destination;
   const placa = selected.find((m) => m.item === PLACA_ITEM);
