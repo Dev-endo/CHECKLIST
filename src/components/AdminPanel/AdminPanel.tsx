@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ROLE_LABELS, ROLES, type UserRole } from "../../domain/roles";
+import { EXTRA_ROLES, ROLE_LABELS, ROLES, type UserRole } from "../../domain/roles";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import { fetchProfiles, updateRole, type Profile } from "../../services/supabase/profilesService";
+import { fetchProfiles, updateExtraRoles, updateRole, type Profile } from "../../services/supabase/profilesService";
 import { formatDateTime } from "../../utils/format";
 import { AssetImport } from "./AssetImport";
 import { useToast } from "../Toast/ToastProvider";
@@ -45,6 +45,20 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
     }
   };
 
+  const handleExtra = async (profile: Profile, role: UserRole, checked: boolean) => {
+    const next = checked ? [...profile.extraRoles, role] : profile.extraRoles.filter((r) => r !== role);
+    setSavingId(profile.id);
+    try {
+      await updateExtraRoles(client, profile.id, next);
+      setProfiles((prev) => prev?.map((p) => (p.id === profile.id ? { ...p, extraRoles: next } : p)) ?? prev);
+      toast(`${profile.name || profile.email}: ${[profile.role, ...next].map((r) => ROLE_LABELS[r]).join(" · ")}`);
+    } catch {
+      toast("Não foi possível alterar as funções");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   let body: ReactNode;
   if (failed) body = <div className={recordStyles.empty}>Não foi possível carregar os usuários.</div>;
   else if (!profiles) body = <div className={recordStyles.empty}>Carregando usuários…</div>;
@@ -73,6 +87,20 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
               </option>
             ))}
           </select>
+          <div className={styles.extras}>
+            <span>Também atua como:</span>
+            {EXTRA_ROLES.filter((role) => role !== profile.role).map((role) => (
+              <label key={role} className={styles.extra}>
+                <input
+                  type="checkbox"
+                  checked={profile.extraRoles.includes(role)}
+                  disabled={isSelf || savingId === profile.id}
+                  onChange={(e) => void handleExtra(profile, role, e.target.checked)}
+                />
+                {ROLE_LABELS[role]}
+              </label>
+            ))}
+          </div>
         </div>
       );
     });
@@ -85,7 +113,7 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
           <h2>Usuários e acessos</h2>
         </div>
         <p className={styles.note}>
-          Quem entra com o Google começa Sem função e não acessa nada até você definir o papel. Técnico faz o checklist de
+          Quem entra com o Google começa Sem função e não acessa nada até você definir o papel. Além do papel principal, marque as outras funções da pessoa (Técnico, Desmontador, Montador): ela vê as abas de todas. Técnico faz o checklist de
           manutenção; Desmontador faz a desmontagem e a desmontagem técnica; Montador faz o checklist de montagem; Supervisor só consulta os registros. O Administrador acessa
           tudo e é o único que altera papéis.
         </p>

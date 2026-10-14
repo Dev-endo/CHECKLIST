@@ -70,9 +70,10 @@ export const DISASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string
 
 /** Direcionamento ao concluir a desmontagem técnica. */
 export const TECHNICAL_DISASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[] = [
-  { id: "analise", label: "Enviar para análise" },
-  ...DISASSEMBLY_DESTINATIONS,
+  { id: "montagem", label: "Enviar para montagem" },
   { id: "pt", label: "Enviar para PT" },
+  { id: "manutencao", label: "Enviar para manutenção" },
+  { id: "analise", label: "Enviar para análise técnica" },
 ];
 
 /** Defeito de partida do aparelho na desmontagem técnica. */

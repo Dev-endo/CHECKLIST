@@ -18,6 +18,17 @@ describe("accessibleTabs", () => {
     expect(canDoAssembly("supervisor")).toBe(false);
   });
 
+  it("adds up the tabs of every role a person has", () => {
+    expect(accessibleTabs(["tecnico", "montador"])).toEqual(["checklist", "montagem", "quarentena"]);
+    expect(accessibleTabs(["desmontador", "tecnico", "montador"])).toEqual([
+      "checklist",
+      "desmontagem",
+      "desmontagem_tecnica",
+      "montagem",
+      "quarentena",
+    ]);
+  });
+
   it("gives nothing to who has no function yet", () => {
     expect(accessibleTabs("colaborador")).toEqual([]);
   });

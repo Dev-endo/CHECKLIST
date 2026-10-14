@@ -44,6 +44,7 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
     setField,
     toggleResult,
     toggleItemFail,
+    setBattery,
     setConfirm,
     openRecord,
     restartRecord,
@@ -155,7 +156,11 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
       destino: outcome.destination,
       bloqueado: outcome.blocked,
       tampaAlta: outcome.highLid,
-      defeito: outcome.bootIssue,
+      consumo: outcome.consumption,
+      obsConsumo: outcome.consumptionNote,
+      ptMarcado: outcome.pt,
+      obsPt: outcome.ptNote,
+      pecas: outcome.neededParts ?? [],
       manutencoes: outcome.parts ?? [],
     });
     setConcluding(false);
@@ -208,6 +213,8 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
         results={draft.r}
         onToggle={toggleResult}
         onToggleItem={toggleItemFail}
+        battery={draft.bateria}
+        onBatteryChange={setBattery}
         onConfirm={setConfirm}
         disabled={!editable}
       />

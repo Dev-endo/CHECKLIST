@@ -6,6 +6,8 @@ export interface Profile {
   name: string;
   email: string;
   role: UserRole;
+  /** Papéis de operação somados ao principal. */
+  extraRoles: UserRole[];
   createdAt: string;
 }
 
@@ -30,6 +32,27 @@ export async function updateRole(client: AppSupabaseClient, id: string, role: Us
   if (!data.length) throw new Error("Sem permissão para alterar este usuário");
 }
 
-function toProfile(row: { id: string; name: string; email: string; role: UserRole; created_at: string }): Profile {
-  return { id: row.id, name: row.name, email: row.email, role: row.role, createdAt: row.created_at };
+/** Só o admin consegue, e nunca na própria conta (política RLS). */
+export async function updateExtraRoles(client: AppSupabaseClient, id: string, extraRoles: UserRole[]): Promise<void> {
+  const { data, error } = await client.from("profiles").update({ extra_roles: extraRoles }).eq("id", id).select("id");
+  if (error) throw error;
+  if (!data.length) throw new Error("Sem permissão para alterar este usuário");
+}
+
+function toProfile(row: {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  extra_roles?: UserRole[];
+  created_at: string;
+}): Profile {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    extraRoles: row.extra_roles ?? [],
+    createdAt: row.created_at,
+  };
 }

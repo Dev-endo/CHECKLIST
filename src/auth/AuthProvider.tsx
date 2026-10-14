@@ -10,6 +10,8 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  /** Papel principal e papéis extras. */
+  roles: UserRole[];
 }
 
 export type AuthStatus = "loading" | "signedOut" | "ready" | "error";
@@ -27,7 +29,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function toUser(profile: Profile): AuthUser {
-  return { id: profile.id, name: profile.name, email: profile.email, role: profile.role };
+  return { id: profile.id, name: profile.name, email: profile.email, role: profile.role, roles: [profile.role, ...profile.extraRoles] };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

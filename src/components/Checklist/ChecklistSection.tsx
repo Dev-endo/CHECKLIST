@@ -35,6 +35,7 @@ export function ChecklistSection({
   disabled,
 }: ChecklistSectionProps) {
   const result = results[block.id] || undefined;
+  const pointing = allowPointing && !block.noPointing;
 
   return (
     <section className={[styles.block, result && styles[result]].filter(Boolean).join(" ")}>
@@ -44,13 +45,13 @@ export function ChecklistSection({
           {block.title}
         </h2>
       </div>
-      {result === "fail" && allowPointing && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
+      {result === "fail" && pointing && <p className={styles.failHint}>Aponte onde ocorreu a falha (opcional):</p>}
       {block.items.map((item) => (
         <ChecklistItemRow
           key={item.id}
           item={item}
           sectionId={block.id}
-          selectable={result === "fail" && allowPointing}
+          selectable={result === "fail" && pointing}
           failed={results[item.id] === "fail"}
           disabled={disabled}
           onToggleFail={onToggleItem}

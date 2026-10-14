@@ -20,7 +20,7 @@ interface AppHeaderProps {
   tabs: readonly AppTab[];
   active: AppTab;
   onChange: (tab: AppTab) => void;
-  user: { name: string; email: string; role: UserRole } | null;
+  user: { name: string; email: string; roles: readonly UserRole[] } | null;
   onSignOut: () => void;
 }
 
@@ -47,7 +47,7 @@ export function AppHeader({ tabs, active, onChange, user, onSignOut }: AppHeader
         <div className={styles.user}>
           <span className={styles.who}>
             <span className={styles.name}>{user.name || user.email}</span>
-            <span className={styles.role}>{ROLE_LABELS[user.role]}</span>
+            <span className={styles.role}>{user.roles.map((role) => ROLE_LABELS[role]).join(" · ")}</span>
           </span>
           <Button variant="small" onClick={onSignOut}>
             Sair

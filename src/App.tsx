@@ -62,7 +62,7 @@ export default function App() {
   // missing: o serial não está na planilha de ativos (segue permitido, só avisa).
   const [assetState, setAssetState] = useState<"idle" | "found" | "missing">("idle");
   // Cada papel abre na primeira aba a que tem acesso (sem login, no modo local, só há o checklist).
-  const allowedTabs: AppTab[] = user ? accessibleTabs(user.role) : ["checklist"];
+  const allowedTabs: AppTab[] = user ? accessibleTabs(user.roles) : ["checklist"];
   const [tab, setTab] = useState<AppTab>(allowedTabs[0] ?? "checklist");
   const [concluding, setConcluding] = useState(false);
   // Checklist com tudo OK: antes de concluir, pergunta as manutenções realizadas.

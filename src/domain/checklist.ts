@@ -15,6 +15,8 @@ export interface ChecklistBlock {
   title: string;
   /** Só tem a caixa de confirmação: sem OK nem Falha, e não conta como tópico a testar. */
   confirmOnly?: boolean;
+  /** Só OK ou Falha no tópico: sem apontar o item em que a falha ocorreu. */
+  noPointing?: boolean;
   items: readonly ChecklistItem[];
 }
 

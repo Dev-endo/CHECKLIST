@@ -36,7 +36,7 @@ export function Checklist({
           results={results}
           onToggle={onToggle}
           onToggleItem={onToggleItem}
-          allowPointing={kind === "manutencao"}
+          allowPointing={kind === "manutencao" || kind === "desmontagem_tecnica"}
           battery={battery}
           onBatteryChange={onBatteryChange}
           onConfirm={onConfirm}

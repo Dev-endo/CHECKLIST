@@ -1,6 +1,6 @@
-import { buildCatalog, type ChecklistBlock } from "./checklist";
+import { buildCatalog, CHECKLIST, type ChecklistBlock } from "./checklist";
 
-/** Desmontagem e desmontagem técnica: mesmos testes, com o aparelho aberto. */
+/** Desmontagem: testes com o aparelho aberto. */
 const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
   {
     title: "Teste de display",
@@ -39,3 +39,26 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
 ];
 
 export const DISASSEMBLY_CHECKLIST: readonly ChecklistBlock[] = buildCatalog(BLOCKS);
+
+/** Desmontagem técnica: o checklist de manutenção mais o teste na fonte de bancada. */
+export const TECHNICAL_DISASSEMBLY_CHECKLIST: readonly ChecklistBlock[] = [
+  ...CHECKLIST,
+  ...buildCatalog([
+    {
+      title: "Fonte de bancada",
+      noPointing: true,
+      items: [{ id: "d-fonte", title: "Fonte de bancada", details: "Testar o consumo do aparelho." }],
+    },
+    {
+      title: "Teste de reinício",
+      noPointing: true,
+      items: [
+        {
+          id: "d-reinicio",
+          title: "Teste de reinício",
+          details: "Testar o aparelho por 5 minutos para garantir que ele não reinicia.",
+        },
+      ],
+    },
+  ]),
+];

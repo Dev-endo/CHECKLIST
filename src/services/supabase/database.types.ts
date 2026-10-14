@@ -48,6 +48,10 @@ export type Database = {
           blame: string | null
           blocked: boolean
           boot_issue: string | null
+          consumption: boolean | null
+          consumption_note: string | null
+          pt_flagged: boolean | null
+          pt_note: string | null
           high_lid: boolean | null
           destination: string | null
           faulty_parts: Json
@@ -75,6 +79,10 @@ export type Database = {
           blame?: string | null
           blocked?: boolean
           boot_issue?: string | null
+          consumption?: boolean | null
+          consumption_note?: string | null
+          pt_flagged?: boolean | null
+          pt_note?: string | null
           high_lid?: boolean | null
           destination?: string | null
           faulty_parts?: Json
@@ -102,6 +110,10 @@ export type Database = {
           blame?: string | null
           blocked?: boolean
           boot_issue?: string | null
+          consumption?: boolean | null
+          consumption_note?: string | null
+          pt_flagged?: boolean | null
+          pt_note?: string | null
           high_lid?: boolean | null
           destination?: string | null
           faulty_parts?: Json
@@ -137,6 +149,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          extra_roles: Database["public"]["Enums"]["user_role"][]
           id: string
           name: string
           role: Database["public"]["Enums"]["user_role"]
@@ -144,6 +157,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email?: string
+          extra_roles?: Database["public"]["Enums"]["user_role"][]
           id: string
           name?: string
           role?: Database["public"]["Enums"]["user_role"]
@@ -151,6 +165,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          extra_roles?: Database["public"]["Enums"]["user_role"][]
           id?: string
           name?: string
           role?: Database["public"]["Enums"]["user_role"]

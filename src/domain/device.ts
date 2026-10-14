@@ -47,6 +47,12 @@ export interface DeviceDraft {
   tampaAlta?: boolean;
   /** Desmontagem técnica: não liga ou em looping. */
   defeito?: BootIssue;
+  /** Desmontagem técnica: aparelho com consumo na fonte de bancada e a observação. */
+  consumo?: boolean;
+  obsConsumo?: string;
+  /** Desmontagem técnica: marcado como PT e a observação. */
+  ptMarcado?: boolean;
+  obsPt?: string;
   criado?: string;
   /** Dono do registro; vazio enquanto o rascunho ainda não foi gravado. */
   autor?: string;
@@ -75,6 +81,10 @@ export interface DeviceDoc {
   bloqueado?: boolean;
   tampaAlta?: boolean;
   defeito?: BootIssue;
+  consumo?: boolean;
+  obsConsumo?: string;
+  ptMarcado?: boolean;
+  obsPt?: string;
   status: DeviceStatus;
   falhas: string[];
   testados: number;
@@ -142,6 +152,10 @@ export function draftFromRecord(record: DeviceRecord): DeviceDraft {
     bloqueado: record.bloqueado,
     tampaAlta: record.tampaAlta,
     defeito: record.defeito,
+    consumo: record.consumo,
+    obsConsumo: record.obsConsumo,
+    ptMarcado: record.ptMarcado,
+    obsPt: record.obsPt,
     criado: record.criado,
     autor: record.autor,
     colaborador: record.colaborador,
@@ -273,6 +287,10 @@ export function toDeviceDoc(draft: DeviceDraft, now: string): DeviceDoc {
     bloqueado: draft.bloqueado,
     tampaAlta: draft.tampaAlta,
     defeito: draft.defeito,
+    consumo: draft.consumo,
+    obsConsumo: draft.obsConsumo,
+    ptMarcado: draft.ptMarcado,
+    obsPt: draft.obsPt,
     status: draft.reprovado ? "reprovado" : stats.status,
     falhas: describeFailures(draft.r, draft.tipo),
     testados: stats.done,
