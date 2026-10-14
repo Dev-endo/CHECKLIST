@@ -98,7 +98,9 @@ describe("describeAssemblyBlock", () => {
   it("lets only devices released for assembly by the last maintenance checklist in", () => {
     expect(describeAssemblyBlock(ok)).toBeNull();
     expect(describeAssemblyBlock(null)).toMatch(/não passou/);
-    expect(describeAssemblyBlock({ ...ok, status: "reprovado" })).toMatch(/não o liberou/);
+    expect(describeAssemblyBlock({ ...ok, status: "reprovado", destination: null as unknown as string })).toMatch(/não o liberou/);
+    // Falha no checklist, mas o técnico enviou para a montagem (ex.: revenda).
+    expect(describeAssemblyBlock({ ...ok, status: "reprovado" })).toBeNull();
     expect(describeAssemblyBlock({ ...ok, destination: "vidro" })).toMatch(/vidro/);
     expect(describeAssemblyBlock({ ...ok, status: "reprovado", destination: "analise" })).toMatch(/análise técnica/);
   });

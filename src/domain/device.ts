@@ -352,7 +352,7 @@ export function latestReleasingId(history: readonly DeviceRecord[]): string | un
     (best, r) => (!best || (r.atualizado ?? "") >= (best.atualizado ?? "") ? r : best),
     undefined,
   );
-  return last?.status === "liberado" ? last.id : undefined;
+  return last?.status === "liberado" || last?.destino === "montagem" ? last.id : undefined;
 }
 
 export function matchesSearch(record: DeviceRecord, query: string): boolean {

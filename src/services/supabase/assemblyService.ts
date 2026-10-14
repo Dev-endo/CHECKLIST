@@ -29,9 +29,10 @@ export function describeAssemblyBlock(source: AssemblySource | null): string | n
   if (source.kind !== "manutencao") {
     return source.destination === "montagem" ? null : "Este aparelho foi enviado da desmontagem para a manutenção.";
   }
+  // O técnico pode enviar para a montagem mesmo com falha no checklist (ex.: revenda).
+  if (source.destination === "montagem") return null;
   if (source.status !== "liberado") return "O último checklist de manutenção deste aparelho não o liberou.";
-  if (source.destination !== "montagem") return "Este aparelho foi enviado para vidro e ainda está em manutenção.";
-  return null;
+  return "Este aparelho foi enviado para vidro e ainda está em manutenção.";
 }
 
 /** Uma montagem reprovada: o aparelho, quem fez a manutenção, quem montou e o motivo. */
