@@ -25,6 +25,8 @@ export interface MaintenanceReport {
   sentAnalysis: number;
   /** Ativos (seriais) enviados para PT pela desmontagem técnica. */
   sentPt: number;
+  /** Ativos (seriais) enviados pela manutenção para aguardando peça. */
+  awaitingPart: number;
   /** Desmontagens concluídas (normal + técnica); cada checklist conta. */
   disassemblies: number;
   /** Ativos (seriais) marcados como bloqueados na manutenção. */
@@ -64,6 +66,7 @@ export async function fetchMaintenanceReport(
     released_resale?: number;
     sent_analysis?: number;
     sent_pt?: number;
+    awaiting_part?: number;
     disassemblies?: number;
     blocked_maintenance?: number;
     by_technician: { name: string; assembly: number; glass: number; rejected: number }[];
@@ -81,6 +84,7 @@ export async function fetchMaintenanceReport(
     releasedResale: raw.released_resale ?? 0,
     sentAnalysis: raw.sent_analysis ?? 0,
     sentPt: raw.sent_pt ?? 0,
+    awaitingPart: raw.awaiting_part ?? 0,
     disassemblies: raw.disassemblies ?? 0,
     blockedMaintenance: raw.blocked_maintenance ?? 0,
     byTechnician: raw.by_technician ?? [],

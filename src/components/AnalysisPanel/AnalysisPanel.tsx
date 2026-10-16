@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { splitAssetId, toDateInputValue } from "../../domain/device";
 import { destinationLabel, type Destination } from "../../domain/maintenance";
 import type { AppSupabaseClient } from "../../services/supabase/client";
@@ -13,6 +13,7 @@ import {
   type AssemblyReport,
 } from "../../services/supabase/assemblyService";
 import { fetchDisassemblyReport, type DisassemblyReport } from "../../services/supabase/disassemblyService";
+import { AnalysisDevicesDialog } from "../AnalysisDevicesDialog/AnalysisDevicesDialog";
 import { Button } from "../Button/Button";
 import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
 import reviewStyles from "../ReviewPanel/ReviewPanel.module.css";
@@ -30,6 +31,12 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "manutencoes", label: "Manutenções" },
   { id: "montagem", label: "Montagem" },
 ];
+
+/** Clicar em um número abre a lista de aparelhos que o compõem. */
+const DetailContext = createContext<(metric: string, label: string) => void>(() => undefined);
+
+/** Recarrega sozinho a cada minuto e ao voltar para a aba, para não mostrar números velhos. */
+const REFRESH_MS = 60_000;
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
@@ -57,6 +64,11 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   const [disassembly, setDisassembly] = useState<DisassemblyReport | null | "error">(null);
   const [failed, setFailed] = useState(false);
   const [reloads, setReloads] = useState(0);
+  const [detail, setDetail] = useState<{ metric: string; label: string } | null>(null);
+  // Filtros do último carregamento: trocar o filtro limpa os números; recarregar não.
+  const loadedFilters = useRef<MaintenanceReportFilters | null>(null);
+  // Dia em que os filtros "até hoje" foram montados: se a virada do dia passar, eles acompanham.
+  const today = useRef(toDateInputValue());
 
   const setFilter = (key: keyof MaintenanceReportFilters, value: string) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -72,10 +84,32 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   }, [client]);
 
   useEffect(() => {
+    const tick = () => {
+      const now = toDateInputValue();
+      if (now !== today.current) {
+        const before = today.current;
+        today.current = now;
+        setFilters((prev) => (prev.to === before ? { ...prev, to: now } : prev));
+      }
+      setReloads((n) => n + 1);
+    };
+    const timer = setInterval(tick, REFRESH_MS);
+    const onVisible = () => document.visibilityState === "visible" && tick();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
-    setReport(null);
-    setAssembly(null);
-    setDisassembly(null);
+    if (loadedFilters.current !== filters) {
+      loadedFilters.current = filters;
+      setReport(null);
+      setAssembly(null);
+      setDisassembly(null);
+    }
     setFailed(false);
     fetchMaintenanceReport(client, filters)
       .then((data) => active && setReport(data))
@@ -149,7 +183,8 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
           </select>
         </label>
       </div>
-      {body}
+      <DetailContext.Provider value={(metric, label) => setDetail({ metric, label })}>{body}</DetailContext.Provider>
+      <AnalysisDevicesDialog client={client} detail={detail} filters={filters} onClose={() => setDetail(null)} />
     </section>
   );
 }
@@ -169,21 +204,22 @@ function ReleasesView({
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Desmontados" value={dis?.total ?? 0} hint="desmontagem normal + técnica; cada checklist conta" />
-        <Stat label="Enviados para vidro" value={report.releasedGlass} hint="pela manutenção; cada envio conta" />
-        <Stat label="Manutenções executadas" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
+        <Stat label="Desmontados" metric="disassembled" value={dis?.total ?? 0} hint="desmontagem normal + técnica; cada checklist conta" />
+        <Stat label="Enviados para vidro" metric="released_glass" value={report.releasedGlass} hint="pela manutenção; cada envio conta" />
+        <Stat label="Aguardando peça" metric="awaiting_part" value={report.awaitingPart} hint="continuam em manutenção; serial = 1 ativo" />
+        <Stat label="Manutenções executadas" metric="maintenance_items" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
         <Stat
-          label="Enviados para montagem"
+          label="Enviados para montagem" metric="sent_assembly"
           value={report.releasedAssembly + (dis?.toAssembly ?? 0)}
           hint="liberados pela manutenção + enviados pela desmontagem; cada envio conta"
         />
-        <Stat label="Aprovados na montagem" value={found?.released ?? 0} hint="serial = 1 ativo" />
-        <Stat label="Reprovados na montagem" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
-        <Stat label="Aprovados na quarentena" value={found?.quarantineApproved ?? 0} hint="cada registro conta" />
-        <Stat label="Reprovados na quarentena" value={found?.quarantineRejected ?? 0} hint="cada registro conta" />
-        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
-        <Stat label="Bloqueados" value={found?.releasedBlock ?? 0} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
-        <Stat label="Enviados para PT" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
+        <Stat label="Aprovados na montagem" metric="assembly_approved" value={found?.released ?? 0} hint="serial = 1 ativo" />
+        <Stat label="Reprovados na montagem" metric="assembly_rejected" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
+        <Stat label="Aprovados na quarentena" metric="quarantine_approved" value={found?.quarantineApproved ?? 0} hint="cada registro conta" />
+        <Stat label="Reprovados na quarentena" metric="quarantine_rejected" value={found?.quarantineRejected ?? 0} hint="cada registro conta" />
+        <Stat label="Enviados para análise técnica" metric="sent_analysis" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Bloqueados" metric="blocked" value={found?.releasedBlock ?? 0} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Enviados para PT" metric="sent_pt" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
       </div>
       {(assembly === "error" || disassembly === "error") && (
         <div className={recordStyles.empty}>Não foi possível carregar todos os números.</div>
@@ -205,11 +241,11 @@ function DisassemblyView({ disassembly }: { disassembly: DisassemblyReport | nul
   if (!disassembly) return <div className={recordStyles.empty}>Carregando análise…</div>;
   return (
     <div className={styles.stats}>
-      <Stat label="Desmontados" value={disassembly.total} hint="desmontagem normal + técnica; cada checklist conta" />
-      <Stat label="Enviados para montagem" value={disassembly.toAssembly} hint="cada envio conta" />
-      <Stat label="Enviados para manutenção" value={disassembly.toMaintenance} hint="cada envio conta" />
-      <Stat label="Enviados para análise" value={disassembly.toAnalysis} hint="cada envio conta" />
-      <Stat label="Viraram PT" value={disassembly.toPt} hint="desmontagem técnica; cada envio conta" />
+      <Stat label="Desmontados" metric="disassembled" value={disassembly.total} hint="desmontagem normal + técnica; cada checklist conta" />
+      <Stat label="Enviados para montagem" metric="dis_assembly" value={disassembly.toAssembly} hint="cada envio conta" />
+      <Stat label="Enviados para manutenção" metric="dis_maintenance" value={disassembly.toMaintenance} hint="cada envio conta" />
+      <Stat label="Enviados para análise" metric="dis_analysis" value={disassembly.toAnalysis} hint="cada envio conta" />
+      <Stat label="Viraram PT" metric="dis_pt" value={disassembly.toPt} hint="desmontagem técnica; cada envio conta" />
     </div>
   );
 }
@@ -220,12 +256,13 @@ function MaintenancesView({ report }: { report: MaintenanceReport }) {
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Liberados para montagem" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
-        <Stat label="Enviados para vidro" value={report.releasedGlass} hint="continuam em manutenção; cada envio conta" />
-        <Stat label="Manutenções feitas" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
-        <Stat label="Enviados para análise técnica" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
-        <Stat label="Enviados para PT" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
-        <Stat label="Bloqueados" value={report.blockedMaintenance} hint="marcados bloqueados na manutenção; serial = 1 ativo" />
+        <Stat label="Liberados para montagem" metric="released_assembly" value={report.releasedAssembly} hint="pela manutenção; cada liberação conta" />
+        <Stat label="Enviados para vidro" metric="released_glass" value={report.releasedGlass} hint="continuam em manutenção; cada envio conta" />
+        <Stat label="Aguardando peça" metric="awaiting_part" value={report.awaitingPart} hint="continuam em manutenção; serial = 1 ativo" />
+        <Stat label="Manutenções feitas" metric="maintenance_items" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
+        <Stat label="Enviados para análise técnica" metric="sent_analysis" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Enviados para PT" metric="sent_pt" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
+        <Stat label="Bloqueados" metric="blocked_maintenance" value={report.blockedMaintenance} hint="marcados bloqueados na manutenção; serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Manutenções por tipo</h3>
@@ -273,11 +310,11 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Aparelhos montados" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
-        <Stat label="Aprovados na montagem" value={assembly.released} hint="serial = 1 ativo" />
-        <Stat label="Reprovados na montagem" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
-        <Stat label="Montagem enviada para análise" value={assembly.returnedAnalysis} hint="reprovados na montagem; serial = 1 ativo" />
-        <Stat label="Enviados para quarentena" value={assembly.releasedQuarantine} hint="aprovados na montagem; serial = 1 ativo" />
+        <Stat label="Aparelhos montados" metric="assembled" value={assembly.checklists} hint="aprovados + reprovados; cada passagem conta, mesmo do mesmo serial" />
+        <Stat label="Aprovados na montagem" metric="assembly_approved" value={assembly.released} hint="serial = 1 ativo" />
+        <Stat label="Reprovados na montagem" metric="assembly_rejected" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
+        <Stat label="Montagem enviada para análise" metric="assembly_analysis" value={assembly.returnedAnalysis} hint="reprovados na montagem; serial = 1 ativo" />
+        <Stat label="Enviados para quarentena" metric="assembly_quarantine" value={assembly.releasedQuarantine} hint="aprovados na montagem; serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Por montador</h3>
@@ -386,12 +423,19 @@ function TechnicianTable({
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: number; hint?: string }) {
-  return (
-    <div className={styles.stat}>
+function Stat({ label, value, hint, metric }: { label: string; value: number; hint?: string; metric?: string }) {
+  const open = useContext(DetailContext);
+  const content = (
+    <>
       <span className={styles.statValue}>{fmt(value)}</span>
       <span className={styles.statLabel}>{label}</span>
       {hint && <span className={styles.statHint}>{hint}</span>}
-    </div>
+    </>
+  );
+  if (!metric) return <div className={styles.stat}>{content}</div>;
+  return (
+    <button type="button" className={`${styles.stat} ${styles.statButton}`} onClick={() => open(metric, label)}>
+      {content}
+    </button>
   );
 }

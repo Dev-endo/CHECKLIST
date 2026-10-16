@@ -92,6 +92,11 @@ describe("desmontagem", () => {
     expect(parseBootIssue("x")).toBeUndefined();
   });
 
+  it("knows the awaiting part destination", () => {
+    expect(parseDestination("aguardando_peca")).toBe("aguardando_peca");
+    expect(destinationLabel("aguardando_peca")).toBe("Aguardando peça");
+  });
+
   it("offers analysis and PT only in the technical disassembly", () => {
     expect(DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["manutencao", "montagem"]);
     expect(TECHNICAL_DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["montagem", "pt", "manutencao", "analise"]);

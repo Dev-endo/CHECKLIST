@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ANALYSIS_LABEL,
+  AWAITING_PART_LABEL,
   DESTINATIONS,
   isMaintenanceComplete,
   MAINTENANCE_ITEMS,
@@ -18,7 +19,7 @@ interface MaintenanceDialogProps {
   open: boolean;
   busy?: boolean;
   onCancel: () => void;
-  onConfirm: (maintenances: Maintenance[], destination?: Destination, blocked?: boolean, resale?: boolean) => void;
+  onConfirm: (maintenances: Maintenance[], destination?: Destination, blocked?: boolean, resale?: boolean, note?: string) => void;
   /** Face ID com defeito: o aparelho segue para a montagem e depois para laudo e revenda. */
   faceIdDefect?: boolean;
   /** Checklist reprovado: marca as manutenções feitas e, se quiser, envia para análise técnica. */
@@ -26,6 +27,7 @@ interface MaintenanceDialogProps {
 }
 
 const PT_OPTION = { id: "pt", label: "Enviar para PT" } as const;
+const AWAITING_OPTION = { id: "aguardando_peca", label: AWAITING_PART_LABEL } as const;
 
 /** Escolha de um checklist com falha que segue sem destino: continua em manutenção. */
 const STAYS = "continua";
@@ -41,6 +43,8 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
   const [blocked, setBlocked] = useState(false);
   // Aparelho vai para revenda? Sim leva direto para a montagem. Com Face ID com defeito já vem em Sim.
   const [resale, setResale] = useState<boolean | undefined>();
+  // Aguardando peça: observação obrigatória (qual peça, previsão etc.).
+  const [note, setNote] = useState("");
 
   useEffect(() => {
     const element = dialog.current;
@@ -49,6 +53,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
       setSelected([]);
       setNone(false);
       setBlocked(false);
+      setNote("");
       setResale(faceIdDefect ? true : undefined);
       setDestination(undefined);
       element.showModal();
@@ -64,11 +69,12 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
         { id: "vidro", label: "Enviado para vidro" },
         { id: "analise", label: ANALYSIS_LABEL },
         PT_OPTION,
+        AWAITING_OPTION,
         { id: STAYS, label: "Continua em manutenção" },
       ]
     : faceIdDefect
-      ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }, PT_OPTION]
-      : [...DESTINATIONS, PT_OPTION];
+      ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }, PT_OPTION, AWAITING_OPTION]
+      : [...DESTINATIONS, PT_OPTION, AWAITING_OPTION];
   // Revenda: o aparelho segue para a montagem automaticamente.
   const choice: Destination | typeof STAYS | undefined = resale ? "montagem" : destination;
   const placa = selected.find((m) => m.item === PLACA_ITEM);
@@ -81,6 +87,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
   else if (!chosen) warn = 'Marque as manutenções feitas ou "Nenhuma manutenção executada".';
   else if (resale === undefined) warn = "Informe se o aparelho vai para revenda.";
   else if (!choice) warn = "Escolha para onde o aparelho vai.";
+  else if (choice === "aguardando_peca" && !note.trim()) warn = "Escreva a observação do aguardando peça.";
 
   return (
     <dialog
@@ -190,6 +197,12 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
           </label>
         ))}
       </fieldset>
+      {choice === "aguardando_peca" && (
+        <label className={styles.detail}>
+          Observação (qual peça está aguardando)
+          <textarea value={note} maxLength={500} rows={2} disabled={busy} onChange={(e) => setNote(e.target.value)} />
+        </label>
+      )}
       {!rejected && (
         <p className={styles.help}>
           Só "Liberado para montagem" tira o aparelho da manutenção. Enviado para vidro ou para análise técnica, ele continua em manutenção.
@@ -201,7 +214,7 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
           Voltar
         </Button>
         <Button
-          onClick={() => onConfirm(selected, choice === STAYS ? undefined : choice, blocked, resale)}
+          onClick={() => onConfirm(selected, choice === STAYS ? undefined : choice, blocked, resale, choice === "aguardando_peca" ? note.trim() : undefined)}
           disabled={busy || Boolean(warn)}
         >
           {busy ? "Concluindo…" : "Concluir checklist"}

@@ -161,3 +161,17 @@
   text-align: left;
   vertical-align: top;
 }
+
+/* Número clicável: abre a lista de aparelhos. */
+.statButton {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.statButton:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}

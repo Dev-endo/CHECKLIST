@@ -42,7 +42,8 @@ export const PLACA_SERVICES: readonly string[] = [];
 /** "analise": checklist reprovado enviado para análise técnica (sem isso, continua em manutenção). */
 /** "bloqueio" e "quarentena": para onde segue uma montagem aprovada. */
 /** "pt": enviado pela desmontagem técnica. */
-export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "quarentena" | "manutencao" | "pt";
+/** "aguardando_peca": a manutenção espera uma peça; o aparelho continua em manutenção. */
+export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "quarentena" | "manutencao" | "pt" | "aguardando_peca";
 
 export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "montagem", label: "Liberado para montagem" },
@@ -61,6 +62,9 @@ export const ASSEMBLY_REJECT_DESTINATIONS: readonly { id: Destination; label: st
   { id: "analise", label: "Liberado para análise técnica" },
   { id: "manutencao", label: "Retorno para manutenção" },
 ];
+
+/** Destino da manutenção: aguarda a chegada de uma peça. */
+export const AWAITING_PART_LABEL = "Aguardando peça";
 
 /** Direcionamento ao concluir a desmontagem. */
 export const DISASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[] = [
@@ -95,6 +99,7 @@ export function destinationLabel(destination: Destination): string {
   if (destination === "analise") return ANALYSIS_LABEL;
   if (destination === "manutencao") return "Retorno para manutenção";
   if (destination === "pt") return "Enviado para PT";
+  if (destination === "aguardando_peca") return AWAITING_PART_LABEL;
   return [...DESTINATIONS, ...ASSEMBLY_DESTINATIONS].find((d) => d.id === destination)?.label ?? destination;
 }
 
@@ -105,7 +110,8 @@ export function parseDestination(value: unknown): Destination | undefined {
     value === "bloqueio" ||
     value === "quarentena" ||
     value === "manutencao" ||
-    value === "pt"
+    value === "pt" ||
+    value === "aguardando_peca"
     ? value
     : undefined;
 }
