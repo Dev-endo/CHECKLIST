@@ -103,6 +103,16 @@ export function destinationLabel(destination: Destination): string {
   return [...DESTINATIONS, ...ASSEMBLY_DESTINATIONS].find((d) => d.id === destination)?.label ?? destination;
 }
 
+/** Nome do destino na etapa de origem: a desmontagem "envia"; a montagem reprovada "retorna". */
+export function destinationLabelFor(stage: string | undefined, destination: Destination): string {
+  if (stage === "desmontagem" || stage === "desmontagem_tecnica") {
+    if (destination === "manutencao") return "Enviado para manutenção";
+    if (destination === "montagem") return "Enviado para montagem";
+    if (destination === "analise") return ANALYSIS_LABEL;
+  }
+  return destinationLabel(destination);
+}
+
 export function parseDestination(value: unknown): Destination | undefined {
   return value === "montagem" ||
     value === "vidro" ||

@@ -1,5 +1,6 @@
+import { KIND_LABELS } from "../../domain/checklist";
 import { computeStats, describeFailures, isPending, isResale, splitAssetId, totalTests, type DeviceRecord } from "../../domain/device";
-import { describeMaintenance, destinationLabel } from "../../domain/maintenance";
+import { describeMaintenance, destinationLabel, destinationLabelFor } from "../../domain/maintenance";
 import { formatDateTime } from "../../utils/format";
 import { Button } from "../Button/Button";
 import styles from "./RecordsPanel.module.css";
@@ -16,9 +17,11 @@ interface RecordRowProps {
   released?: boolean;
   /** Abre o histórico do serial (consulta de supervisor e admin). */
   onHistory?: (record: DeviceRecord) => void;
+  /** Falso esconde o botão Abrir (etapas que não abrem no checklist de manutenção). */
+  canOpen?: boolean;
 }
 
-export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = false, released = false, onHistory }: RecordRowProps) {
+export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = false, released = false, onHistory, canOpen = true }: RecordRowProps) {
   const computed = computeStats(record.r, record.tipo);
   // Concluído vale o resultado gravado (inclui a reprovação manual da montagem).
   const stats = isPending(record) || !record.status ? computed : { ...computed, status: record.status };
@@ -47,6 +50,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
           {record.modelo || "Sem modelo"} · {record.serial || "sem serial"}
         </div>
         <div className={styles.meta}>
+          {showOwner && `${KIND_LABELS[record.tipo ?? "manutencao"]} · `}
           {record.bateria !== undefined && `Bateria ${record.bateria}% · `}
           {record.ativo && `Unit ${splitAssetId(record.ativo).code || record.ativo} · `}
           {formatDateTime(record.atualizado)}
@@ -72,7 +76,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
         {pending ? "Pendente" : "Concluído"}
       </span>
       <span className={[styles.badge, badge.className].filter(Boolean).join(" ")}>{badge.label}</span>
-      {record.destino === "manutencao" && <span className={[styles.badge, styles.pending].join(" ")}>Retorno para manutenção</span>}
+      {record.destino === "manutencao" && <span className={[styles.badge, styles.pending].join(" ")}>{destinationLabelFor(record.tipo, "manutencao")}</span>}
       {record.destino === "analise" && <span className={[styles.badge, styles.pending].join(" ")}>Análise técnica</span>}
       {record.destino === "aguardando_peca" && <span className={[styles.badge, styles.pending].join(" ")}>Aguardando peça</span>}
       {record.destino === "pt" && <span className={[styles.badge, styles.pending].join(" ")}>PT</span>}
@@ -81,9 +85,11 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
         <span className={styles.meta}>aberto</span>
       ) : (
         <div className={styles.actions}>
-          <Button variant="small" onClick={() => onOpen(record)}>
-            {pending && onRestart ? "Retomar" : "Abrir"}
-          </Button>
+          {canOpen && (
+            <Button variant="small" onClick={() => onOpen(record)}>
+              {pending && onRestart ? "Retomar" : "Abrir"}
+            </Button>
+          )}
           {onHistory && record.serial && (
             <Button variant="small" onClick={() => onHistory(record)}>
               Histórico

@@ -25,6 +25,13 @@ export interface ChecklistBlock {
 /** Qual checklist: manutenção, montagem, desmontagem ou desmontagem técnica. */
 export type ChecklistKind = "manutencao" | "montagem" | "desmontagem" | "desmontagem_tecnica";
 
+export const KIND_LABELS: Record<ChecklistKind, string> = {
+  manutencao: "Manutenção",
+  montagem: "Montagem",
+  desmontagem: "Desmontagem",
+  desmontagem_tecnica: "Desmontagem técnica",
+};
+
 /** As duas desmontagens têm os mesmos testes e não passam pela liberação da manutenção. */
 export const isDisassembly = (kind: ChecklistKind): boolean => kind === "desmontagem" || kind === "desmontagem_tecnica";
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { KIND_LABELS, type ChecklistKind } from "../../domain/checklist";
 import { toDateInputValue, type DeviceRecord } from "../../domain/device";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { useReleasedIds } from "../../hooks/useReleasedIds";
@@ -27,7 +28,7 @@ const SERIAL_DEBOUNCE_MS = 300;
 /** Abre mostrando só os checklists de hoje; o filtro de datas libera os outros dias. */
 const todayFilters = (): ReviewFilters => {
   const today = toDateInputValue();
-  return { from: today, to: today, userId: "", serial: "" };
+  return { from: today, to: today, userId: "", serial: "", kind: "" };
 };
 
 /** Consulta, só leitura, dos checklists de todos os colaboradores. */
@@ -40,7 +41,7 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
   const [historySerial, setHistorySerial] = useState<string | null>(null);
   const releasedIds = useReleasedIds(client, list.records);
 
-  const setFilter = (key: "from" | "to" | "userId", value: string) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const setFilter = (key: "from" | "to" | "userId" | "kind", value: string) => setFilters((prev) => ({ ...prev, [key]: value }));
 
   useEffect(() => {
     let active = true;
@@ -70,7 +71,7 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
 
   const today = toDateInputValue();
   const onlyToday = filters.from === today && filters.to === today;
-  const hasFilters = !onlyToday || Boolean(filters.userId || serialInput);
+  const hasFilters = !onlyToday || Boolean(filters.userId || serialInput || filters.kind);
   const resetToToday = () => {
     setSerialInput("");
     setFilters(todayFilters());
@@ -94,7 +95,9 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
             key={record.id}
             record={record}
             isCurrent={false}
+            // Só a manutenção abre no checklist de manutenção; as outras etapas se consultam pelo histórico.
             onOpen={onOpen}
+            canOpen={record.tipo === undefined || record.tipo === "manutencao"}
             showOwner
             released={releasedIds.has(record.id)}
             onHistory={(item) => setHistorySerial(item.serial ?? null)}
@@ -145,6 +148,17 @@ export function ReviewPanel({ client, onOpen }: ReviewPanelProps) {
             {people.map((person) => (
               <option key={person.id} value={person.id}>
                 {person.name || person.email}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          Etapa
+          <select value={filters.kind} onChange={(e) => setFilter("kind", e.target.value as ChecklistKind | "")}>
+            <option value="">Todas</option>
+            {(Object.keys(KIND_LABELS) as ChecklistKind[]).map((kind) => (
+              <option key={kind} value={kind}>
+                {KIND_LABELS[kind]}
               </option>
             ))}
           </select>

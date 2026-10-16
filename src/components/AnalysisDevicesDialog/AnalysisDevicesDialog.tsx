@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { splitAssetId } from "../../domain/device";
-import { destinationLabel, parseDestination } from "../../domain/maintenance";
+import { destinationLabelFor, parseDestination } from "../../domain/maintenance";
 import { fetchAnalysisDevices, type AnalysisDevice } from "../../services/supabase/analysisDevicesService";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import type { MaintenanceReportFilters } from "../../services/supabase/reportService";
@@ -96,7 +96,7 @@ export function AnalysisDevicesDialog({ client, detail, filters, onClose }: Anal
                     <td>{STAGE_LABELS[row.stage] ?? row.stage}</td>
                     <td>{row.person}</td>
                     <td>{formatDateTime(row.at ?? undefined)}</td>
-                    <td>{destination ? destinationLabel(destination) : row.stage === "quarentena" ? row.status : "—"}</td>
+                    <td>{destination ? destinationLabelFor(row.stage, destination) : row.stage === "quarentena" ? row.status : "—"}</td>
                     <td>{row.observations.join(" · ") || "—"}</td>
                   </tr>
                 );

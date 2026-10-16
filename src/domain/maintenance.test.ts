@@ -6,6 +6,7 @@ import {
   parseBootIssue,
   TECHNICAL_DISASSEMBLY_DESTINATIONS,
   destinationLabel,
+  destinationLabelFor,
   parseDestination,
   isMaintenanceComplete,
   MAINTENANCE_ITEMS,
@@ -100,5 +101,14 @@ describe("desmontagem", () => {
   it("offers analysis and PT only in the technical disassembly", () => {
     expect(DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["manutencao", "montagem"]);
     expect(TECHNICAL_DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["montagem", "pt", "manutencao", "analise"]);
+  });
+});
+
+describe("destinationLabelFor", () => {
+  it("says 'enviado' for the disassembly and 'retorno' for a rejected assembly", () => {
+    expect(destinationLabelFor("desmontagem", "manutencao")).toBe("Enviado para manutenção");
+    expect(destinationLabelFor("desmontagem_tecnica", "montagem")).toBe("Enviado para montagem");
+    expect(destinationLabelFor("montagem", "manutencao")).toBe("Retorno para manutenção");
+    expect(destinationLabelFor("manutencao", "montagem")).toBe("Liberado para montagem");
   });
 });

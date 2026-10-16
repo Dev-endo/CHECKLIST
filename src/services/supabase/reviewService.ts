@@ -1,3 +1,4 @@
+import type { ChecklistKind } from "../../domain/checklist";
 import type { DeviceRecord } from "../../domain/device";
 import type { AppSupabaseClient } from "./client";
 import { toRecord } from "./supabaseRepository";
@@ -11,6 +12,8 @@ export interface ReviewFilters {
   /** Id do colaborador, ou vazio para todos. */
   userId: string;
   serial: string;
+  /** Etapa (manutenção, montagem, desmontagens), ou vazio para todas. */
+  kind: ChecklistKind | "";
 }
 
 const startOfDay = (date: string) => new Date(`${date}T00:00:00`);
@@ -29,10 +32,10 @@ export async function fetchReviewRecords(client: AppSupabaseClient, filters: Rev
   let query = client
     .from("devices")
     .select("*, profiles(name, email)", { count: "exact" })
-    .eq("kind", "manutencao")
     .order("created_at", { ascending: false })
     .limit(REVIEW_LIMIT);
 
+  if (filters.kind) query = query.eq("kind", filters.kind);
   if (filters.userId) query = query.eq("user_id", filters.userId);
   const serial = filters.serial.trim();
   if (serial) query = query.ilike("serial", `%${escapeLike(serial)}%`);
