@@ -270,6 +270,7 @@ export type Database = {
           user_id: string
           name: string
           maintenance: number
+          maintenance_items: number
           disassembly: number
           technical: number
           assembly: number

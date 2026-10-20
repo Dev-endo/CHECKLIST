@@ -61,7 +61,10 @@ export async function fetchPartChanges(
 export interface CollaboratorSummary {
   userId: string;
   name: string;
+  /** Checklists de manutenção concluídos. */
   maintenance: number;
+  /** Manutenções feitas (itens), contando também as trocas da desmontagem técnica. */
+  maintenanceItems: number;
   disassembly: number;
   technical: number;
   assembly: number;
@@ -79,6 +82,7 @@ export async function fetchCollaboratorSummary(
     userId: row.user_id,
     name: row.name,
     maintenance: Number(row.maintenance),
+    maintenanceItems: Number(row.maintenance_items),
     disassembly: Number(row.disassembly),
     technical: Number(row.technical),
     assembly: Number(row.assembly),

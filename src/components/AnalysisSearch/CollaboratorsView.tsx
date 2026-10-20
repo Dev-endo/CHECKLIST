@@ -40,9 +40,11 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
   const shown = useMemo(
     () =>
       (rows ?? [])
+        // O colaborador escolhido no topo da Análise vale aqui também.
+        .filter((row) => !filters.userId || row.userId === filters.userId)
         .filter((row) => !query || row.name.toLowerCase().includes(query))
         .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
-    [rows, query],
+    [rows, query, filters.userId],
   );
   const sum = (pick: (row: CollaboratorSummary) => number) => shown.reduce((n, row) => n + pick(row), 0);
 
@@ -61,7 +63,7 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
       {shown.length > 0 && (
         <>
           <p className={analysisStyles.statHint} style={{ padding: "8px 14px 0" }}>
-            Checklists concluídos no período. Clique em um colaborador para ver os aparelhos, o destino e as observações.
+            Checklists concluídos no período; "Manutenções feitas" são os itens de manutenção (o mesmo número do card da aba Manutenções). Clique em um colaborador para ver os aparelhos, o destino e as observações.
           </p>
           <div className={analysisStyles.tableWrap}>
             <table className={analysisStyles.table}>
@@ -69,6 +71,7 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
                 <tr>
                   <th>Colaborador</th>
                   <th>Manutenção</th>
+                  <th>Manutenções feitas</th>
                   <th>Desmontagem</th>
                   <th>Desm. técnica</th>
                   <th>Montagem</th>
@@ -85,6 +88,7 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
                       </button>
                     </td>
                     <td>{fmt(row.maintenance)}</td>
+                    <td>{fmt(row.maintenanceItems)}</td>
                     <td>{fmt(row.disassembly)}</td>
                     <td>{fmt(row.technical)}</td>
                     <td>{fmt(row.assembly)}</td>
@@ -97,6 +101,7 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
                 <tr>
                   <td>Total</td>
                   <td>{fmt(sum((r) => r.maintenance))}</td>
+                  <td>{fmt(sum((r) => r.maintenanceItems))}</td>
                   <td>{fmt(sum((r) => r.disassembly))}</td>
                   <td>{fmt(sum((r) => r.technical))}</td>
                   <td>{fmt(sum((r) => r.assembly))}</td>
