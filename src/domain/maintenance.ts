@@ -105,6 +105,7 @@ export function destinationLabel(destination: Destination): string {
 
 /** Nome do destino na etapa de origem: a desmontagem "envia"; a montagem reprovada "retorna". */
 export function destinationLabelFor(stage: string | undefined, destination: Destination): string {
+  if (stage === "manutencao" && destination === "quarentena") return "Enviado para quarentena";
   if (stage === "desmontagem" || stage === "desmontagem_tecnica") {
     if (destination === "manutencao") return "Enviado para manutenção";
     if (destination === "montagem") return "Enviado para montagem";

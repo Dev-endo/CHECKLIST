@@ -219,6 +219,7 @@ function ReleasesView({
         <Stat label="Reprovados na quarentena" metric="quarantine_rejected" value={found?.quarantineRejected ?? 0} hint="cada registro conta" />
         <Stat label="Enviados para análise técnica" metric="sent_analysis" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
         <Stat label="Bloqueados" metric="blocked" value={found?.releasedBlock ?? 0} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Enviados para quarentena" metric="sent_quarantine" value={found?.releasedQuarantine ?? 0} hint="montagem ou manutenção; serial = 1 ativo" />
         <Stat label="Enviados para PT" metric="sent_pt" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
       </div>
       {(assembly === "error" || disassembly === "error") && (
@@ -314,7 +315,7 @@ function AssemblyView({ assembly }: { assembly: AssemblyReport | null | "error" 
         <Stat label="Aprovados na montagem" metric="assembly_approved" value={assembly.released} hint="serial = 1 ativo" />
         <Stat label="Reprovados na montagem" metric="assembly_rejected" value={assembly.rejected} hint="cada reprovação conta, mesmo do mesmo aparelho" />
         <Stat label="Montagem enviada para análise" metric="assembly_analysis" value={assembly.returnedAnalysis} hint="reprovados na montagem; serial = 1 ativo" />
-        <Stat label="Enviados para quarentena" metric="assembly_quarantine" value={assembly.releasedQuarantine} hint="aprovados na montagem; serial = 1 ativo" />
+        <Stat label="Enviados para quarentena" metric="sent_quarantine" value={assembly.releasedQuarantine} hint="montagem ou manutenção; serial = 1 ativo" />
       </div>
 
       <h3 className={styles.subtitle}>Por montador</h3>

@@ -27,6 +27,7 @@ interface MaintenanceDialogProps {
 }
 
 const PT_OPTION = { id: "pt", label: "Enviar para PT" } as const;
+const QUARANTINE_OPTION = { id: "quarentena", label: "Enviar para quarentena" } as const;
 const AWAITING_OPTION = { id: "aguardando_peca", label: AWAITING_PART_LABEL } as const;
 
 /** Escolha de um checklist com falha que segue sem destino: continua em manutenção. */
@@ -69,12 +70,13 @@ export function MaintenanceDialog({ open, busy = false, onCancel, onConfirm, fac
         { id: "vidro", label: "Enviado para vidro" },
         { id: "analise", label: ANALYSIS_LABEL },
         PT_OPTION,
+        QUARANTINE_OPTION,
         AWAITING_OPTION,
         { id: STAYS, label: "Continua em manutenção" },
       ]
     : faceIdDefect
-      ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }, PT_OPTION, AWAITING_OPTION]
-      : [...DESTINATIONS, PT_OPTION, AWAITING_OPTION];
+      ? [...DESTINATIONS, { id: "analise", label: ANALYSIS_LABEL }, PT_OPTION, QUARANTINE_OPTION, AWAITING_OPTION]
+      : [...DESTINATIONS, PT_OPTION, QUARANTINE_OPTION, AWAITING_OPTION];
   // Revenda: o aparelho segue para a montagem automaticamente.
   const choice: Destination | typeof STAYS | undefined = resale ? "montagem" : destination;
   const placa = selected.find((m) => m.item === PLACA_ITEM);
