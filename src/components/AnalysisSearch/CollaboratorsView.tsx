@@ -63,14 +63,14 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
       {shown.length > 0 && (
         <>
           <p className={analysisStyles.statHint} style={{ padding: "8px 14px 0" }}>
-            Checklists concluídos no período; "Manutenções feitas" são os itens de manutenção (o mesmo número do card da aba Manutenções). Clique em um colaborador para ver os aparelhos, o destino e as observações.
+            Checklists concluídos no período. "Manutenções feitas" soma os itens trocados (o mesmo número do card da aba Manutenções); cada checklist pode ter vários itens. Clique em um colaborador para ver os aparelhos, o destino e as observações.
           </p>
           <div className={analysisStyles.tableWrap}>
             <table className={analysisStyles.table}>
               <thead>
                 <tr>
                   <th>Colaborador</th>
-                  <th>Manutenção</th>
+                  <th>Checklists de manutenção</th>
                   <th>Manutenções feitas</th>
                   <th>Desmontagem</th>
                   <th>Desm. técnica</th>
