@@ -175,3 +175,16 @@
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+
+/* Nome clicável dentro de uma tabela. */
+.linkButton {
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+}

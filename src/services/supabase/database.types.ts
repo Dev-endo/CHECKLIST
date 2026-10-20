@@ -249,6 +249,33 @@ export type Database = {
         Args: { p_from?: string; p_to?: string; p_user?: string }
         Returns: Json
       }
+      analysis_parts: {
+        Args: { p_item?: string; p_from?: string; p_to?: string; p_user?: string }
+        Returns: {
+          kind: string
+          serial: string
+          unit: string | null
+          model: string | null
+          destination: string | null
+          technician: string
+          user_id: string
+          concluded_at: string | null
+          item: string
+          detail: string | null
+        }[]
+      }
+      collaborator_summary: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          user_id: string
+          name: string
+          maintenance: number
+          disassembly: number
+          technical: number
+          assembly: number
+          quarantine: number
+        }[]
+      }
       analysis_devices: {
         Args: { p_metric: string; p_from?: string; p_to?: string; p_user?: string }
         Returns: {

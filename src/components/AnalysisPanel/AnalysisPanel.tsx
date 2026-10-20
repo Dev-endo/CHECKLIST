@@ -14,6 +14,8 @@ import {
 } from "../../services/supabase/assemblyService";
 import { fetchDisassemblyReport, type DisassemblyReport } from "../../services/supabase/disassemblyService";
 import { AnalysisDevicesDialog } from "../AnalysisDevicesDialog/AnalysisDevicesDialog";
+import { CollaboratorsView } from "../AnalysisSearch/CollaboratorsView";
+import { PartsSearchView } from "../AnalysisSearch/PartsSearchView";
 import { Button } from "../Button/Button";
 import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
 import reviewStyles from "../ReviewPanel/ReviewPanel.module.css";
@@ -23,13 +25,15 @@ interface AnalysisPanelProps {
   client: AppSupabaseClient;
 }
 
-type View = "liberacoes" | "desmontagem" | "manutencoes" | "montagem";
+type View = "liberacoes" | "desmontagem" | "manutencoes" | "montagem" | "pecas" | "colaboradores";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "liberacoes", label: "Liberações" },
   { id: "desmontagem", label: "Desmontagem" },
   { id: "manutencoes", label: "Manutenções" },
   { id: "montagem", label: "Montagem" },
+  { id: "pecas", label: "Pesquisar peças" },
+  { id: "colaboradores", label: "Pesquisar colaborador" },
 ];
 
 /** Clicar em um número abre a lista de aparelhos que o compõem. */
@@ -126,7 +130,9 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   }, [client, filters, reloads]);
 
   let body: ReactNode;
-  if (view === "montagem") body = <AssemblyView assembly={assembly} />;
+  if (view === "pecas") body = <PartsSearchView client={client} filters={filters} reloads={reloads} />;
+  else if (view === "colaboradores") body = <CollaboratorsView client={client} filters={filters} reloads={reloads} />;
+  else if (view === "montagem") body = <AssemblyView assembly={assembly} />;
   else if (view === "desmontagem") body = <DisassemblyView disassembly={disassembly} />;
   else if (failed) body = <div className={recordStyles.empty}>Não foi possível carregar a análise. Tente atualizar.</div>;
   else if (!report) body = <div className={recordStyles.empty}>Carregando análise…</div>;
