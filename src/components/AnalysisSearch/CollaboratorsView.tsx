@@ -41,7 +41,7 @@ export function CollaboratorsView({ client, filters, reloads }: CollaboratorsVie
     () =>
       (rows ?? [])
         .filter((row) => !query || row.name.toLowerCase().includes(query))
-        .sort((a, b) => total(b) - total(a) || a.name.localeCompare(b.name)),
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
     [rows, query],
   );
   const sum = (pick: (row: CollaboratorSummary) => number) => shown.reduce((n, row) => n + pick(row), 0);
