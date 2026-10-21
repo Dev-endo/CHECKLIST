@@ -3,11 +3,13 @@ import { useAuth } from "./auth/AuthProvider";
 import { AdminPanel } from "./components/AdminPanel/AdminPanel";
 import { AppHeader, type AppTab } from "./components/AppHeader/AppHeader";
 import { Checklist } from "./components/Checklist/Checklist";
+import { CurrentOsHint } from "./components/CurrentOsHint/CurrentOsHint";
 import { DeviceForm } from "./components/DeviceForm/DeviceForm";
 import { DuplicateHint } from "./components/DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "./components/RecordsPanel/RecordsPanel";
 import { DisassemblyChecklist } from "./components/DisassemblyChecklist/DisassemblyChecklist";
 import { AssemblyChecklist } from "./components/AssemblyChecklist/AssemblyChecklist";
+import { ServiceOrderPanel } from "./components/ServiceOrderPanel/ServiceOrderPanel";
 import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
 import { ReviewSection } from "./components/ReviewSection/ReviewSection";
@@ -220,6 +222,7 @@ export default function App() {
         {activeTab === "desmontagem_tecnica" && <DisassemblyChecklist kind="desmontagem_tecnica" />}
         {activeTab === "montagem" && <AssemblyChecklist />}
         {activeTab === "quarentena" && client && <QuarantinePanel client={client} userId={userId} />}
+        {activeTab === "os" && client && <ServiceOrderPanel client={client} />}
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 
@@ -237,6 +240,7 @@ export default function App() {
               {editable && client && assetState === "missing" && (
                 <p className={styles.hint}>Serial não encontrado na lista de ativos. Preencha o modelo manualmente.</p>
               )}
+              {client && <CurrentOsHint client={client} serial={draft.serial} />}
               {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
             </header>
 

@@ -17,6 +17,7 @@ import { useDeviceRecords } from "../../hooks/useDeviceRecords";
 import { useRepository } from "../../hooks/useRepository";
 import { lookupAsset } from "../../services/supabase/assetsService";
 import appStyles from "../../App.module.css";
+import { CurrentOsHint } from "../CurrentOsHint/CurrentOsHint";
 import { Checklist } from "../Checklist/Checklist";
 import { DeviceForm } from "../DeviceForm/DeviceForm";
 import { DisassemblyDialog, type DisassemblyOutcome } from "../DisassemblyDialog/DisassemblyDialog";
@@ -199,6 +200,7 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
         {editable && client && assetState === "missing" && (
           <p className={appStyles.hint}>Serial não encontrado na lista de ativos. Preencha o modelo manualmente.</p>
         )}
+        {client && <CurrentOsHint client={client} serial={draft.serial} />}
         {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
       </header>
 

@@ -20,6 +20,7 @@ import { describeAssemblyBlock, fetchAssemblySource } from "../../services/supab
 import appStyles from "../../App.module.css";
 import { AssemblyFailureDialog } from "../AssemblyFailureDialog/AssemblyFailureDialog";
 import { AssemblyReleaseDialog } from "../AssemblyReleaseDialog/AssemblyReleaseDialog";
+import { CurrentOsHint } from "../CurrentOsHint/CurrentOsHint";
 import { Checklist } from "../Checklist/Checklist";
 import { DeviceForm } from "../DeviceForm/DeviceForm";
 import { DuplicateHint } from "../DuplicateHint/DuplicateHint";
@@ -245,6 +246,7 @@ export function AssemblyChecklist() {
         {editable && source.state === "error" && (
           <p className={appStyles.hint}>Não foi possível conferir a liberação deste aparelho. Tente de novo.</p>
         )}
+        {client && <CurrentOsHint client={client} serial={draft.serial} />}
         {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
       </header>
 

@@ -202,6 +202,43 @@ export type Database = {
         }
         Relationships: []
       }
+      service_orders: {
+        Row: {
+          asset_short_id: string | null
+          created_at: string
+          id: string
+          os_key: string | null
+          os_number: string
+          serial: string
+          serial_key: string | null
+          user_id: string
+        }
+        Insert: {
+          asset_short_id?: string | null
+          created_at?: string
+          id?: string
+          os_number: string
+          serial: string
+          user_id?: string
+        }
+        Update: {
+          asset_short_id?: string | null
+          created_at?: string
+          id?: string
+          os_number?: string
+          serial?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_presets: {
         Row: {
           email: string
@@ -247,6 +284,10 @@ export type Database = {
       }
       assembly_report: {
         Args: { p_from?: string; p_to?: string; p_user?: string }
+        Returns: Json
+      }
+      os_map: {
+        Args: { p_os_id: string }
         Returns: Json
       }
       analysis_parts: {

@@ -15,6 +15,7 @@ import {
 import { fetchDisassemblyReport, type DisassemblyReport } from "../../services/supabase/disassemblyService";
 import { AnalysisDevicesDialog } from "../AnalysisDevicesDialog/AnalysisDevicesDialog";
 import { CollaboratorsView } from "../AnalysisSearch/CollaboratorsView";
+import { OsSearchView } from "../AnalysisSearch/OsSearchView";
 import { PartsSearchView } from "../AnalysisSearch/PartsSearchView";
 import { Button } from "../Button/Button";
 import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
@@ -25,7 +26,7 @@ interface AnalysisPanelProps {
   client: AppSupabaseClient;
 }
 
-type View = "liberacoes" | "desmontagem" | "manutencoes" | "montagem" | "pecas" | "colaboradores";
+type View = "liberacoes" | "desmontagem" | "manutencoes" | "montagem" | "pecas" | "colaboradores" | "os";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "liberacoes", label: "Liberações" },
@@ -34,6 +35,7 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "montagem", label: "Montagem" },
   { id: "pecas", label: "Pesquisar peças" },
   { id: "colaboradores", label: "Pesquisar colaborador" },
+  { id: "os", label: "Ordens de serviço" },
 ];
 
 /** Clicar em um número abre a lista de aparelhos que o compõem. */
@@ -130,7 +132,8 @@ export function AnalysisPanel({ client }: AnalysisPanelProps) {
   }, [client, filters, reloads]);
 
   let body: ReactNode;
-  if (view === "pecas") body = <PartsSearchView client={client} filters={filters} reloads={reloads} />;
+  if (view === "os") body = <OsSearchView client={client} filters={filters} reloads={reloads} />;
+  else if (view === "pecas") body = <PartsSearchView client={client} filters={filters} reloads={reloads} />;
   else if (view === "colaboradores") body = <CollaboratorsView client={client} filters={filters} reloads={reloads} />;
   else if (view === "montagem") body = <AssemblyView assembly={assembly} />;
   else if (view === "desmontagem") body = <DisassemblyView disassembly={disassembly} />;
@@ -210,9 +213,7 @@ function ReleasesView({
   return (
     <>
       <div className={styles.stats}>
-        <Stat label="Desmontados" metric="disassembled" value={dis?.total ?? 0} hint="desmontagem normal + técnica; cada checklist conta" />
-        <Stat label="Enviados para vidro" metric="released_glass" value={report.releasedGlass} hint="pela manutenção; cada envio conta" />
-        <Stat label="Aguardando peça" metric="awaiting_part" value={report.awaitingPart} hint="continuam em manutenção; serial = 1 ativo" />
+        <Stat label="Desmontagem" metric="disassembled" value={dis?.total ?? 0} hint="normal + técnica; cada checklist conta" />
         <Stat label="Manutenções executadas" metric="maintenance_items" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
         <Stat
           label="Enviados para montagem" metric="sent_assembly"
@@ -221,12 +222,14 @@ function ReleasesView({
         />
         <Stat label="Aprovados na montagem" metric="assembly_approved" value={found?.released ?? 0} hint="serial = 1 ativo" />
         <Stat label="Reprovados na montagem" metric="assembly_rejected" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />
+        <Stat label="Enviados para vidro" metric="released_glass" value={report.releasedGlass} hint="pela manutenção; cada envio conta" />
+        <Stat label="Enviados para análise técnica" metric="sent_analysis" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Enviados para PT" metric="sent_pt" value={report.sentPt} hint="manutenção ou desmontagem técnica; serial = 1 ativo" />
+        <Stat label="Enviados para quarentena" metric="sent_quarantine" value={found?.releasedQuarantine ?? 0} hint="montagem ou manutenção; serial = 1 ativo" />
         <Stat label="Aprovados na quarentena" metric="quarantine_approved" value={found?.quarantineApproved ?? 0} hint="cada registro conta" />
         <Stat label="Reprovados na quarentena" metric="quarantine_rejected" value={found?.quarantineRejected ?? 0} hint="cada registro conta" />
-        <Stat label="Enviados para análise técnica" metric="sent_analysis" value={report.sentAnalysis} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
+        <Stat label="Aguardando peça" metric="awaiting_part" value={report.awaitingPart} hint="continuam em manutenção; serial = 1 ativo" />
         <Stat label="Bloqueados" metric="blocked" value={found?.releasedBlock ?? 0} hint="manutenção, desmontagem ou montagem; serial = 1 ativo" />
-        <Stat label="Enviados para quarentena" metric="sent_quarantine" value={found?.releasedQuarantine ?? 0} hint="montagem ou manutenção; serial = 1 ativo" />
-        <Stat label="Enviados para PT" metric="sent_pt" value={report.sentPt} hint="desmontagem técnica; serial = 1 ativo" />
       </div>
       {(assembly === "error" || disassembly === "error") && (
         <div className={recordStyles.empty}>Não foi possível carregar todos os números.</div>

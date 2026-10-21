@@ -12,6 +12,7 @@ const TAB_LABELS: Record<AppTab, string> = {
   desmontagem_tecnica: "Desmontagem técnica",
   montagem: "Checklist de montagem",
   quarentena: "Quarentena",
+  os: "Registrar OS",
   registros: "Registros",
   admin: "Administração",
 };

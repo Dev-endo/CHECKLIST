@@ -28,6 +28,7 @@ export type TabId =
   | "desmontagem_tecnica"
   | "montagem"
   | "quarentena"
+  | "os"
   | "registros"
   | "admin";
 
@@ -51,6 +52,11 @@ export function canDoDisassembly(role: Roles): boolean {
   return hasRole(role, "desmontador", "admin");
 }
 
+/** Registrar a OS do ativo: qualquer pessoa com função (só quem está "Sem função" fica de fora). */
+export function canRegisterOs(role: Roles): boolean {
+  return hasRole(role, "admin", "supervisor", "tecnico", "desmontador", "montador");
+}
+
 /** Checklist de montagem: montadores (e o admin). */
 export function canDoAssembly(role: Roles): boolean {
   return hasRole(role, "montador", "admin");
@@ -64,6 +70,7 @@ export function accessibleTabs(role: Roles): TabId[] {
   if (canDoAssembly(role)) tabs.push("montagem");
   if (canDoAssembly(role)) tabs.push("quarentena");
   if (canReviewAll(role)) tabs.push("registros");
+  if (canRegisterOs(role)) tabs.push("os");
   if (canManageUsers(role)) tabs.push("admin");
   return tabs;
 }
