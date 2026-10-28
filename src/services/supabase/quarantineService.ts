@@ -11,11 +11,20 @@ export interface QuarantineEntry {
 }
 
 /** Grava todos os seriais bipados de uma vez, cada um com o seu resultado. */
-export async function registerQuarantine(client: AppSupabaseClient, entries: readonly QuarantineEntry[]): Promise<void> {
+export async function registerQuarantine(
+  client: AppSupabaseClient,
+  entries: readonly QuarantineEntry[],
+): Promise<void> {
   if (!entries.length) return;
   const { error } = await client
     .from("quarantine_checks")
-    .insert(entries.map((entry) => ({ serial: entry.serial, result: entry.result, asset_short_id: entry.unit })));
+    .insert(
+      entries.map((entry) => ({
+        serial: entry.serial,
+        result: entry.result,
+        asset_short_id: entry.unit,
+      })),
+    );
   if (error) throw error;
 }
 
@@ -29,7 +38,10 @@ export interface QuarantineDay {
 const PAGE = 1000;
 
 /** Aprovados e reprovados por dia nos últimos `days` dias, do mais recente para o mais antigo. */
-export async function fetchQuarantineDaily(client: AppSupabaseClient, days = 30): Promise<QuarantineDay[]> {
+export async function fetchQuarantineDaily(
+  client: AppSupabaseClient,
+  days = 30,
+): Promise<QuarantineDay[]> {
   const since = new Date();
   since.setHours(0, 0, 0, 0);
   since.setDate(since.getDate() - (days - 1));
@@ -52,4 +64,39 @@ export async function fetchQuarantineDaily(client: AppSupabaseClient, days = 30)
     if (data.length < PAGE) break;
   }
   return [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export interface QuarantineSerial {
+  serial: string;
+  result: QuarantineResult;
+}
+
+/** Seriais bipados na quarentena hoje (horário local), sem repetir, do mais recente para o mais antigo. */
+export async function fetchQuarantineToday(
+  client: AppSupabaseClient,
+): Promise<QuarantineSerial[]> {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const rows: QuarantineSerial[] = [];
+  const seen = new Set<string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await client
+      .from("quarantine_checks")
+      .select("serial, result")
+      .gte("created_at", start.toISOString())
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const row of data) {
+      const key = row.serial.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({
+        serial: row.serial,
+        result: row.result === "aprovado" ? "aprovado" : "reprovado",
+      });
+    }
+    if (data.length < PAGE) break;
+  }
+  return rows;
 }
