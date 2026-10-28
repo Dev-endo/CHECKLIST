@@ -5,6 +5,7 @@ import {
   blankDraft,
   computeStats,
   describeFailures,
+  describeMissingParts,
   findDuplicate,
   hasFaceIdDefect,
   isConfirmed,
@@ -250,5 +251,25 @@ describe("vidro traseiro", () => {
     const results = { "d-display": "ok", "d-prox": "ok", "vidro-traseiro": "fail" } as const;
     expect(computeStats(results, "desmontagem").status).not.toBe("reprovado");
     expect(describeFailures(results, "desmontagem")).toEqual([]);
+  });
+});
+
+describe("peças que o ativo trouxe faltando", () => {
+  it("is undefined when neither question was answered", () => {
+    expect(describeMissingParts({})).toBeUndefined();
+  });
+
+  it("describes none, one or both", () => {
+    expect(describeMissingParts({ "faltando-parafuso": "ok", "faltando-blindagem": "ok" })).toBe(
+      "Não veio faltando parafuso nem blindagem",
+    );
+    expect(describeMissingParts({ "faltando-parafuso": "fail", "faltando-blindagem": "ok" })).toBe("Veio faltando parafuso");
+    expect(describeMissingParts({ "faltando-parafuso": "fail", "faltando-blindagem": "fail" })).toBe(
+      "Veio faltando parafuso e blindagem",
+    );
+  });
+
+  it("does not reject the checklist", () => {
+    expect(describeFailures({ "faltando-parafuso": "fail" }, "desmontagem")).toEqual([]);
   });
 });

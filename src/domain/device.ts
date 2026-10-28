@@ -238,6 +238,29 @@ export function describeFailures(results: Results = {}, kind: ChecklistKind = "m
   });
 }
 
+/** Ids dos tópicos "Faltando parafuso" e "Faltando blindagem" (resposta "fail" = Sim). */
+const MISSING_SCREW = "faltando-parafuso";
+const MISSING_SHIELD = "faltando-blindagem";
+
+/**
+ * O que o ativo trouxe faltando segundo este checklist: [] se respondeu Não aos dois, ["parafuso"],
+ * ["blindagem"] ou os dois. undefined se nenhuma das perguntas foi respondida (ex.: manutenção).
+ */
+export function missingParts(results: Results = {}): ("parafuso" | "blindagem")[] | undefined {
+  if (!results[MISSING_SCREW] && !results[MISSING_SHIELD]) return undefined;
+  const missing: ("parafuso" | "blindagem")[] = [];
+  if (results[MISSING_SCREW] === "fail") missing.push("parafuso");
+  if (results[MISSING_SHIELD] === "fail") missing.push("blindagem");
+  return missing;
+}
+
+/** Texto para o histórico: "Veio faltando parafuso e blindagem" ou "Não veio faltando parafuso nem blindagem". */
+export function describeMissingParts(results: Results = {}): string | undefined {
+  const missing = missingParts(results);
+  if (!missing) return undefined;
+  return missing.length ? `Veio faltando ${missing.join(" e ")}` : "Não veio faltando parafuso nem blindagem";
+}
+
 /** Chave, dentro de results, da confirmação obrigatória de um item (não confunde com a falha do item). */
 export const confirmKey = (itemId: string) => `confirm:${itemId}`;
 

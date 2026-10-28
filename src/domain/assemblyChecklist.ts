@@ -1,4 +1,4 @@
-import { buildCatalog, type ChecklistBlock } from "./checklist";
+import { buildCatalog, MISSING_PARTS_BLOCKS, type ChecklistBlock } from "./checklist";
 
 /** Checklist de montagem: testes básicos depois que o aparelho volta da manutenção. */
 const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
@@ -19,11 +19,13 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
         id: "m-cam-frontal",
         title: "Câmera frontal",
         details: "Abrir a câmera frontal e observar se está embaçada, se foca ou se está estourando na luz.",
+        failure: "câmera suja, embaçada ou com mancha.",
       },
       {
         id: "m-cam-traseira",
         title: "Câmera traseira",
         details: "Abrir a câmera traseira e observar se está embaçada, se foca ou se está estourando na luz.",
+        failure: "câmera suja, embaçada ou com mancha.",
       },
     ],
   },
@@ -34,6 +36,23 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
       { id: "m-lente-traseira-limpa", title: "Câmera traseira limpa" },
       { id: "m-lente-frontal-adesivo", title: "Câmera frontal sem adesivo" },
       { id: "m-lente-traseira-adesivo", title: "Câmera traseira sem adesivo" },
+    ],
+  },
+  {
+    title: "Áudio depois de colar",
+    items: [
+      {
+        id: "m-alto-falante",
+        title: "Alto-falante",
+        details: "Depois de fechar com a cola, tocar um áudio no volume máximo.",
+        failure: "som abafado.",
+      },
+      {
+        id: "m-microfone",
+        title: "Microfone",
+        details: "Depois de fechar com a cola, gravar um áudio no app Gravador e ouvir.",
+        failure: "áudio abafado.",
+      },
     ],
   },
   {
@@ -57,6 +76,7 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
       },
     ],
   },
+  ...MISSING_PARTS_BLOCKS,
   {
     title: "Conferência de IMEI",
     confirmOnly: true,

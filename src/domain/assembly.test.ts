@@ -27,8 +27,11 @@ describe("checklist de montagem", () => {
       "Display",
       "Câmeras",
       "Lentes da câmera",
+      "Áudio depois de colar",
       "Proximidade",
       "Reiniciar",
+      "Faltando parafuso",
+      "Faltando blindagem",
       "Conferência de IMEI",
     ]);
     const ids = ASSEMBLY_CHECKLIST.flatMap((block) => [block.id, ...block.items.map((item) => item.id)]);
@@ -38,12 +41,12 @@ describe("checklist de montagem", () => {
 
   it("is selected by kind and counted by its own topics", () => {
     expect(catalogFor("montagem")).toBe(ASSEMBLY_CHECKLIST);
-    expect(totalTests("montagem")).toBe(5);
+    expect(totalTests("montagem")).toBe(8);
     expect(totalTests()).toBeGreaterThan(5);
   });
 
   it("is liberado when every topic is OK, reprovado on any failure", () => {
-    expect(computeStats(allOk(), "montagem")).toMatchObject({ done: 5, status: "liberado" });
+    expect(computeStats(allOk(), "montagem")).toMatchObject({ done: 8, status: "liberado" });
     expect(computeStats({ ...allOk(), reiniciar: "fail" }, "montagem")).toMatchObject({ status: "reprovado" });
     expect(computeStats({}, "montagem").status).toBe("incompleto");
   });

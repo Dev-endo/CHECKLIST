@@ -1,4 +1,4 @@
-import { buildCatalog, CHECKLIST, type ChecklistBlock } from "./checklist";
+import { buildCatalog, CHECKLIST, MISSING_PARTS_BLOCKS, type ChecklistBlock } from "./checklist";
 
 /** Desmontagem: testes com o aparelho aberto. */
 const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
@@ -36,6 +36,7 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
       },
     ],
   },
+  ...MISSING_PARTS_BLOCKS,
   {
     title: "Confirmar serial",
     confirmOnly: true,
@@ -56,6 +57,7 @@ export const DISASSEMBLY_CHECKLIST: readonly ChecklistBlock[] = buildCatalog(BLO
 export const TECHNICAL_DISASSEMBLY_CHECKLIST: readonly ChecklistBlock[] = [
   ...CHECKLIST,
   ...buildCatalog([
+    ...MISSING_PARTS_BLOCKS,
     {
       title: "Fonte de bancada",
       noPointing: true,

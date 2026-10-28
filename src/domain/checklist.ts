@@ -49,6 +49,7 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
     items: [
       { id: "tela-branca", title: "Tela branca, brilho máximo", details: "Procurar manchas, pontos claros, amarelado ou sombra nas bordas." },
       { id: "tela-preta", title: "Tela preta", failure: "linha ou pixel aceso." },
+      { id: "tela-ondulacao", title: "Ondulação na tela", details: "Pressionar a tela com a ponta do dedo em vários pontos e observar se forma ondulação.", failure: "ondulação causada por sujeira, ponta de chave, parafuso solto ou elevado." },
       { id: "teclado", title: "Digitar rápido no teclado", details: "Cobrir Q, P, espaço e apagar (extremidades)." },
       { id: "truetone", title: "True Tone e brilho automático", details: "True Tone aparece na Central de Controle; cobrir o topo baixa o brilho." },
       { id: "freeform", title: "Freeform", details: "Abrir o aplicativo, clicar no lápis no canto inferior esquerdo e rabiscar a tela inteira." },
@@ -104,6 +105,22 @@ const BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
       { id: "imei", title: "Conferir IMEI", field: "confirm", details: "Conferir se o IMEI da caixa é igual ao do ativo. Confirmação obrigatória para concluir." },
       { id: "panic", title: "Registros de travamento", details: "Ajustes › Privacidade e Segurança › Análise e Melhorias › Dados de Análise.", failure: "arquivo “panic-full” com a data de hoje." },
     ],
+  },
+];
+
+/** Ativo que chegou faltando parafuso ou blindagem: nas desmontagens e na montagem, Sim ou Não (não reprova). */
+export const MISSING_PARTS_BLOCKS: readonly Omit<ChecklistBlock, "id">[] = [
+  {
+    title: "Faltando parafuso",
+    noPointing: true,
+    choice: { first: "Não", second: "Sim" },
+    items: [{ id: "faltando-parafuso-item", title: "Faltando parafuso", details: "O ativo veio faltando parafuso?" }],
+  },
+  {
+    title: "Faltando blindagem",
+    noPointing: true,
+    choice: { first: "Não", second: "Sim" },
+    items: [{ id: "faltando-blindagem-item", title: "Faltando blindagem", details: "O ativo veio faltando blindagem?" }],
   },
 ];
 

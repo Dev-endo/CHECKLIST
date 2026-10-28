@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { describeFailures, isPending, isResale, latestReleasingId, type DeviceRecord } from "../../domain/device";
+import { describeFailures, describeMissingParts, isPending, isResale, latestReleasingId, type DeviceRecord } from "../../domain/device";
 import { blameLabel, describeMaintenance, destinationLabel } from "../../domain/maintenance";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchAssetHistory } from "../../services/supabase/releaseService";
@@ -78,6 +78,7 @@ export function AssetHistoryDialog({ client, serial, onClose }: AssetHistoryDial
             {history.map((record) => {
               const failures = describeFailures(record.r, record.tipo);
               const releasing = record.id === releasingId;
+              const missingParts = describeMissingParts(record.r);
               return (
                 <li key={record.id} className={[styles.item, releasing && styles.releasing].filter(Boolean).join(" ")}>
                   <div className={styles.head}>
@@ -90,6 +91,11 @@ export function AssetHistoryDialog({ client, serial, onClose }: AssetHistoryDial
                     {record.destino === "analise" && <span className={styles.badge}>Análise técnica</span>}
                     {record.tipo === "montagem" && record.destino && record.status === "liberado" && (
                       <span className={[styles.badge, styles.ok].join(" ")}>{destinationLabel(record.destino)}</span>
+                    )}
+                    {missingParts && (
+                      <span className={[styles.badge, missingParts.startsWith("Veio") && styles.fail].filter(Boolean).join(" ")}>
+                        {missingParts}
+                      </span>
                     )}
                     {isResale(record) && (
                       <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>
