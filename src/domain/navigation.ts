@@ -10,6 +10,8 @@ export interface NavGroup {
 
 const GROUPS: { id: string; label: string; tabs: readonly TabId[] }[] = [
   { id: "reparo", label: "Reparo", tabs: ["reparo", "reparo2"] },
+  // Checklist de aparelhos antigos (sem Estágio 1).
+  { id: "checklist_manutencao", label: "Checklist manutenção", tabs: ["checklist_manutencao"] },
   // Uma aba só para a quarentena, aberta para todos (aguardando, registrar e seriais de hoje).
   { id: "quarentena", label: "Quarentena", tabs: ["quarentena"] },
   { id: "analise_tecnica", label: "Análise técnica", tabs: ["analise_tecnica", "reparo_placa", "analise_montagem"] },
@@ -24,6 +26,7 @@ const GROUPS: { id: string; label: string; tabs: readonly TabId[] }[] = [
 export const TAB_LABELS: Record<TabId, string> = {
   reparo: "Estágio 1",
   reparo2: "Estágio 2",
+  checklist_manutencao: "Checklist manutenção",
   analise_tecnica: "Análise",
   reparo_placa: "Reparo em placa",
   analise_montagem: "Checklist e montagem",

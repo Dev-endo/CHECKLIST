@@ -117,6 +117,7 @@ describe("expectedOutcome", () => {
     expect(expectedOutcome({ aberto: { ...allOk("aberto"), sistema: "fail" }, fechado: allOk("fechado") }, "auto")).toBe("analise");
     expect(expectedOutcome(ready().results, "revenda")).toBe("revenda");
     expect(expectedOutcome(ready().results, "vidro")).toBe("vidro");
+    expect(expectedOutcome(ready().results, "analise")).toBe("analise");
     expect(expectedOutcome({ aberto: allOk("aberto"), fechado: { ...allOk("fechado"), cameras: "fail" } }, "vidro")).toBe("vidro");
   });
 });

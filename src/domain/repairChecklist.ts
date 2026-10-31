@@ -122,7 +122,8 @@ export function pendingTests(phase: ChecklistPhase, results: Results): string[] 
 }
 
 /** Destino escolhido ao finalizar: automático (quarentena ou análise pelos testes), vidro ou revenda. */
-export type FinishDestination = "auto" | "vidro" | "revenda";
+/** "analise": Análise técnica escolhida mesmo sem teste reprovado (aba Checklist manutenção). */
+export type FinishDestination = "auto" | "vidro" | "revenda" | "analise";
 
 export interface FinishInput {
   results: Record<ChecklistPhase, Results>;
@@ -160,6 +161,7 @@ export function expectedOutcome(
 ): "quarentena" | "analise" | "revenda" | "vidro" {
   if (destination === "revenda") return "revenda";
   if (destination === "vidro") return "vidro";
+  if (destination === "analise") return "analise";
   const failed = PHASES.some((phase) => {
     const choice = new Set(choiceTests(phase));
     return requiredTests(phase).some((id) => results[phase][id] === "fail" && !choice.has(id));

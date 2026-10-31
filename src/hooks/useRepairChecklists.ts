@@ -20,7 +20,9 @@ type Action =
   | { type: "loaded"; phases: Record<ChecklistPhase, PhaseState> }
   | { type: "edit"; phase: ChecklistPhase; next: PhaseState }
   | { type: "saved"; phase: ChecklistPhase; sent: PhaseState }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { type: "draft" }
+  | { type: "merge"; phases: Record<ChecklistPhase, PhaseState> };
 
 const blank = (): Record<ChecklistPhase, PhaseState> => ({
   aberto: { results: {}, battery: undefined },
@@ -43,6 +45,20 @@ function reducer(state: State, action: Action): State {
     }
     case "reset":
       return { loaded: false, phases: blank(), dirty: new Set<ChecklistPhase>() };
+    case "draft":
+      return { loaded: true, phases: blank(), dirty: new Set<ChecklistPhase>() };
+    case "merge": {
+      // O que foi marcado antes de bipar vale por cima do que já estava gravado, e é gravado em seguida.
+      const dirty = new Set<ChecklistPhase>();
+      const phases = { ...action.phases };
+      for (const phase of PHASES) {
+        const draft = state.phases[phase];
+        if (!Object.keys(draft.results).length && draft.battery === undefined) continue;
+        phases[phase] = { results: { ...action.phases[phase].results, ...draft.results }, battery: draft.battery ?? action.phases[phase].battery };
+        dirty.add(phase);
+      }
+      return { loaded: true, phases, dirty };
+    }
   }
 }
 
@@ -57,6 +73,11 @@ export function useRepairChecklists(
   stageId: string | undefined,
   editable: boolean,
   onError: (error: unknown) => void,
+  /**
+   * Checklist manutenção: sem etapa ainda, dá para marcar (rascunho, só na tela). Quando a etapa abre, o rascunho
+   * entra por cima do que estava gravado e é gravado.
+   */
+  draft = false,
 ) {
   const [state, dispatch] = useReducer(reducer, { loaded: false, phases: blank(), dirty: new Set<ChecklistPhase>() });
   const stateRef = useRef(state);
@@ -64,22 +85,27 @@ export function useRepairChecklists(
   const errorRef = useRef(onError);
   errorRef.current = onError;
 
+  const previousStage = useRef<string | undefined>(undefined);
   useEffect(() => {
-    dispatch({ type: "reset" });
-    if (!stageId) return;
+    const fromDraft = draft && !previousStage.current;
+    previousStage.current = stageId;
+    if (!stageId) {
+      dispatch({ type: draft ? "draft" : "reset" });
+      return;
+    }
+    if (!fromDraft) dispatch({ type: "reset" });
     let active = true;
     fetchChecklists(client, stageId)
       .then((saved) => {
         if (!active) return;
-        const open = fromSaved(saved.aberto);
-        const closed = fromSaved(saved.fechado);
-        dispatch({ type: "loaded", phases: { aberto: open, fechado: closed } });
+        const phases = { aberto: fromSaved(saved.aberto), fechado: fromSaved(saved.fechado) };
+        dispatch(fromDraft ? { type: "merge", phases } : { type: "loaded", phases });
       })
       .catch((error) => active && errorRef.current(error));
     return () => {
       active = false;
     };
-  }, [client, stageId]);
+  }, [client, stageId, draft]);
 
   const persist = useCallback(
     async (phase: ChecklistPhase) => {

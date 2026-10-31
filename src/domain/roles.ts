@@ -53,6 +53,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export type TabId =
   | "reparo"
   | "reparo2"
+  | "checklist_manutencao"
   | "vidro"
   | "analise_tecnica"
   | "reparo_placa"
@@ -153,7 +154,7 @@ export function accessibleTabs(role: Roles): TabId[] {
   const tabs: TabId[] = [];
   // Técnico: Reparo. Técnico de placa: Análise técnica. Técnico de vidro: Vidro. Estoquista: Estoque.
   // Supervisor: Análise. Todos: Quarentena. Admin: tudo.
-  if (canDoRepair(role)) tabs.push("reparo", "reparo2");
+  if (canDoRepair(role)) tabs.push("reparo", "reparo2", "checklist_manutencao");
   if (canUseQuarantine(role)) tabs.push("quarentena");
   if (canDoAnalysis(role)) tabs.push("analise_tecnica", "reparo_placa", "analise_montagem");
   if (canDoGlass(role)) tabs.push("vidro");

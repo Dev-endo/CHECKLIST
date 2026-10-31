@@ -1,0 +1,79 @@
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--ok);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.todayMain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+
+.todayLabel {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.todayValue {
+  font-family: var(--mono);
+  font-size: 26px;
+}
+
+.todayDetail {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.todayList summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.todayList ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.todayList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+
+.top {
+  margin-bottom: 12px;
+}
+
+.serialRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.serialRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mono {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--muted);
+}

@@ -15,7 +15,7 @@ import {
 
 describe("accessibleTabs", () => {
   it("gives each function its tab, plus the Quarentena everyone shares", () => {
-    expect(accessibleTabs("tecnico")).toEqual(["reparo", "reparo2", "quarentena"]);
+    expect(accessibleTabs("tecnico")).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena"]);
     expect(accessibleTabs("estoquista")).toEqual(["quarentena", "solicitacoes", "os"]);
     expect(accessibleTabs("analista")).toEqual(["quarentena", "analise_tecnica", "reparo_placa", "analise_montagem"]);
     expect(accessibleTabs("tecnico_vidro")).toEqual(["quarentena", "vidro"]);
@@ -28,6 +28,7 @@ describe("accessibleTabs", () => {
     expect(accessibleTabs("admin")).toEqual([
       "reparo",
       "reparo2",
+      "checklist_manutencao",
       "quarentena",
       "analise_tecnica",
       "reparo_placa",
@@ -57,7 +58,7 @@ describe("accessibleTabs", () => {
   });
 
   it("adds up the tabs of every function a person has", () => {
-    expect(accessibleTabs(["tecnico", "tecnico_vidro"])).toEqual(["reparo", "reparo2", "quarentena", "vidro"]);
+    expect(accessibleTabs(["tecnico", "tecnico_vidro"])).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena", "vidro"]);
     expect(accessibleTabs(["estoquista", "supervisor"])).toEqual(["quarentena", "solicitacoes", "os", "dashboard"]);
   });
 

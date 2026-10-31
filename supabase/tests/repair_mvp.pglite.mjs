@@ -1,4 +1,4 @@
-// Testa as migrations 44-72 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-75 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-72 aplicadas (2x)");
+console.log("migrations 44-75 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -1054,6 +1054,65 @@ await db.exec(`update public.profiles set extra_roles = '{supervisor}' where id 
 q = (await db.query(`select extra_roles from public.profiles where id='${U.tec}'`)).rows[0];
 ok("supervisor pode ser função somada", q.extra_roles.includes("supervisor"), JSON.stringify(q));
 await db.exec(`update public.profiles set extra_roles = '{}' where id = '${U.tec}'`);
+
+// ---- Checklist manutenção (aparelhos antigos, sem Estágio 1)
+r = await as("tec", `select public.start_legacy_maintenance('ANTIGO0')`);
+ok("sem OS não inicia o checklist", r.err === "no_os", JSON.stringify(r));
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('ANTIGO1','OS-A1','${U.tec}'), ('ANTIGO2','OS-A2','${U.tec}'), ('ANTIGO3','OS-A3','${U.tec}'), ('ANTIGO4','OS-A4','${U.tec}')`);
+r = await as("est", `select public.start_legacy_maintenance('ANTIGO1')`);
+ok("estoquista não faz o checklist", r.err?.includes("sem permissão"));
+const l1 = await one("tec", `select public.start_legacy_maintenance('ANTIGO1')`);
+q = (await db.query(`select stage, status, legacy, technician_id, round from public.repair_stages where id='${l1}'`)).rows[0];
+ok("o checklist abre a manutenção do técnico, marcada como aparelho antigo", q.stage === "manutencao" && q.status === "em_andamento" && q.legacy === true && q.technician_id === U.tec && q.round === 1, JSON.stringify(q));
+ok("iniciar de novo devolve o mesmo checklist", (await one("tec", `select public.start_legacy_maintenance('antigo1 ')`)) === l1);
+await as("tec", `select public.save_repair_checklist('${l1}', 'fechado', '{"t3":"ok"}')`);
+r = await as("tec", `select public.finish_maintenance('${l1}', array[]::text[], array['t3'])`);
+ok("tudo aprovado vai para a quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
+r = await as("tec", `select serial from public.quarantine_pending() where serial = 'ANTIGO1'`);
+ok("e aparece na lista de aguardando da quarentena", r.rows.length === 1);
+const l1b = await one("tec", `select public.start_legacy_maintenance('ANTIGO1')`);
+q = (await db.query(`select round, status, legacy from public.repair_stages where id='${l1b}'`)).rows[0];
+ok("checar de novo na mesma OS abre um checklist novo (rodada seguinte)", l1b !== l1 && q.round === 2 && q.status === "em_andamento" && q.legacy, JSON.stringify(q));
+q = (await db.query(`select count(*)::int c from public.service_orders where serial='ANTIGO1'`)).rows[0].c;
+ok("sem criar OS nova", q === 1);
+
+const l2 = await one("tec", `select public.start_legacy_maintenance('ANTIGO2')`);
+await as("tec", `select public.save_repair_checklist('${l2}', 'fechado', '{"t3":"ok"}')`);
+r = await as("tec", `select public.finish_maintenance('${l2}', array[]::text[], array['t3'], false, null, '{}', false, true)`);
+ok("análise técnica escolhida mesmo sem reprovação", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
+q = (await db.query(`select status, source from public.repair_analysis_queue where serial='ANTIGO2'`)).rows[0];
+ok("e entra na fila da Análise técnica", q && q.status === "aguardando" && q.source === "manutencao", JSON.stringify(q));
+r = await as("tec", `select public.finish_maintenance('${l2}', array[]::text[], array[]::text[], false, null, '{}', true, true)`);
+ok("vidro e análise ao mesmo tempo é recusado", Boolean(r.err), JSON.stringify(r));
+
+const l3 = await one("tec", `select public.start_legacy_maintenance('ANTIGO3')`);
+r = await as("tec", `select public.finish_maintenance('${l3}', array[]::text[], array[]::text[], false, null, '{}', true, true)`);
+ok("vidro e análise juntos não são aceitos", r.err?.includes("dados incompletos"), JSON.stringify(r));
+r = await as("tec", `select public.finish_maintenance('${l3}', array[]::text[], array[]::text[], false, null, '{}', true)`);
+ok("vidro a partir do checklist", r.rows?.[0] && Object.values(r.rows[0])[0] === "vidro", JSON.stringify(r));
+q = (await db.query(`select origin, responsible_id from public.repair_glass_jobs where serial='ANTIGO3'`)).rows[0];
+ok("abre o mesmo serviço de vidro", q && q.origin === "manutencao" && q.responsible_id === U.tec, JSON.stringify(q));
+
+const l4 = await one("tec", `select public.start_legacy_maintenance('ANTIGO4')`);
+await as("tec", `select public.save_repair_checklist('${l4}', 'fechado', '{"t3":"fail"}')`);
+r = await as("tec", `select public.finish_maintenance('${l4}', array[]::text[], array['t3'])`);
+ok("quarentena com teste reprovado vai para a análise técnica", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
+
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('ANTIGO5','OS-A5','${U.tec}')`);
+await as("tec", `select public.start_disassembly('ANTIGO5')`);
+r = await as("tec", `select public.start_legacy_maintenance('ANTIGO5')`);
+ok("aparelho com Estágio 1 em andamento não abre o checklist antigo", r.err === "disassembly_open", JSON.stringify(r));
+r = await as("tec", `select public.start_legacy_maintenance('SER95')`);
+ok("aparelho com manutenção do Reparo em andamento não abre aqui", r.err === "in_repair", JSON.stringify(r));
+
+// ---- Rodapé do técnico: quantos aparelhos ele finalizou
+const my = await one("tec", `select public.repair_my_summary(current_date - 1, current_date + 1)`);
+const myExpected = (await db.query(`select count(distinct serial_key)::int n, count(distinct serial_key) filter (where outcome='quarentena')::int q, count(distinct serial_key) filter (where outcome='vidro')::int v, count(distinct serial_key) filter (where outcome='analise')::int a from public.repair_stages where technician_id='${U.tec}' and stage='manutencao' and status='concluida'`)).rows[0];
+ok("o técnico vê quantos aparelhos finalizou, por destino", my.ativos === myExpected.n && my.quarentena === myExpected.q && my.vidro === myExpected.v && my.analise === myExpected.a && my.ativos > 0, JSON.stringify([my, myExpected]));
+const myVid = await one("vid", `select public.repair_my_summary(current_date - 1, current_date + 1)`);
+ok("cada um vê só os próprios números", myVid.ativos === 0, JSON.stringify(myVid));
+const myOld = await one("tec", `select public.repair_my_summary(current_date - 30, current_date - 20)`);
+ok("fora do período não conta", myOld.ativos === 0);
 
 // ---- Revenda com justificativa
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('SER3','OS-3','${U.tec}')`);

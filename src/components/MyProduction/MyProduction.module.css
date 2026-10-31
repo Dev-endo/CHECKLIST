@@ -1,0 +1,38 @@
+.box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin-top: 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--ok);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.box > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.value {
+  font-family: var(--mono);
+  font-size: 24px;
+}
+
+.unit {
+  font-size: 14px;
+}
+
+.detail {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}

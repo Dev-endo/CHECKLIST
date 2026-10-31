@@ -14,6 +14,8 @@ import { PartsControl } from "./components/PartsControl/PartsControl";
 import { AnalysisTechPanel } from "./components/AnalysisTechPanel/AnalysisTechPanel";
 import { BoardRepairPanel } from "./components/AnalysisTechPanel/BoardRepairPanel";
 import { GlassPanel } from "./components/GlassPanel/GlassPanel";
+import { LegacyChecklistPanel } from "./components/LegacyChecklist/LegacyChecklistPanel";
+import { MyProduction } from "./components/MyProduction/MyProduction";
 import { Stage2Panel } from "./components/RepairStage2/Stage2Panel";
 import { Stage1Panel } from "./components/RepairStage1/Stage1Panel";
 import { StockAlerts } from "./components/StockAlerts/StockAlerts";
@@ -244,7 +246,13 @@ export default function App() {
           </div>
         )}
         {activeTab === "reparo" && <Stage1Panel />}
-        {activeTab === "reparo2" && <Stage2Panel />}
+        {activeTab === "reparo2" && (
+          <>
+            <Stage2Panel />
+            {client && <MyProduction client={client} />}
+          </>
+        )}
+        {activeTab === "checklist_manutencao" && <LegacyChecklistPanel />}
         {activeTab === "vidro" && <GlassPanel />}
         {activeTab === "analise_tecnica" && <AnalysisTechPanel />}
         {activeTab === "reparo_placa" && <BoardRepairPanel />}

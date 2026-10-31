@@ -6,9 +6,10 @@ const summary = (roles: Parameters<typeof accessibleTabs>[0]) =>
   navGroups(accessibleTabs(roles)).map((group) => [group.label, group.tabs]);
 
 describe("navGroups", () => {
-  it("keeps only Reparo, Quarentena, Análise técnica, Vidro, Estoque and Análise (plus Administração for the admin)", () => {
+  it("keeps only Reparo, Checklist manutenção, Quarentena, Análise técnica, Vidro, Estoque and Análise (plus Administração for the admin)", () => {
     expect(summary("admin")).toEqual([
       ["Reparo", ["reparo", "reparo2"]],
+      ["Checklist manutenção", ["checklist_manutencao"]],
       ["Quarentena", ["quarentena"]],
       ["Análise técnica", ["analise_tecnica", "reparo_placa", "analise_montagem"]],
       ["Vidro", ["vidro"]],
@@ -21,6 +22,7 @@ describe("navGroups", () => {
   it("shows each function its own group", () => {
     expect(summary("tecnico")).toEqual([
       ["Reparo", ["reparo", "reparo2"]],
+      ["Checklist manutenção", ["checklist_manutencao"]],
       ["Quarentena", ["quarentena"]],
     ]);
     expect(summary("estoquista")).toEqual([

@@ -41,6 +41,13 @@ import styles from "./RepairStage2.module.css";
 
 const LIST_POLL_MS = 15_000;
 
+/** Checklist manutenção (aparelhos antigos): os destinos possíveis. */
+const LEGACY_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
+  { id: "auto", label: "Quarentena", hint: "Tudo aprovado. Com algum teste reprovado, o aparelho vai para a Análise técnica." },
+  { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado." },
+  { id: "vidro", label: "Vidro", hint: "Pede Vidro e Aro ao estoque e abre o serviço na aba Vidro; depois o aparelho volta para você finalizar." },
+];
+
 const since = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 interface ReadyDevice extends OpenStage {
@@ -64,9 +71,13 @@ interface Stage2PanelProps {
   initialSerial?: string;
   /** "Voltar" sai desta tela (em vez de voltar à lista). */
   onBack?: () => void;
+  /** Aba Checklist manutenção (aparelhos antigos): só os checklists e o destino quarentena, análise técnica ou vidro. */
+  legacy?: boolean;
+  /** Sem o título da tela (quem usa já mostra o seu). */
+  hideHeader?: boolean;
 }
 
-export function Stage2Panel({ title, subtitle, assemblyOnly = false, initialSerial, onBack }: Stage2PanelProps = {}) {
+export function Stage2Panel({ title, subtitle, assemblyOnly = false, initialSerial, onBack, legacy = false, hideHeader = false }: Stage2PanelProps = {}) {
   const { user, client } = useAuth();
   if (!client || !user) {
     return <p className={appStyles.banner}>Entre com a sua conta para usar o Reparo.</p>;
@@ -81,6 +92,8 @@ export function Stage2Panel({ title, subtitle, assemblyOnly = false, initialSeri
       assemblyOnly={assemblyOnly}
       initialSerial={initialSerial}
       onBack={onBack}
+      legacy={legacy}
+      hideHeader={hideHeader}
     />
   );
 }
@@ -94,9 +107,11 @@ interface Stage2Props {
   assemblyOnly: boolean;
   initialSerial?: string;
   onBack?: () => void;
+  legacy: boolean;
+  hideHeader: boolean;
 }
 
-function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, initialSerial, onBack }: Stage2Props) {
+function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, initialSerial, onBack, legacy, hideHeader }: Stage2Props) {
   const toast = useToast();
   // Aparelho escolhido na lista (sem bipar): o que já passou pelo Estágio 1 e espera a manutenção.
   const [serial, setSerial] = useState(initialSerial ?? "");
@@ -123,7 +138,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
   useEffect(() => {
     let active = true;
     const load = () =>
-      fetchMyOpenStages(client, userId, ["manutencao"], ["em_andamento", "aguardando_pecas"])
+      fetchMyOpenStages(client, userId, ["manutencao"], ["em_andamento", "aguardando_pecas"], legacy)
         .then(async (found) => {
           const assets = await assetsBySerial(client, found.map((item) => item.serial)).catch(() => new Map());
           if (!active) return;
@@ -141,7 +156,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
       active = false;
       clearInterval(poll);
     };
-  }, [client, userId, mineReloads]);
+  }, [client, userId, mineReloads, legacy]);
 
   const { disassembly, evaluation, maintenance } = stages;
 
@@ -189,7 +204,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
 
   const finish = async () => {
     if (!maintenance || busy) return;
-    const what = assemblyOnly ? "o checklist e a montagem" : "a manutenção";
+    const what = assemblyOnly ? "o checklist e a montagem" : legacy ? "o checklist" : "a manutenção";
     if (!window.confirm(`Finalizar ${what}? O aparelho vai para: ${OUTCOME_LABELS[outcome]}. Depois disso não dá para alterar.`)) return;
     setBusy(true);
     try {
@@ -229,12 +244,14 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
 
   return (
     <>
+      {!hideHeader && (
       <header>
-        <h1 className={appStyles.title}>{title ?? "Reparo · Estágio 2: manutenção"}</h1>
-        <p className={appStyles.subtitle}>
-          {subtitle ?? "Escolha o aparelho que já passou pelo Estágio 1, faça os testes com o aparelho aberto e fechado e finalize."}
-        </p>
-      </header>
+          <h1 className={appStyles.title}>{title ?? "Reparo · Estágio 2: manutenção"}</h1>
+          <p className={appStyles.subtitle}>
+            {subtitle ?? "Escolha o aparelho que já passou pelo Estágio 1, faça os testes com o aparelho aberto e fechado e finalize."}
+          </p>
+        </header>
+      )}
 
       {!serial && (
         <section aria-label="Aparelhos">
@@ -312,13 +329,15 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 </p>
               )}
 
-              {!assemblyOnly && (
+              {!assemblyOnly && !legacy && (
                 <>
                   <h2 className={stage1Styles.heading}>Histórico da desmontagem</h2>
                   <StageHistory client={client} disassembly={disassembly} evaluation={evaluation} />
                 </>
               )}
 
+              {!legacy && (
+                <>
               <h2 className={stage1Styles.heading}>{assemblyOnly ? "Troca de peça" : "Manutenção"}</h2>
               <RepairTimer
                 title={assemblyOnly ? "Troca de peça" : "Manutenção"}
@@ -349,6 +368,9 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
 
               <h2 className={stage1Styles.heading}>Solicitações de peça da OS {order.osNumber}</h2>
               <RequestList client={client} requests={requests} returns={returns} disabled={busy} onChanged={afterRequestChange} />
+
+                </>
+              )}
 
               {PHASES.map((phase) => (
                 <section key={phase} className={styles.phase} aria-label={PHASE_LABELS[phase]}>
@@ -384,6 +406,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                   onFinish={() => void finish()}
                   title={assemblyOnly ? "Finalizar checklist e montagem" : undefined}
                   onlyAuto={assemblyOnly}
+                  destinations={legacy ? LEGACY_DESTINATIONS : undefined}
                   maintenanceItems={maintenanceItems}
                 />
               )}

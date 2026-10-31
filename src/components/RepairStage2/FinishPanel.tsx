@@ -18,6 +18,10 @@ interface FinishPanelProps {
   onlyAuto?: boolean;
   /** Manutenções que contam para quem finaliza (placa e peças usadas de vez). */
   maintenanceItems?: MaintenanceItem[];
+  /** Troca as opções de destino (ex.: Checklist manutenção: quarentena, análise técnica ou vidro). */
+  destinations?: readonly { id: FinishDestination; label: string; hint: string }[];
+  /** Esconde a caixa "Manutenções que contam para você" (Checklist manutenção não troca peça). */
+  hideCount?: boolean;
 }
 
 /** Fim da manutenção: o que ainda falta e o destino (automático, vidro ou revenda excepcional, com justificativa). */
@@ -40,6 +44,8 @@ export function FinishPanel({
   title = "Finalizar manutenção",
   onlyAuto = false,
   maintenanceItems = [],
+  destinations = DESTINATIONS,
+  hideCount = false,
 }: FinishPanelProps) {
   const blocked = blockers.length > 0;
   const summary = summarizeMaintenance(maintenanceItems);
@@ -47,6 +53,7 @@ export function FinishPanel({
     <section className={styles.finish} aria-label="Finalizar manutenção">
       <h2 className={styles.heading}>{title}</h2>
 
+      {!hideCount && (
       <div className={styles.count}>
         <span>
           Manutenções que contam para você: <strong>{summary.count}</strong>
@@ -61,6 +68,7 @@ export function FinishPanel({
           <span className={styles.muted}>Reparo em placa feito por você conta 1; cada peça usada de vez conta 1.</span>
         )}
       </div>
+      )}
 
       {blocked ? (
         <>
@@ -80,7 +88,7 @@ export function FinishPanel({
       {!onlyAuto && (
       <fieldset className={styles.destinationChoice} disabled={busy}>
         <legend>Para onde o aparelho vai?</legend>
-        {DESTINATIONS.map((option) => (
+        {destinations.map((option) => (
           <label key={option.id} className={styles.resale}>
             <input type="radio" name="finish-destination" checked={destination === option.id} onChange={() => onDestination(option.id)} />
             <span>

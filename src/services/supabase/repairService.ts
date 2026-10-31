@@ -109,18 +109,87 @@ export async function fetchMyOpenStages(
   userId: string,
   stages: readonly RepairStageName[],
   statuses: readonly RepairStageStatus[] = ["em_andamento"],
+  /** true: só os checklists de aparelhos antigos; false: só o fluxo do Reparo; sem valor: todos. */
+  legacy?: boolean,
 ): Promise<OpenStage[]> {
+  let query = loose(client)
+    .from("repair_stages")
+    .select(`${STAGE_COLUMNS}, service_orders(os_number)`)
+    .eq("technician_id", userId)
+    .in("stage", stages)
+    .in("status", statuses);
+  if (legacy !== undefined) query = query.eq("legacy", legacy);
   const found = await rows<StageRow & { service_orders: { os_number: string } | null }>(
-    loose(client)
-      .from("repair_stages")
-      .select(`${STAGE_COLUMNS}, service_orders(os_number)`)
-      .eq("technician_id", userId)
-      .in("stage", stages)
-      .in("status", statuses)
-      .order("started_at", { ascending: false })
-      .limit(50),
+    query.order("started_at", { ascending: false }).limit(50),
   );
   return found.map((row) => ({ ...toStage(row), osNumber: row.service_orders?.os_number ?? "—" }));
+}
+
+/** Aba Checklist manutenção: abre (ou retoma) o checklist de um aparelho antigo, na OS atual do serial. */
+export const startLegacyMaintenance = (client: AppSupabaseClient, serial: string) =>
+  call<string>(client, "start_legacy_maintenance", { p_serial: serial });
+
+export interface LegacyChecklist {
+  id: string;
+  serial: string;
+  status: RepairStageStatus;
+  outcome: "quarentena" | "analise" | "vidro" | "revenda" | null;
+  startedAt: string;
+  finishedAt: string | null;
+  osNumber: string;
+}
+
+interface LegacyRow {
+  id: string;
+  serial: string;
+  status: RepairStageStatus;
+  outcome: LegacyChecklist["outcome"];
+  started_at: string;
+  finished_at: string | null;
+  service_orders: { os_number: string } | null;
+}
+
+const LEGACY_COLUMNS = "id, serial, status, outcome, started_at, finished_at, service_orders(os_number)";
+const toLegacy = (row: LegacyRow): LegacyChecklist => ({
+  id: row.id,
+  serial: row.serial,
+  status: row.status,
+  outcome: row.outcome,
+  startedAt: row.started_at,
+  finishedAt: row.finished_at,
+  osNumber: row.service_orders?.os_number ?? "—",
+});
+
+/** O checklist mais recente do serial na aba Checklist manutenção (de qualquer técnico), ou null. */
+export async function fetchLastLegacy(client: AppSupabaseClient, serial: string): Promise<LegacyChecklist | null> {
+  const found = await rows<LegacyRow>(
+    loose(client)
+      .from("repair_stages")
+      .select(LEGACY_COLUMNS)
+      .eq("serial_key", serial.trim().toLowerCase())
+      .eq("stage", "manutencao")
+      .eq("legacy", true)
+      .order("started_at", { ascending: false })
+      .limit(1),
+  );
+  return found[0] ? toLegacy(found[0]) : null;
+}
+
+/** Checklists que o técnico finalizou na aba Checklist manutenção desde `since` (ex.: meia-noite de hoje). */
+export async function fetchMyLegacyFinished(client: AppSupabaseClient, userId: string, since: Date): Promise<LegacyChecklist[]> {
+  const found = await rows<LegacyRow>(
+    loose(client)
+      .from("repair_stages")
+      .select(LEGACY_COLUMNS)
+      .eq("technician_id", userId)
+      .eq("stage", "manutencao")
+      .eq("legacy", true)
+      .eq("status", "concluida")
+      .gte("finished_at", since.toISOString())
+      .order("finished_at", { ascending: false })
+      .limit(500),
+  );
+  return found.map(toLegacy);
 }
 
 export const startDisassembly = (client: AppSupabaseClient, serial: string) =>
@@ -264,7 +333,7 @@ export const finishMaintenance = (
     requiredOpen: string[];
     requiredClosed: string[];
     choice: string[];
-    destination: "auto" | "vidro" | "revenda";
+    destination: "auto" | "vidro" | "revenda" | "analise";
     resaleReason: string;
   },
 ) =>
@@ -276,6 +345,7 @@ export const finishMaintenance = (
     p_resale_reason: input.destination === "revenda" ? input.resaleReason.trim() : null,
     p_choice: input.choice,
     p_glass: input.destination === "vidro",
+    p_analysis: input.destination === "analise",
   });
 
 /** Manutenções que contam para quem finaliza a etapa (a placa que ele reparou e cada peça usada de vez). */
