@@ -97,6 +97,8 @@ as $$
 $$;
 
 -- Resultado individual de cada colaborador (só quem fez alguma coisa no período).
+-- (A 71 acrescenta uma coluna; o drop deixa este arquivo rodar de novo depois dela.)
+drop function if exists public.repair_dashboard_people(date, date);
 create or replace function public.repair_dashboard_people(p_from date, p_to date)
 returns table (user_id uuid, name text, manutencoes bigint, quarentena bigint, placas bigint, vidros bigint)
 language sql
@@ -149,6 +151,7 @@ as $$
 $$;
 
 -- Desempenho diário de um colaborador.
+drop function if exists public.repair_dashboard_person_daily(uuid, date, date);
 create or replace function public.repair_dashboard_person_daily(p_user uuid, p_from date, p_to date)
 returns table (day date, manutencoes bigint, quarentena bigint, placas bigint, vidros bigint)
 language sql

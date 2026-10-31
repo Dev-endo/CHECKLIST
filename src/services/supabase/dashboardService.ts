@@ -32,6 +32,8 @@ export interface DashboardPerson {
   name: string;
   manutencoes: number;
   quarentena: number;
+  /** Aparelhos que a pessoa liberou para o vidro. */
+  vidroEnviados: number;
   placas: number;
   vidros: number;
 }
@@ -40,6 +42,8 @@ export interface DashboardDay {
   day: string;
   manutencoes: number;
   quarentena: number;
+  /** Aparelhos que a pessoa liberou para o vidro. */
+  vidroEnviados: number;
   placas: number;
   vidros: number;
 }
@@ -99,20 +103,21 @@ export async function fetchDevices(client: AppSupabaseClient, kind: DashboardKin
 
 export async function fetchPeople(client: AppSupabaseClient, period: Period): Promise<DashboardPerson[]> {
   const rows = await call<
-    { user_id: string; name: string; manutencoes: number; quarentena: number; placas: number; vidros: number }[] | null
+    { user_id: string; name: string; manutencoes: number; quarentena: number; vidro_enviados: number; placas: number; vidros: number }[] | null
   >(client, "repair_dashboard_people", range(period));
   return (rows ?? []).map((row) => ({
     userId: row.user_id,
     name: row.name,
     manutencoes: Number(row.manutencoes),
     quarentena: Number(row.quarentena),
+    vidroEnviados: Number(row.vidro_enviados),
     placas: Number(row.placas),
     vidros: Number(row.vidros),
   }));
 }
 
 export async function fetchPersonDaily(client: AppSupabaseClient, userId: string, period: Period): Promise<DashboardDay[]> {
-  const rows = await call<{ day: string; manutencoes: number; quarentena: number; placas: number; vidros: number }[] | null>(
+  const rows = await call<{ day: string; manutencoes: number; quarentena: number; vidro_enviados: number; placas: number; vidros: number }[] | null>(
     client,
     "repair_dashboard_person_daily",
     { p_user: userId, ...range(period) },
@@ -121,6 +126,7 @@ export async function fetchPersonDaily(client: AppSupabaseClient, userId: string
     day: row.day,
     manutencoes: Number(row.manutencoes),
     quarentena: Number(row.quarentena),
+    vidroEnviados: Number(row.vidro_enviados),
     placas: Number(row.placas),
     vidros: Number(row.vidros),
   }));

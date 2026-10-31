@@ -254,8 +254,9 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                     <th>Colaborador</th>
                     <th>Manutenções</th>
                     <th>Liberou para a quarentena</th>
+                    <th>Liberou para o vidro</th>
                     <th>Placas</th>
-                    <th>Vidros</th>
+                    <th>Vidros feitos</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,6 +269,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                       </td>
                       <td>{row.manutencoes}</td>
                       <td>{row.quarentena}</td>
+                      <td>{row.vidroEnviados}</td>
                       <td>{row.placas}</td>
                       <td>{row.vidros}</td>
                     </tr>
@@ -289,8 +291,9 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                         <th>Dia</th>
                         <th>Manutenções</th>
                         <th>Liberou para a quarentena</th>
+                        <th>Liberou para o vidro</th>
                         <th>Placas</th>
-                        <th>Vidros</th>
+                        <th>Vidros feitos</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -299,6 +302,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                           <td>{dayLabel(row.day)}</td>
                           <td>{row.manutencoes}</td>
                           <td>{row.quarentena}</td>
+                          <td>{row.vidroEnviados}</td>
                           <td>{row.placas}</td>
                           <td>{row.vidros}</td>
                         </tr>

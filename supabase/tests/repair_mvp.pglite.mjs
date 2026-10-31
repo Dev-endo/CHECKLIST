@@ -1,4 +1,4 @@
-// Testa as migrations 44-70 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-71 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-70 aplicadas (2x)");
+console.log("migrations 44-71 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -1024,10 +1024,15 @@ ok("fora do período não aparece", r.rows.length === 0);
 const people = (await as("sup", `select * from public.repair_dashboard_people(${range})`)).rows;
 const ana = people.find((x) => x.name === "Ana");
 ok("colaborador: analista com manutenções, placas e quarentena", ana && Number(ana.manutencoes) >= 4 && Number(ana.placas) >= 3 && Number(ana.quarentena) >= 2, JSON.stringify(ana));
+const tecRow = people.find((x) => x.name === "Tec");
+const tecGlass = (await db.query(`select count(distinct serial_key)::int n from public.repair_glass_jobs where requested_by='${U.tec}'`)).rows[0].n;
+ok("colaborador: liberou para o vidro (por serial)", tecRow && Number(tecRow.vidro_enviados) === tecGlass && tecGlass >= 3, JSON.stringify([tecRow, tecGlass]));
 const vid = people.find((x) => x.name === "Vid");
 ok("colaborador: técnico de vidro com vidros feitos", vid && Number(vid.vidros) >= 3, JSON.stringify(vid));
 r = await as("sup", `select * from public.repair_dashboard_person_daily('${U.ana}', ${range})`);
 ok("desempenho diário do colaborador", r.rows.length >= 1 && Number(r.rows[0].manutencoes) >= 4, JSON.stringify(r.rows));
+r = await as("sup", `select sum(vidro_enviados)::int n from public.repair_dashboard_person_daily('${U.tec}', ${range})`);
+ok("desempenho diário mostra o que liberou para o vidro", r.rows[0].n === tecGlass, JSON.stringify(r.rows));
 r = await as("tec", `select count(*)::int from public.repair_dashboard_people(${range})`);
 ok("técnico não vê os colaboradores", r.rows[0].count === 0);
 
