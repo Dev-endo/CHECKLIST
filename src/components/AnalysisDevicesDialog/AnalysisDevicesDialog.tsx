@@ -52,6 +52,9 @@ export function AnalysisDevicesDialog({ client, detail, filters, onClose }: Anal
     };
   }, [client, detail, filters]);
 
+  // A quarentena lista seriais bipados; as outras listas mostram quantas vezes o ativo foi recusado na montagem.
+  const showRejections = !detail?.metric.startsWith("quarantine_");
+
   return (
     <dialog
       ref={dialog}
@@ -81,6 +84,7 @@ export function AnalysisDevicesDialog({ client, detail, filters, onClose }: Anal
                 <th>Responsável</th>
                 <th>Data</th>
                 <th>Destino</th>
+                {showRejections && <th>Recusas na montagem</th>}
                 <th>Observações</th>
               </tr>
             </thead>
@@ -97,6 +101,7 @@ export function AnalysisDevicesDialog({ client, detail, filters, onClose }: Anal
                     <td>{row.person}</td>
                     <td>{formatDateTime(row.at ?? undefined)}</td>
                     <td>{destination ? destinationLabelFor(row.stage, destination) : row.stage === "quarentena" ? row.status : "—"}</td>
+                    {showRejections && <td>{row.assemblyRejections}</td>}
                     <td>{row.observations.join(" · ") || "—"}</td>
                   </tr>
                 );

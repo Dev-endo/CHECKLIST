@@ -4,7 +4,9 @@ import { lookupAsset } from "../../services/supabase/assetsService";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
   fetchQuarantineDaily,
+  fetchQuarantinePending,
   registerQuarantine,
+  type PendingQuarantine,
   type QuarantineDay,
   type QuarantineEntry,
   type QuarantineResult,
@@ -18,6 +20,8 @@ import { QuarantineTodayView } from "./QuarantineTodayView";
 interface QuarantinePanelProps {
   client: AppSupabaseClient;
   userId: string;
+  /** Aba do Reparo: mostra os aparelhos enviados pela manutenção que ainda faltam bipar. */
+  showPending?: boolean;
 }
 
 const RESULTS: { id: QuarantineResult; label: string }[] = [
@@ -25,13 +29,19 @@ const RESULTS: { id: QuarantineResult; label: string }[] = [
   { id: "reprovado", label: "Reprovado" },
 ];
 
-const VIEWS = [
+type View = "registrar" | "hoje" | "aguardando";
+
+const VIEWS: readonly { id: View; label: string }[] = [
   { id: "registrar", label: "Registrar" },
+  { id: "aguardando", label: "Aguardando" },
   { id: "hoje", label: "Seriais de hoje" },
-] as const;
+];
+
+const sentOn = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 /** Quarentena: bipa vários seriais, marca aprovado ou reprovado e registra todos de uma vez. */
-export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
+export function QuarantinePanel({ client, userId, showPending = false }: QuarantinePanelProps) {
   const toast = useToast();
   const [serial, setSerial] = useState("");
   const [result, setResult] = useState<QuarantineResult>("aprovado");
@@ -39,7 +49,9 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
   const [saving, setSaving] = useState(false);
   const [days, setDays] = useState<QuarantineDay[] | "error" | null>(null);
   const [reloads, setReloads] = useState(0);
-  const [view, setView] = useState<"registrar" | "hoje">("registrar");
+  const [view, setView] = useState<View>("registrar");
+  // null enquanto carrega; só existe na aba do Reparo.
+  const [pending, setPending] = useState<PendingQuarantine[] | "error" | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +62,26 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
       active = false;
     };
   }, [client, reloads]);
+
+  useEffect(() => {
+    if (!showPending) return;
+    let active = true;
+    const load = () =>
+      fetchQuarantinePending(client)
+        .then((data) => active && setPending(data))
+        .catch(() => active && setPending("error"));
+    void load();
+    // Outro aparelho pode chegar da manutenção a qualquer momento.
+    const poll = setInterval(() => void load(), 15_000);
+    return () => {
+      active = false;
+      clearInterval(poll);
+    };
+  }, [client, showPending, reloads]);
+
+  const waiting = Array.isArray(pending) ? pending : [];
+  const waitingKeys = new Set(waiting.map((item) => item.serial.trim().toLowerCase()));
+  const views = showPending ? VIEWS : VIEWS.filter((item) => item.id !== "aguardando");
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -111,7 +143,7 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
         <h2>Quarentena</h2>
       </div>
       <div className={styles.tabs} role="tablist">
-        {VIEWS.map(({ id, label }) => (
+        {views.map(({ id, label }) => (
           <button
             key={id}
             type="button"
@@ -121,10 +153,38 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
             onClick={() => setView(id)}
           >
             {label}
+            {id === "aguardando" && waiting.length > 0 && <span className={styles.badge}>{waiting.length}</span>}
           </button>
         ))}
       </div>
-      {view === "hoje" ? (
+      {view === "aguardando" ? (
+        <>
+          <p className={styles.pendingNote}>
+            Aparelhos que a manutenção enviou para a quarentena. Cada um fica aqui até o serial ser bipado e marcado como aprovado ou
+            reprovado.
+          </p>
+          {pending === null && <div className={recordStyles.empty}>Carregando…</div>}
+          {pending === "error" && <div className={recordStyles.empty}>Não foi possível carregar a lista agora.</div>}
+          {Array.isArray(pending) && !pending.length && <div className={recordStyles.empty}>Nenhum aparelho aguardando a quarentena.</div>}
+          <ul className={styles.list}>
+            {waiting.map((item) => (
+              <li key={`${item.serial}-${item.sentAt}`} className={styles.item}>
+                <span className={styles.itemSerial}>
+                  {item.serial}
+                  <small>
+                    {item.model ?? "Modelo não encontrado"}
+                    {item.unit ? ` · ${splitAssetId(item.unit).code || item.unit}` : ""} · OS {item.osNumber}
+                  </small>
+                </span>
+                <span className={styles.sent}>
+                  enviado por {item.technician}
+                  <small>{sentOn(item.sentAt)}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : view === "hoje" ? (
         <QuarantineTodayView client={client} reloadKey={reloads} />
       ) : (
         <>
@@ -156,12 +216,22 @@ export function QuarantinePanel({ client, userId }: QuarantinePanelProps) {
             </fieldset>
           </form>
 
+          {showPending && waiting.length > 0 && (
+            <p className={styles.pendingNote}>
+              <strong>{waiting.filter((item) => !entries.some((entry) => entry.serial.trim().toLowerCase() === item.serial.trim().toLowerCase())).length}</strong>{" "}
+              aparelho(s) da manutenção ainda faltam bipar. Veja a visão Aguardando.
+            </p>
+          )}
+
           {entries.length ? (
             <ul className={styles.list}>
               {entries.map((entry) => (
                 <li key={entry.serial} className={styles.item}>
                   <span className={styles.itemSerial}>
                     {entry.serial}
+                    {showPending && Array.isArray(pending) && !waitingKeys.has(entry.serial.trim().toLowerCase()) && (
+                      <small>não estava na lista de aguardando</small>
+                    )}
                     {entry.unit && (
                       <small>
                         {splitAssetId(entry.unit).model} ·{" "}

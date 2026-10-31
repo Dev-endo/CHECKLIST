@@ -100,3 +100,40 @@ export async function fetchQuarantineToday(
   }
   return rows;
 }
+
+export interface PendingQuarantine {
+  serial: string;
+  osNumber: string;
+  model: string | null;
+  unit: string | null;
+  technician: string;
+  sentAt: string;
+}
+
+/**
+ * Aparelhos que a manutenção do Reparo enviou para a quarentena e ainda não tiveram o serial bipado e marcado
+ * como aprovado ou reprovado. Saem da lista quando o resultado é registrado.
+ */
+export async function fetchQuarantinePending(client: AppSupabaseClient): Promise<PendingQuarantine[]> {
+  // A função é da migration 53 e ainda não está em database.types.ts.
+  const rpc = client.rpc as unknown as (
+    fn: string,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  const { data, error } = await rpc.call(client, "quarantine_pending");
+  if (error) throw error;
+  return ((data ?? []) as {
+    serial: string;
+    os_number: string;
+    model: string | null;
+    unit: string | null;
+    technician: string;
+    sent_at: string;
+  }[]).map((row) => ({
+    serial: row.serial,
+    osNumber: row.os_number,
+    model: row.model,
+    unit: row.unit,
+    technician: row.technician,
+    sentAt: row.sent_at,
+  }));
+}

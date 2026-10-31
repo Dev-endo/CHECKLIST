@@ -99,8 +99,8 @@ describe("desmontagem", () => {
   });
 
   it("offers analysis and PT only in the technical disassembly", () => {
-    expect(DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["manutencao", "montagem"]);
-    expect(TECHNICAL_DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["montagem", "pt", "manutencao", "analise"]);
+    expect(DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["manutencao", "montagem", "alocacao_peca"]);
+    expect(TECHNICAL_DISASSEMBLY_DESTINATIONS.map((d) => d.id)).toEqual(["montagem", "pt", "manutencao", "analise", "alocacao_peca"]);
   });
 });
 

@@ -26,6 +26,7 @@ export function describeAssemblyBlock(source: AssemblySource | null): string | n
   if (source.destination === "analise") return "Este aparelho foi enviado para análise técnica.";
   if (source.destination === "pt") return "Este aparelho foi enviado para PT.";
   if (source.destination === "quarentena") return "Este aparelho foi enviado para quarentena.";
+  if (source.destination === "alocacao_peca") return "Este aparelho foi enviado para alocação de peça no estoque.";
   if (source.destination === "aguardando_peca") return "Este aparelho está aguardando peça na manutenção.";
   // Desmontagem: vale o direcionamento escolhido, não o resultado dos testes.
   if (source.kind !== "manutencao") {

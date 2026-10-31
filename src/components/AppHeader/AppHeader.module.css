@@ -9,9 +9,41 @@
   justify-content: space-between;
 }
 
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+/* Abas de dentro do grupo aberto (ex.: Quarentena dentro de Montagem). */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 4px;
+}
+
+.subtab {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.subtab[aria-current="page"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .tab {

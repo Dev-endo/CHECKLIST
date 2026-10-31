@@ -79,6 +79,7 @@ export function RecordRow({ record, isCurrent, onOpen, onRestart, showOwner = fa
       {record.destino === "manutencao" && badge.label !== destinationLabelFor(record.tipo, "manutencao") && <span className={[styles.badge, styles.pending].join(" ")}>{destinationLabelFor(record.tipo, "manutencao")}</span>}
       {record.destino === "analise" && <span className={[styles.badge, styles.pending].join(" ")}>Análise técnica</span>}
       {record.destino === "aguardando_peca" && <span className={[styles.badge, styles.pending].join(" ")}>Aguardando peça</span>}
+      {record.destino === "alocacao_peca" && <span className={[styles.badge, styles.pending].join(" ")}>Alocação de peça</span>}
       {record.destino === "pt" && <span className={[styles.badge, styles.pending].join(" ")}>PT</span>}
       {isResale(record) && <span className={[styles.badge, styles.fail].join(" ")}>Liberado para revenda</span>}
       {isCurrent ? (

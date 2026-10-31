@@ -72,3 +72,29 @@
   color: var(--accent);
   font-weight: 600;
 }
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-right: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.row .item {
+  flex: 1;
+  border-top: none;
+}
+
+.edit {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 14px;
+}
+
+.edit input {
+  flex: 1 1 160px;
+}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { DeviceDraft, DraftField } from "../../domain/device";
 import styles from "./DeviceForm.module.css";
 
@@ -15,9 +16,11 @@ interface DeviceFormProps {
   lockedFields?: readonly DraftField[];
   /** Unit id do ativo reconhecido pelo serial, só para mostrar. */
   unitId?: string;
+  /** Campo a mais no fim da linha (ex.: a OS, na desmontagem). */
+  extra?: ReactNode;
 }
 
-export function DeviceForm({ draft, onChange, disabled, lockedFields = [], unitId }: DeviceFormProps) {
+export function DeviceForm({ draft, onChange, disabled, lockedFields = [], unitId, extra }: DeviceFormProps) {
   return (
     <div className={styles.fields}>
       {FIELDS.map(({ field, label, placeholder }) => (
@@ -38,6 +41,7 @@ export function DeviceForm({ draft, onChange, disabled, lockedFields = [], unitI
           <input value={unitId} disabled readOnly />
         </label>
       )}
+      {extra}
     </div>
   );
 }

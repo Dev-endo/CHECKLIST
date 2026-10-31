@@ -33,7 +33,7 @@ export function CurrentOsHint({ client, serial }: CurrentOsHintProps) {
 
   if (!key || !orders) return null;
   const current = orders[orders.length - 1];
-  if (!current) return <p className={appStyles.hint}>Nenhuma OS registrada para este ativo. Registre na aba Registrar OS.</p>;
+  if (!current) return <p className={appStyles.hint}>Nenhuma OS registrada para este ativo. A OS é registrada pelo desmontador, na aba Ordens de serviço.</p>;
   return (
     <p className={appStyles.hint}>
       OS atual: {current.osNumber} ({orders.length}ª OS deste ativo)

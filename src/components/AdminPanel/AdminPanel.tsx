@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { EXTRA_ROLES, ROLE_LABELS, ROLES, type UserRole } from "../../domain/roles";
+import { ADMIN_ROLES, EXTRA_ROLES, ROLE_LABELS, type UserRole } from "../../domain/roles";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchProfiles, updateExtraRoles, updateRole, type Profile } from "../../services/supabase/profilesService";
 import { formatDateTime } from "../../utils/format";
@@ -81,7 +81,7 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
             aria-label={`Papel de ${profile.name || profile.email}`}
             onChange={(e) => void handleChange(profile, e.target.value as UserRole)}
           >
-            {ROLES.map((role) => (
+            {(ADMIN_ROLES.includes(profile.role) ? ADMIN_ROLES : [...ADMIN_ROLES, profile.role]).map((role) => (
               <option key={role} value={role}>
                 {ROLE_LABELS[role]}
               </option>
@@ -113,9 +113,11 @@ export function AdminPanel({ client, currentUserId }: AdminPanelProps) {
           <h2>Usuários e acessos</h2>
         </div>
         <p className={styles.note}>
-          Quem entra com o Google começa Sem função e não acessa nada até você definir o papel. Além do papel principal, marque as outras funções da pessoa (Técnico, Desmontador, Montador): ela vê as abas de todas. Técnico faz o checklist de
-          manutenção; Desmontador faz a desmontagem e a desmontagem técnica; Montador faz o checklist de montagem; Supervisor só consulta os registros. O Administrador acessa
-          tudo e é o único que altera papéis.
+          Quem entra com o Google começa Sem função e não acessa nada até você definir o papel. Além do papel principal, marque as
+          outras funções da pessoa: ela vê as abas de todas e recebe os avisos delas. Técnico fica com o Reparo; Técnico de placa com
+          a Análise técnica; Técnico de vidro com o Vidro; Estoquista com o Estoque (e os avisos de peça); Supervisor com a Análise.
+          Todos acessam a Quarentena. O Administrador vê todas as abas, mas só recebe avisos das funções marcadas para ele, e é o
+          único que altera papéis.
         </p>
         {body}
       </section>

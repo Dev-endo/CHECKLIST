@@ -17,12 +17,13 @@ import { useDeviceRecords } from "../../hooks/useDeviceRecords";
 import { useRepository } from "../../hooks/useRepository";
 import { lookupAsset } from "../../services/supabase/assetsService";
 import appStyles from "../../App.module.css";
-import { CurrentOsHint } from "../CurrentOsHint/CurrentOsHint";
 import { Checklist } from "../Checklist/Checklist";
 import { DeviceForm } from "../DeviceForm/DeviceForm";
+import { OsField } from "../DeviceForm/OsField";
 import { DisassemblyDialog, type DisassemblyOutcome } from "../DisassemblyDialog/DisassemblyDialog";
 import { DuplicateHint } from "../DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "../RecordsPanel/RecordsPanel";
+import { PartsControl } from "../PartsControl/PartsControl";
 import { StatusBar } from "../StatusBar/StatusBar";
 import { useToast } from "../Toast/ToastProvider";
 
@@ -196,11 +197,13 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
           disabled={!editable}
           lockedFields={[...(user ? ["tec" as const] : []), ...(draft.ativo ? ["modelo" as const] : [])]}
           unitId={draft.ativo ? splitAssetId(draft.ativo).code || draft.ativo : undefined}
+          extra={client && <OsField client={client} serial={draft.serial} disabled={!editable} />}
         />
         {editable && client && assetState === "missing" && (
           <p className={appStyles.hint}>Serial não encontrado na lista de ativos. Preencha o modelo manualmente.</p>
         )}
-        {client && <CurrentOsHint client={client} serial={draft.serial} />}
+        {/* Só a desmontagem técnica pede peça (para teste ou para reparo). */}
+        {client && technical && <PartsControl client={client} serial={draft.serial} technical disabled={!editable} />}
         {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
       </header>
 

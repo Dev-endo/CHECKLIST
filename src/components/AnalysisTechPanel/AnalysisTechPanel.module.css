@@ -1,0 +1,168 @@
+.muted {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.s_em_analise {
+  background: var(--accent-soft);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  font-size: 14px;
+}
+
+.serial {
+  font-family: var(--mono);
+  font-size: 15px;
+}
+
+.os {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.state {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 6px 0;
+  font-size: 13.5px;
+}
+
+.failed {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  font-size: 13.5px;
+  color: var(--crit);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.partGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 6px;
+}
+
+.partChip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.partChip label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.partChip input[type="checkbox"] {
+  flex: none;
+  width: auto;
+  margin: 0;
+}
+
+.partOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.partControls {
+  display: flex;
+  gap: 6px;
+}
+
+.partControls select,
+.partControls input {
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.partControls input {
+  width: 58px;
+}
+
+.sentBy {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px dashed var(--accent);
+  font-size: 14px;
+}
+
+.parts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.partsTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.partsForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.partsForm select {
+  min-width: 200px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}

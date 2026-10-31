@@ -1,21 +1,10 @@
-import { ROLE_LABELS, type UserRole } from "../../domain/roles";
+import { useState } from "react";
+import { navGroups, TAB_LABELS } from "../../domain/navigation";
+import { ROLE_LABELS, type TabId, type UserRole } from "../../domain/roles";
 import { Button } from "../Button/Button";
 import styles from "./AppHeader.module.css";
 
-import type { TabId } from "../../domain/roles";
-
 export type AppTab = TabId;
-
-const TAB_LABELS: Record<AppTab, string> = {
-  checklist: "Checklist de manutenção",
-  desmontagem: "Desmontagem",
-  desmontagem_tecnica: "Desmontagem técnica",
-  montagem: "Checklist de montagem",
-  quarentena: "Quarentena",
-  os: "Registrar OS",
-  registros: "Registros",
-  admin: "Administração",
-};
 
 interface AppHeaderProps {
   tabs: readonly AppTab[];
@@ -26,24 +15,56 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ tabs, active, onChange, user, onSignOut }: AppHeaderProps) {
+  // Última aba aberta em cada grupo: voltar ao grupo reabre onde a pessoa estava.
+  const [lastTab, setLastTab] = useState<Record<string, AppTab>>({});
+
   // Sem login (modo local) e com uma só aba, não há o que mostrar.
   if (!user && tabs.length < 2) return null;
 
+  const groups = navGroups(tabs);
+  const activeGroup = groups.find((group) => group.tabs.includes(active)) ?? groups[0];
+
+  const open = (groupId: string, tab: AppTab) => {
+    setLastTab((prev) => ({ ...prev, [groupId]: tab }));
+    onChange(tab);
+  };
+
   return (
     <div className={styles.bar}>
-      <nav className={styles.tabs} aria-label="Seções">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            className={styles.tab}
-            aria-current={tab === active ? "page" : undefined}
-            onClick={() => onChange(tab)}
-          >
-            {TAB_LABELS[tab]}
-          </button>
-        ))}
-      </nav>
+      <div className={styles.nav}>
+        <nav className={styles.tabs} aria-label="Seções">
+          {groups.map((group) => {
+            const remembered = lastTab[group.id];
+            const target = remembered && group.tabs.includes(remembered) ? remembered : (group.tabs[0] as AppTab);
+            return (
+              <button
+                key={group.id}
+                type="button"
+                className={styles.tab}
+                aria-current={group === activeGroup ? "page" : undefined}
+                onClick={() => open(group.id, target)}
+              >
+                {group.label}
+              </button>
+            );
+          })}
+        </nav>
+        {activeGroup && activeGroup.tabs.length > 1 && (
+          <nav className={styles.subtabs} aria-label={activeGroup.label}>
+            {activeGroup.tabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={styles.subtab}
+                aria-current={tab === active ? "page" : undefined}
+                onClick={() => open(activeGroup.id, tab)}
+              >
+                {TAB_LABELS[tab]}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
       {user && (
         <div className={styles.user}>
           <span className={styles.who}>

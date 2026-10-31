@@ -1,0 +1,106 @@
+.overlay {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  transform: translateX(-50%);
+}
+
+.card {
+  padding: 14px 16px;
+  border: 3px solid var(--crit);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.message {
+  padding-right: 34px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--crit);
+}
+
+.detail {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.35), 0 0 0 0 rgb(220 38 38 / 0.55);
+  }
+  50% {
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.35), 0 0 0 10px rgb(220 38 38 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}
+
+.flat {
+  animation: none;
+  border-width: 2px;
+  box-shadow: none;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+
+.more {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--crit);
+}
+
+.close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--crit);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--crit);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}

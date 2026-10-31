@@ -43,7 +43,17 @@ export const PLACA_SERVICES: readonly string[] = [];
 /** "bloqueio" e "quarentena": para onde segue uma montagem aprovada. */
 /** "pt": enviado pela desmontagem técnica. */
 /** "aguardando_peca": a manutenção espera uma peça; o aparelho continua em manutenção. */
-export type Destination = "montagem" | "vidro" | "analise" | "bloqueio" | "quarentena" | "manutencao" | "pt" | "aguardando_peca";
+/** "alocacao_peca": enviado pela desmontagem ao estoque para alocar peça. */
+export type Destination =
+  | "montagem"
+  | "vidro"
+  | "analise"
+  | "bloqueio"
+  | "quarentena"
+  | "manutencao"
+  | "pt"
+  | "aguardando_peca"
+  | "alocacao_peca";
 
 export const DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "montagem", label: "Liberado para montagem" },
@@ -66,10 +76,14 @@ export const ASSEMBLY_REJECT_DESTINATIONS: readonly { id: Destination; label: st
 /** Destino da manutenção: aguarda a chegada de uma peça. */
 export const AWAITING_PART_LABEL = "Aguardando peça";
 
+/** Destino das desmontagens: o aparelho vai ao estoque para alocar peça. */
+export const ALLOCATION_LABEL = "Enviar para alocação de peça";
+
 /** Direcionamento ao concluir a desmontagem. */
 export const DISASSEMBLY_DESTINATIONS: readonly { id: Destination; label: string }[] = [
   { id: "manutencao", label: "Enviar para manutenção" },
   { id: "montagem", label: "Enviar para montagem" },
+  { id: "alocacao_peca", label: ALLOCATION_LABEL },
 ];
 
 /** Direcionamento ao concluir a desmontagem técnica. */
@@ -78,6 +92,7 @@ export const TECHNICAL_DISASSEMBLY_DESTINATIONS: readonly { id: Destination; lab
   { id: "pt", label: "Enviar para PT" },
   { id: "manutencao", label: "Enviar para manutenção" },
   { id: "analise", label: "Enviar para análise técnica" },
+  { id: "alocacao_peca", label: ALLOCATION_LABEL },
 ];
 
 /** Defeito de partida do aparelho na desmontagem técnica. */
@@ -100,6 +115,7 @@ export function destinationLabel(destination: Destination): string {
   if (destination === "manutencao") return "Retorno para manutenção";
   if (destination === "pt") return "Enviado para PT";
   if (destination === "aguardando_peca") return AWAITING_PART_LABEL;
+  if (destination === "alocacao_peca") return "Enviado para alocação de peça";
   return [...DESTINATIONS, ...ASSEMBLY_DESTINATIONS].find((d) => d.id === destination)?.label ?? destination;
 }
 
@@ -122,7 +138,8 @@ export function parseDestination(value: unknown): Destination | undefined {
     value === "quarentena" ||
     value === "manutencao" ||
     value === "pt" ||
-    value === "aguardando_peca"
+    value === "aguardando_peca" ||
+    value === "alocacao_peca"
     ? value
     : undefined;
 }

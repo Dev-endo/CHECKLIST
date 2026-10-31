@@ -1,0 +1,107 @@
+.allocation {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 9px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.status {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.alocada {
+  color: var(--accent);
+}
+
+.trocada {
+  color: var(--crit);
+}
+
+.liberada {
+  color: var(--ok, var(--accent));
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.awaiting {
+  margin: 12px 14px 0;
+  padding: 10px 12px;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 13.5px;
+}
+
+.awaiting ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 14px 0;
+}
+
+.stat {
+  font: inherit;
+  text-align: left;
+  background: var(--surface);
+  cursor: pointer;
+  display: flex;
+  flex: 1 1 150px;
+  flex-direction: column;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stat strong {
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.statAlert {
+  border: 2px solid var(--crit);
+}
+
+.statAlert strong {
+  color: var(--crit);
+}
+
+.requests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 0;
+}
+
+.allocatedList {
+  margin: 12px 14px 0;
+  font-size: 13.5px;
+}
+
+.allocatedList summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.allocatedList ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.stat:hover {
+  background: var(--accent-soft);
+}

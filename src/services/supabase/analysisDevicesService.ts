@@ -16,6 +16,8 @@ export interface AnalysisDevice {
   at: string | null;
   /** Observações reunidas: texto escrito, manutenções, peças, falhas e notas da desmontagem técnica. */
   observations: string[];
+  /** Quantas vezes o ativo já foi reprovado na montagem (todo o histórico do serial). */
+  assemblyRejections: number;
 }
 
 const startOfDay = (date: string) => new Date(`${date}T00:00:00`);
@@ -57,6 +59,7 @@ export async function fetchAnalysisDevices(
       person: row.technician,
       at: row.concluded_at,
       observations,
+      assemblyRejections: Number(row.assembly_rejections ?? 0),
     };
   });
 }

@@ -1,4 +1,4 @@
-import type { ChecklistKind } from "../../domain/checklist";
+import type { SwappedPart } from "../../domain/stock";
 import type { AppSupabaseClient } from "./client";
 import type { MaintenanceReportFilters } from "./reportService";
 
@@ -13,48 +13,6 @@ function range(filters: MaintenanceReportFilters): { from?: string; to?: string 
     to = nextDay.toISOString();
   }
   return { from: filters.from ? startOfDay(filters.from).toISOString() : undefined, to };
-}
-
-/** Uma peça trocada em um aparelho, e quem fez a troca. */
-export interface PartChange {
-  stage: ChecklistKind;
-  serial: string;
-  unit: string | null;
-  model: string | null;
-  destination: string | null;
-  userId: string;
-  person: string;
-  at: string | null;
-  item: string;
-  detail: string | null;
-}
-
-/** Peças trocadas no período; `item` vazio traz todas. */
-export async function fetchPartChanges(
-  client: AppSupabaseClient,
-  item: string,
-  filters: MaintenanceReportFilters,
-): Promise<PartChange[]> {
-  const { from, to } = range(filters);
-  const { data, error } = await client.rpc("analysis_parts", {
-    p_item: item || undefined,
-    p_from: from,
-    p_to: to,
-    p_user: filters.userId || undefined,
-  });
-  if (error) throw error;
-  return data.map((row) => ({
-    stage: row.kind as ChecklistKind,
-    serial: row.serial,
-    unit: row.unit,
-    model: row.model,
-    destination: row.destination,
-    userId: row.user_id,
-    person: row.technician,
-    at: row.concluded_at,
-    item: row.item,
-    detail: row.detail,
-  }));
 }
 
 /** O que um colaborador concluiu no período, por etapa. */
@@ -87,5 +45,20 @@ export async function fetchCollaboratorSummary(
     technical: Number(row.technical),
     assembly: Number(row.assembly),
     quarantine: Number(row.quarantine),
+  }));
+}
+
+/** Peças trocadas no período pela decisão do estoquista: erro técnico ou peça ruim (qualidade do fornecedor). */
+export async function fetchSwappedParts(client: AppSupabaseClient, filters: MaintenanceReportFilters): Promise<SwappedPart[]> {
+  const { from, to } = range(filters);
+  const { data, error } = await client.rpc("swapped_parts", { p_from: from, p_to: to, p_user: filters.userId || undefined });
+  if (error) throw error;
+  return data.map((row) => ({
+    reason: row.reason === "erro_tecnico" ? "erro_tecnico" : "peca_ruim",
+    part: row.part,
+    model: row.model,
+    person: row.technician,
+    userId: row.user_id,
+    at: row.swapped_at,
   }));
 }

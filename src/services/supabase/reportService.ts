@@ -19,6 +19,8 @@ export interface MaintenanceReport {
   /** Ativos (seriais) liberados para montagem e para vidro no período. */
   releasedAssembly: number;
   releasedGlass: number;
+  /** Enviados para montagem por serial (1 por serial; reprovado depois na montagem sai); null sem o SQL novo. */
+  sentAssembly: number | null;
   /** Face ID com defeito: liberados para montagem e depois laudo e revenda. */
   releasedResale: number;
   /** Ativos (seriais) enviados para análise técnica. */
@@ -63,6 +65,7 @@ export async function fetchMaintenanceReport(
     assets_with_maintenance: number;
     released_assembly: number;
     released_glass: number;
+    sent_assembly?: number;
     released_resale?: number;
     sent_analysis?: number;
     sent_pt?: number;
@@ -81,6 +84,7 @@ export async function fetchMaintenanceReport(
     assetsWithMaintenance: raw.assets_with_maintenance,
     releasedAssembly: raw.released_assembly ?? 0,
     releasedGlass: raw.released_glass ?? 0,
+    sentAssembly: raw.sent_assembly ?? null,
     releasedResale: raw.released_resale ?? 0,
     sentAnalysis: raw.sent_analysis ?? 0,
     sentPt: raw.sent_pt ?? 0,

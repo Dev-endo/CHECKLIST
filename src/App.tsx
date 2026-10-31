@@ -9,10 +9,22 @@ import { DuplicateHint } from "./components/DuplicateHint/DuplicateHint";
 import { RecordsPanel } from "./components/RecordsPanel/RecordsPanel";
 import { DisassemblyChecklist } from "./components/DisassemblyChecklist/DisassemblyChecklist";
 import { AssemblyChecklist } from "./components/AssemblyChecklist/AssemblyChecklist";
+import { LoansPanel } from "./components/LoansPanel/LoansPanel";
+import { PartsControl } from "./components/PartsControl/PartsControl";
+import { AnalysisTechPanel } from "./components/AnalysisTechPanel/AnalysisTechPanel";
+import { BoardRepairPanel } from "./components/AnalysisTechPanel/BoardRepairPanel";
+import { GlassPanel } from "./components/GlassPanel/GlassPanel";
+import { Stage2Panel } from "./components/RepairStage2/Stage2Panel";
+import { Stage1Panel } from "./components/RepairStage1/Stage1Panel";
+import { StockAlerts } from "./components/StockAlerts/StockAlerts";
+import { StockRequestsProvider } from "./components/StockAlerts/StockRequests";
+import { StockRequestsPanel } from "./components/StockRequests/StockRequestsPanel";
+import { StockPanel } from "./components/StockPanel/StockPanel";
 import { ServiceOrderPanel } from "./components/ServiceOrderPanel/ServiceOrderPanel";
 import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
 import { ReviewSection } from "./components/ReviewSection/ReviewSection";
+import { DashboardPanel } from "./components/Dashboard/DashboardPanel";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useToast } from "./components/Toast/ToastProvider";
 import {
@@ -28,7 +40,8 @@ import {
   type DeviceRecord,
 } from "./domain/device";
 import type { Destination, Maintenance } from "./domain/maintenance";
-import { accessibleTabs } from "./domain/roles";
+import { accessibleTabs, canCorrectOs, receivesStockAlerts } from "./domain/roles";
+import type { AllocationAction } from "./domain/stock";
 import { useAutosave } from "./hooks/useAutosave";
 import { useDeviceDraft } from "./hooks/useDeviceDraft";
 import { useDeviceRecords } from "./hooks/useDeviceRecords";
@@ -36,6 +49,7 @@ import { useReleasedIds } from "./hooks/useReleasedIds";
 import { useRepository } from "./hooks/useRepository";
 import { preferences } from "./services/preferences";
 import { lookupAsset } from "./services/supabase/assetsService";
+import { closeAllocations } from "./services/supabase/stockService";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -174,12 +188,23 @@ export default function App() {
     await finishConclude([]);
   };
 
-  const finishConclude = async (maintenances: Maintenance[], destino?: Destination, bloqueado?: boolean, revenda?: boolean, observacao?: string) => {
+  const finishConclude = async (
+    maintenances: Maintenance[],
+    destino?: Destination,
+    bloqueado?: boolean,
+    revenda?: boolean,
+    observacao?: string,
+    allocations?: { id: string; action: AllocationAction }[],
+  ) => {
     setConcluding(true);
     const ok = await conclude({ ...draft, manutencoes: maintenances, destino, bloqueado, revenda, observacao });
     setConcluding(false);
     setMaintenanceOpen(false);
     if (ok) {
+      // As peças alocadas são fechadas depois de concluir: concluída (usada) ou devolvida.
+      if (client && allocations?.length) {
+        await closeAllocations(client, allocations).catch(() => toast("Checklist concluído, mas não foi possível atualizar as peças. Avise o estoquista."));
+      }
       startNew();
       window.scrollTo(0, 0);
       toast("Checklist concluído");
@@ -209,7 +234,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <StockRequestsProvider client={client} enabled={Boolean(user && receivesStockAlerts(user.roles))}>
       <AppHeader tabs={tabs} active={activeTab ?? "checklist"} onChange={setTab} user={user} onSignOut={() => void signOut()} />
 
       <main className={styles.wrap}>
@@ -218,12 +243,28 @@ export default function App() {
             Seu acesso ainda não foi liberado. Peça ao administrador para definir o seu papel.
           </div>
         )}
+        {activeTab === "reparo" && <Stage1Panel />}
+        {activeTab === "reparo2" && <Stage2Panel />}
+        {activeTab === "vidro" && <GlassPanel />}
+        {activeTab === "analise_tecnica" && <AnalysisTechPanel />}
+        {activeTab === "reparo_placa" && <BoardRepairPanel />}
+        {activeTab === "analise_montagem" && (
+          <Stage2Panel
+            assemblyOnly
+            title="Checklist e montagem"
+            subtitle="Aparelhos do reparo em placa sem outro reparo: faça os checklists com o aparelho aberto e fechado e a montagem (com cronômetro) e finalize. Tudo aprovado, o aparelho vai direto para a quarentena."
+          />
+        )}
         {activeTab === "desmontagem" && <DisassemblyChecklist kind="desmontagem" />}
         {activeTab === "desmontagem_tecnica" && <DisassemblyChecklist kind="desmontagem_tecnica" />}
         {activeTab === "montagem" && <AssemblyChecklist />}
-        {activeTab === "quarentena" && client && <QuarantinePanel client={client} userId={userId} />}
-        {activeTab === "os" && client && <ServiceOrderPanel client={client} />}
+        {activeTab === "quarentena" && client && <QuarantinePanel client={client} userId={userId} showPending />}
+        {activeTab === "solicitacoes" && client && <StockRequestsPanel client={client} />}
+        {activeTab === "estoque" && client && <StockPanel client={client} />}
+        {activeTab === "emprestimos" && client && <LoansPanel client={client} />}
+        {activeTab === "os" && client && <ServiceOrderPanel client={client} canCorrect={Boolean(user && canCorrectOs(user.roles))} />}
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
+        {activeTab === "dashboard" && client && <DashboardPanel client={client} />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 
         {activeTab === "checklist" && (
@@ -241,6 +282,7 @@ export default function App() {
                 <p className={styles.hint}>Serial não encontrado na lista de ativos. Preencha o modelo manualmente.</p>
               )}
               {client && <CurrentOsHint client={client} serial={draft.serial} />}
+              {client && <PartsControl client={client} serial={draft.serial} disabled={!editable} />}
               {editable && <DuplicateHint draft={draft} records={records} onOpen={handleOpen} onRestart={handleRestart} />}
             </header>
 
@@ -289,14 +331,26 @@ export default function App() {
           onNewDevice={handleNew}
         />
       )}
+      {user && receivesStockAlerts(user.roles) && (
+        <StockAlerts
+          hideLegacy
+          hideFresh={activeTab === "solicitacoes"}
+          onOpenStock={() => setTab("estoque")}
+          onOpenRequests={() => setTab("solicitacoes")}
+        />
+      )}
       <MaintenanceDialog
+        client={client ?? undefined}
+        serial={draft.serial}
         open={maintenanceOpen}
         busy={concluding}
         faceIdDefect={hasFaceIdDefect(draft.r, draft.tipo)}
         rejected={computeStats(draft.r, draft.tipo).status === "reprovado"}
         onCancel={() => setMaintenanceOpen(false)}
-        onConfirm={(maintenances, destination, blocked, resale, note) => void finishConclude(maintenances, destination, blocked, resale, note)}
+        onConfirm={(maintenances, destination, blocked, resale, note, allocations) =>
+          void finishConclude(maintenances, destination, blocked, resale, note, allocations)
+        }
       />
-    </>
+    </StockRequestsProvider>
   );
 }

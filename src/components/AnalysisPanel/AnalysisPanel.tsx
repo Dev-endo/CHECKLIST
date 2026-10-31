@@ -217,8 +217,8 @@ function ReleasesView({
         <Stat label="Manutenções executadas" metric="maintenance_items" value={report.maintenancesTotal} hint="soma de todos os itens, incluindo a desmontagem técnica" />
         <Stat
           label="Enviados para montagem" metric="sent_assembly"
-          value={report.releasedAssembly + (dis?.toAssembly ?? 0)}
-          hint="liberados pela manutenção + enviados pela desmontagem; cada envio conta"
+          value={report.sentAssembly ?? report.releasedAssembly + (dis?.toAssembly ?? 0)}
+          hint="manutenção ou desmontagem; cada serial conta 1 e sai da conta se for reprovado na montagem"
         />
         <Stat label="Aprovados na montagem" metric="assembly_approved" value={found?.released ?? 0} hint="serial = 1 ativo" />
         <Stat label="Reprovados na montagem" metric="assembly_rejected" value={found?.rejected ?? 0} hint="cada reprovação conta, mesmo do mesmo aparelho" />

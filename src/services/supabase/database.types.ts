@@ -202,6 +202,140 @@ export type Database = {
         }
         Relationships: []
       }
+      part_allocations: {
+        Row: {
+          created_at: string
+          id: string
+          os_id: string
+          part: string
+          serial: string
+          serial_key: string | null
+          status: string
+          swap_reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          os_id: string
+          part: string
+          serial: string
+          status?: string
+          swap_reason?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          os_id?: string
+          part?: string
+          serial?: string
+          status?: string
+          swap_reason?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_allocations_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      part_loans: {
+        Row: {
+          borrower: string
+          closed_at: string | null
+          created_at: string
+          id: string
+          lent_by: string
+          os_id: string
+          part: string
+          serial: string
+          serial_key: string | null
+          status: string
+        }
+        Insert: {
+          borrower: string
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          lent_by?: string
+          os_id: string
+          part: string
+          serial: string
+          status?: string
+        }
+        Update: {
+          borrower?: string
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          lent_by?: string
+          os_id?: string
+          part?: string
+          serial?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      part_requests: {
+        Row: {
+          allocation_id: string | null
+          loan_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          os_id: string
+          part: string
+          requested_by: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          serial: string
+          serial_key: string | null
+          status: string
+        }
+        Insert: {
+          allocation_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          os_id: string
+          part: string
+          requested_by?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          serial: string
+          status?: string
+        }
+        Update: {
+          allocation_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          os_id?: string
+          part?: string
+          requested_by?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          serial?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_requests_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "service_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_orders: {
         Row: {
           asset_short_id: string | null
@@ -286,6 +420,76 @@ export type Database = {
         Args: { p_from?: string; p_to?: string; p_user?: string }
         Returns: Json
       }
+      allocate_part: {
+        Args: { p_serial: string; p_part: string }
+        Returns: string
+      }
+      request_part: {
+        Args: { p_serial: string; p_part: string; p_kind: string; p_allocation_id?: string; p_loan_id?: string }
+        Returns: string
+      }
+      lend_test_part: {
+        Args: { p_serial: string; p_part: string; p_borrower: string }
+        Returns: string
+      }
+      stock_borrowers: {
+        Args: never
+        Returns: { id: string; name: string }[]
+      }
+      awaiting_allocation: {
+        Args: never
+        Returns: { id: string; kind: string; model: string | null; sender: string; since: string }[]
+      }
+      swapped_parts: {
+        Args: { p_from?: string; p_to?: string; p_user?: string }
+        Returns: {
+          reason: string
+          part: string
+          model: string | null
+          technician: string
+          user_id: string
+          swapped_at: string
+        }[]
+      }
+      return_loan: {
+        Args: { p_loan_id: string }
+        Returns: undefined
+      }
+      open_part_loans: {
+        Args: never
+        Returns: {
+          id: string
+          part: string
+          model: string | null
+          os_number: string
+          borrower: string
+          since: string
+        }[]
+      }
+      complete_allocation: {
+        Args: { p_id: string; p_action: string }
+        Returns: undefined
+      }
+      resolve_part_request: {
+        Args: { p_id: string; p_decision: string }
+        Returns: undefined
+      }
+      pending_part_requests: {
+        Args: never
+        Returns: {
+          id: string
+          kind: string
+          part: string
+          os_number: string
+          model: string | null
+          requester: string
+          created_at: string
+        }[]
+      }
+      correct_service_order: {
+        Args: { p_os_id: string; p_os_number: string }
+        Returns: undefined
+      }
       os_map: {
         Args: { p_os_id: string }
         Returns: Json
@@ -335,6 +539,7 @@ export type Database = {
           failures: string[] | null
           consumption_note: string | null
           pt_note: string | null
+          assembly_rejections: number
         }[]
       }
       disassembly_report: {
@@ -349,7 +554,7 @@ export type Database = {
     Enums: {
       device_phase: "pendente" | "concluido"
       device_status: "incompleto" | "liberado" | "reprovado"
-      user_role: "admin" | "supervisor" | "colaborador" | "tecnico" | "montador" | "desmontador"
+      user_role: "admin" | "supervisor" | "colaborador" | "tecnico" | "montador" | "desmontador" | "estoquista" | "analista" | "tecnico_vidro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -479,7 +684,7 @@ export const Constants = {
     Enums: {
       device_phase: ["pendente", "concluido"],
       device_status: ["incompleto", "liberado", "reprovado"],
-      user_role: ["admin", "supervisor", "colaborador", "tecnico", "montador", "desmontador"],
+      user_role: ["admin", "supervisor", "colaborador", "tecnico", "montador", "desmontador", "estoquista", "analista", "tecnico_vidro"],
     },
   },
 } as const

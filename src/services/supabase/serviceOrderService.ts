@@ -68,7 +68,7 @@ export async function fetchAssetOrders(client: AppSupabaseClient, serial: string
 
 export type RegisterOrderResult = "ok" | "duplicate";
 
-/** Registra a OS do ativo. "duplicate": esse número de OS já foi registrado. */
+/** O desmontador registra a OS do ativo. "duplicate": esse número de OS já foi registrado. */
 export async function registerServiceOrder(
   client: AppSupabaseClient,
   order: { serial: string; osNumber: string; unit: string | null },
@@ -76,6 +76,18 @@ export async function registerServiceOrder(
   const { error } = await client
     .from("service_orders")
     .insert({ serial: order.serial.trim(), os_number: order.osNumber.trim(), asset_short_id: order.unit });
+  if (!error) return "ok";
+  if (error.code === "23505") return "duplicate";
+  throw error;
+}
+
+/** Só o admin: corrige o número de uma OS registrada errada. "duplicate": esse número já existe em outra OS. */
+export async function correctServiceOrder(
+  client: AppSupabaseClient,
+  osId: string,
+  osNumber: string,
+): Promise<"ok" | "duplicate"> {
+  const { error } = await client.rpc("correct_service_order", { p_os_id: osId, p_os_number: osNumber.trim() });
   if (!error) return "ok";
   if (error.code === "23505") return "duplicate";
   throw error;

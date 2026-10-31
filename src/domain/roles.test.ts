@@ -1,36 +1,86 @@
 import { describe, expect, it } from "vitest";
-import { accessibleTabs, canDoAssembly, canDoMaintenance } from "./roles";
+import {
+  accessibleTabs,
+  ADMIN_ROLES,
+  canCorrectOs,
+  canDoAssembly,
+  canDoMaintenance,
+  canManageStock,
+  canRegisterOs,
+  canUseQuarantine,
+  EXTRA_ROLES,
+  ROLE_LABELS,
+  receivesStockAlerts,
+} from "./roles";
 
 describe("accessibleTabs", () => {
-  it("gives each role only its own checklist", () => {
-    expect(accessibleTabs("tecnico")).toEqual(["checklist", "os"]);
-    expect(accessibleTabs("desmontador")).toEqual(["desmontagem", "desmontagem_tecnica", "os"]);
-    expect(accessibleTabs("montador")).toEqual(["montagem", "quarentena", "os"]);
+  it("gives each function its tab, plus the Quarentena everyone shares", () => {
+    expect(accessibleTabs("tecnico")).toEqual(["reparo", "reparo2", "quarentena"]);
+    expect(accessibleTabs("estoquista")).toEqual(["quarentena", "solicitacoes", "os"]);
+    expect(accessibleTabs("analista")).toEqual(["quarentena", "analise_tecnica", "reparo_placa", "analise_montagem"]);
+    expect(accessibleTabs("tecnico_vidro")).toEqual(["quarentena", "vidro"]);
+    expect(accessibleTabs("supervisor")).toEqual(["quarentena", "dashboard"]);
+    expect(canRegisterOs("estoquista")).toBe(false);
+    expect(canRegisterOs("tecnico")).toBe(true);
   });
 
-  it("lets the admin open both checklists and manage users", () => {
-    expect(accessibleTabs("admin")).toEqual(["checklist", "desmontagem", "desmontagem_tecnica", "montagem", "quarentena", "registros", "os", "admin"]);
+  it("lets the admin open every tab and manage users", () => {
+    expect(accessibleTabs("admin")).toEqual([
+      "reparo",
+      "reparo2",
+      "quarentena",
+      "analise_tecnica",
+      "reparo_placa",
+      "analise_montagem",
+      "vidro",
+      "solicitacoes",
+      "os",
+      "dashboard",
+      "admin",
+    ]);
   });
 
-  it("lets the supervisor only consult", () => {
-    expect(accessibleTabs("supervisor")).toEqual(["registros", "os"]);
+  it("no longer shows the old screens (manutenção, desmontagem, montagem, análise antiga)", () => {
+    for (const tab of ["checklist", "desmontagem", "desmontagem_tecnica", "montagem", "registros", "estoque", "emprestimos"] as const) {
+      expect(accessibleTabs("admin")).not.toContain(tab);
+    }
+    expect(accessibleTabs("desmontador")).toEqual(["quarentena"]);
+    expect(accessibleTabs("montador")).toEqual(["quarentena"]);
+  });
+
+  it("lets the supervisor only see the results", () => {
     expect(canDoMaintenance("supervisor")).toBe(false);
     expect(canDoAssembly("supervisor")).toBe(false);
+    expect(canManageStock("supervisor")).toBe(false);
+    expect(canCorrectOs("estoquista")).toBe(false);
+    expect(canCorrectOs("admin")).toBe(true);
   });
 
-  it("adds up the tabs of every role a person has", () => {
-    expect(accessibleTabs(["tecnico", "montador"])).toEqual(["checklist", "montagem", "quarentena", "os"]);
-    expect(accessibleTabs(["desmontador", "tecnico", "montador"])).toEqual([
-      "checklist",
-      "desmontagem",
-      "desmontagem_tecnica",
-      "montagem",
-      "quarentena",
-      "os",
-    ]);
+  it("adds up the tabs of every function a person has", () => {
+    expect(accessibleTabs(["tecnico", "tecnico_vidro"])).toEqual(["reparo", "reparo2", "quarentena", "vidro"]);
+    expect(accessibleTabs(["estoquista", "supervisor"])).toEqual(["quarentena", "solicitacoes", "os", "dashboard"]);
   });
 
   it("gives nothing to who has no function yet", () => {
     expect(accessibleTabs("colaborador")).toEqual([]);
+    expect(canUseQuarantine("colaborador")).toBe(false);
+  });
+});
+
+describe("notifications", () => {
+  it("only the stock function receives stock alerts, even for the admin", () => {
+    expect(receivesStockAlerts("estoquista")).toBe(true);
+    expect(receivesStockAlerts(["admin", "estoquista"])).toBe(true);
+    expect(receivesStockAlerts("admin")).toBe(false);
+    expect(receivesStockAlerts("supervisor")).toBe(false);
+  });
+});
+
+describe("administração", () => {
+  it("offers the new functions, which can be combined", () => {
+    expect(ADMIN_ROLES).toEqual(["admin", "supervisor", "tecnico", "analista", "tecnico_vidro", "estoquista", "colaborador"]);
+    expect(EXTRA_ROLES).toEqual(["tecnico", "analista", "tecnico_vidro", "estoquista", "supervisor"]);
+    expect(ROLE_LABELS.analista).toBe("Técnico de placa");
+    expect(ROLE_LABELS.tecnico_vidro).toBe("Técnico de vidro");
   });
 });
