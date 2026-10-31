@@ -34,6 +34,8 @@ export interface DashboardPerson {
   quarentena: number;
   /** Aparelhos que a pessoa liberou para o vidro. */
   vidroEnviados: number;
+  /** Aparelhos que a pessoa liberou para a análise técnica. */
+  analiseEnviados: number;
   placas: number;
   vidros: number;
 }
@@ -44,6 +46,8 @@ export interface DashboardDay {
   quarentena: number;
   /** Aparelhos que a pessoa liberou para o vidro. */
   vidroEnviados: number;
+  /** Aparelhos que a pessoa liberou para a análise técnica. */
+  analiseEnviados: number;
   placas: number;
   vidros: number;
 }
@@ -103,7 +107,7 @@ export async function fetchDevices(client: AppSupabaseClient, kind: DashboardKin
 
 export async function fetchPeople(client: AppSupabaseClient, period: Period): Promise<DashboardPerson[]> {
   const rows = await call<
-    { user_id: string; name: string; manutencoes: number; quarentena: number; vidro_enviados: number; placas: number; vidros: number }[] | null
+    { user_id: string; name: string; manutencoes: number; quarentena: number; vidro_enviados: number; analise_enviados: number; placas: number; vidros: number }[] | null
   >(client, "repair_dashboard_people", range(period));
   return (rows ?? []).map((row) => ({
     userId: row.user_id,
@@ -111,13 +115,14 @@ export async function fetchPeople(client: AppSupabaseClient, period: Period): Pr
     manutencoes: Number(row.manutencoes),
     quarentena: Number(row.quarentena),
     vidroEnviados: Number(row.vidro_enviados),
+    analiseEnviados: Number(row.analise_enviados),
     placas: Number(row.placas),
     vidros: Number(row.vidros),
   }));
 }
 
 export async function fetchPersonDaily(client: AppSupabaseClient, userId: string, period: Period): Promise<DashboardDay[]> {
-  const rows = await call<{ day: string; manutencoes: number; quarentena: number; vidro_enviados: number; placas: number; vidros: number }[] | null>(
+  const rows = await call<{ day: string; manutencoes: number; quarentena: number; vidro_enviados: number; analise_enviados: number; placas: number; vidros: number }[] | null>(
     client,
     "repair_dashboard_person_daily",
     { p_user: userId, ...range(period) },
@@ -127,6 +132,7 @@ export async function fetchPersonDaily(client: AppSupabaseClient, userId: string
     manutencoes: Number(row.manutencoes),
     quarentena: Number(row.quarentena),
     vidroEnviados: Number(row.vidro_enviados),
+    analiseEnviados: Number(row.analise_enviados),
     placas: Number(row.placas),
     vidros: Number(row.vidros),
   }));

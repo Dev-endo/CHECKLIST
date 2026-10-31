@@ -255,6 +255,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                     <th>Manutenções</th>
                     <th>Liberou para a quarentena</th>
                     <th>Liberou para o vidro</th>
+                    <th>Liberou para a análise técnica</th>
                     <th>Placas</th>
                     <th>Vidros feitos</th>
                   </tr>
@@ -270,6 +271,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                       <td>{row.manutencoes}</td>
                       <td>{row.quarentena}</td>
                       <td>{row.vidroEnviados}</td>
+                      <td>{row.analiseEnviados}</td>
                       <td>{row.placas}</td>
                       <td>{row.vidros}</td>
                     </tr>
@@ -292,6 +294,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                         <th>Manutenções</th>
                         <th>Liberou para a quarentena</th>
                         <th>Liberou para o vidro</th>
+                    <th>Liberou para a análise técnica</th>
                         <th>Placas</th>
                         <th>Vidros feitos</th>
                       </tr>
@@ -303,6 +306,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
                           <td>{row.manutencoes}</td>
                           <td>{row.quarentena}</td>
                           <td>{row.vidroEnviados}</td>
+                      <td>{row.analiseEnviados}</td>
                           <td>{row.placas}</td>
                           <td>{row.vidros}</td>
                         </tr>
