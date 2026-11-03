@@ -1,4 +1,4 @@
-// Testa as migrations 44-75 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-78 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-75 aplicadas (2x)");
+console.log("migrations 44-78 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -187,13 +187,18 @@ let eff = (await db.query(`select coalesce(sum(stock_effect),0)::int s from publ
 ok("funcional volta ao disponível (-1 +1 = 0)", eff === 0, String(eff));
 
 // ---- Substituição de definitiva
-r = await as("tec", `select public.request_replacement('${dTela}', 5)`);
+r = await as("tec", `select public.request_replacement('${dTela}', 1, null, 'Tela sem touch')`);
+ok("substituição sem tipo de falha recusada", r.err?.includes("replace_failure_required"), JSON.stringify(r));
+r = await as("tec", `select public.request_replacement('${dTela}', 1, 'falha_teste', ' ')`);
+ok("substituição sem motivo recusada", r.err?.includes("replace_reason_required"), JSON.stringify(r));
+r = await as("tec", `select public.request_replacement('${dTela}', 5, 'falha_teste', 'Tela sem touch')`);
 ok("substituição acima do entregue recusada", r.err?.includes("acima do entregue"), JSON.stringify(r));
-r = await as("tec", `select public.request_replacement('${dTela}', 1)`);
+r = await as("tec", `select public.request_replacement('${dTela}', 1, 'falha_teste', 'Tela sem touch')`);
 const repl = r.rows?.[0] && Object.values(r.rows[0])[0];
 ok("substituição cria solicitação vinculada", !!repl, JSON.stringify(r));
-q = (await db.query(`select replaces_request_id, status from public.stock_requests where id='${repl}'`)).rows[0];
+q = (await db.query(`select replaces_request_id, status, replace_failure, replace_reason from public.stock_requests where id='${repl}'`)).rows[0];
 ok("vinculada à original", q.replaces_request_id === dTela && q.status === "pendente", JSON.stringify(q));
+ok("substituição grava tipo de falha e motivo", q.replace_failure === "falha_teste" && q.replace_reason === "Tela sem touch", JSON.stringify(q));
 const ret2 = (await db.query(`select id from public.stock_returns where request_id='${dTela}'`)).rows[0].id;
 
 // ---- Finalizar Estágio 1 com pendências e abrir Estágio 2
@@ -228,7 +233,7 @@ q = (await db.query(`select stage_id from public.stock_requests where id='${repl
 ok("solicitação pendente acompanha o Estágio 2", q.stage_id === s2);
 
 // ---- Regras de finalização
-const fin = (extra = "") => as("tec", `select public.finish_maintenance('${s2}', array['t1','t2'], array['t3'], ${extra || "false, null"})`);
+const fin = (extra = "") => as("tec", `select public.finish_maintenance('${s2}', array['t1','t2'], array['t3'], ${extra || "false, null"}, p_analysis_note => 'Motivo de teste')`);
 await as("tec", `select public.save_repair_checklist('${s2}','aberto','{"t1":"ok","t2":"ok"}')`);
 r = await fin();
 ok("bloqueia com teste obrigatório sem resposta", r.err === "tests_pending", JSON.stringify(r));
@@ -257,7 +262,7 @@ ok("bloqueia com teste entregue sem destino", r.err === "test_destiny_missing", 
 await as("tec", `select public.define_test_destiny('${tCam}','utilizacao_definitiva')`);
 r = await fin("true, 'x'");
 ok("revenda exige justificativa", r.err === "resale_reason_required", JSON.stringify(r));
-r = await as("tec2", `select public.finish_maintenance('${s2}', array[]::text[], array[]::text[])`);
+r = await as("tec2", `select public.finish_maintenance('${s2}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("outro técnico não finaliza", r.err?.includes("sem permissão"));
 r = await fin();
 ok("tudo aprovado -> quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
@@ -270,12 +275,15 @@ ok("cronômetro encerrado ao finalizar", tot.open_kind === null);
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('SER2','OS-2','${U.tec}')`);
 const a1 = await one("tec", `select public.start_disassembly('SER2')`);
 const aEval = await one("tec", `select public.finish_disassembly('${a1}')`);
-r = await as("tec", `select public.finish_maintenance('${aEval}', array[]::text[], array[]::text[])`);
+r = await as("tec", `select public.finish_maintenance('${aEval}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("manutenção não finaliza em etapa de avaliação", !!r.err);
 const a2 = await one("tec", `select public.finish_evaluation('${aEval}')`);
 await as("tec", `select public.save_repair_checklist('${a2}','aberto','{"t1":"fail","t2":"ok"}')`);
 await as("tec", `select public.save_repair_checklist('${a2}','fechado','{"t3":"ok"}')`);
 r = await as("tec", `select public.finish_maintenance('${a2}', array['t1','t2'], array['t3'])`);
+ok("reprovado sem justificativa da análise recusado", r.err === "analysis_note_required", JSON.stringify(r));
+r = await as("tec", `select public.finish_maintenance('${a2}', array['t1','t2'], array['t3'], p_analysis_note => 'Motivo de teste')`);
+ok("justificativa da manutenção gravada na fila", (await db.query(`select send_note from public.repair_analysis_queue where serial='SER2'`)).rows[0]?.send_note === "Motivo de teste");
 ok("teste reprovado -> analise", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
 q = (await db.query(`select failed_tests from public.repair_analysis_queue where serial='SER2'`)).rows[0];
 ok("reprovados registrados na fila de Análise", q && q.failed_tests[0].teste === "t1", JSON.stringify(q));
@@ -286,7 +294,7 @@ const c1 = await one("tec", `select public.start_disassembly('SER4')`);
 const c2 = await one("tec", `select public.finish_evaluation('${await one("tec", `select public.finish_disassembly('${c1}')`)}')`);
 await as("tec", `select public.save_repair_checklist('${c2}','aberto','{"t1":"ok","opt":"fail","item-x":"fail"}')`);
 await as("tec", `select public.save_repair_checklist('${c2}','fechado','{"t3":"ok"}')`);
-r = await as("tec", `select public.finish_maintenance('${c2}', array['t1','opt'], array['t3'], false, null, array['opt'])`);
+r = await as("tec", `select public.finish_maintenance('${c2}', array['t1','opt'], array['t3'], false, null, array['opt'], p_analysis_note => 'Motivo de teste')`);
 ok("tópico de escolha em 'fail' não reprova (quarentena)", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
 q = (await db.query(`select failed_tests from public.repair_stages where id='${c2}'`)).rows[0];
 ok("sem reprovado não registra itens soltos", q.failed_tests.length === 0, JSON.stringify(q));
@@ -295,7 +303,7 @@ await db.exec(`insert into public.service_orders (serial, os_number, user_id) va
 const d1 = await one("tec", `select public.start_disassembly('SER5')`);
 const d2 = await one("tec", `select public.finish_evaluation('${await one("tec", `select public.finish_disassembly('${d1}')`)}')`);
 await as("tec", `select public.save_repair_checklist('${d2}','fechado','{"t3":"fail","foco":"fail","confirm:imei":"ok"}')`);
-r = await as("tec", `select public.finish_maintenance('${d2}', array[]::text[], array['t3'], false, null, array[]::text[])`);
+r = await as("tec", `select public.finish_maintenance('${d2}', array[]::text[], array['t3'], false, null, array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("reprovado com item apontado vai para análise", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
 q = (await db.query(`select failed_tests from public.repair_stages where id='${d2}'`)).rows[0];
 ok("registra o teste e o item apontado (sem as confirmações)", JSON.stringify(q.failed_tests) === JSON.stringify([{ fase: "fechado", teste: "t3" }, { fase: "fechado", item: "foco" }]), JSON.stringify(q));
@@ -337,9 +345,14 @@ ok("resolvidos todos os pedidos, o Estágio 2 abre sozinho", q.status === "em_an
 
 // análise técnica
 const e9 = await evalOf("SER9", "OS-9");
-await as("tec", `select public.finish_evaluation('${e9}', 'analise')`);
-q = (await db.query(`select source, status from public.repair_analysis_queue where serial='SER9'`)).rows[0];
+r = await as("tec", `select public.finish_evaluation('${e9}', 'analise')`);
+ok("Estágio 1 para a análise sem justificativa recusado", r.err === "analysis_note_required", JSON.stringify(r));
+r = await as("tec", `select public.finish_evaluation('${e9}', 'analise', '  ok ')`);
+ok("justificativa curta recusada", r.err === "analysis_note_required", JSON.stringify(r));
+await as("tec", `select public.finish_evaluation('${e9}', 'analise', 'Motivo de teste')`);
+q = (await db.query(`select source, status, send_note from public.repair_analysis_queue where serial='SER9'`)).rows[0];
 ok("destino análise técnica entra na fila", q && q.source === "estagio1" && q.status === "aguardando", JSON.stringify(q));
+ok("justificativa do Estágio 1 gravada na fila", q?.send_note === "Motivo de teste", JSON.stringify(q));
 q = (await db.query(`select count(*)::int c from public.repair_stages where os_id=(select id from public.service_orders where serial='SER9') and stage='manutencao'`)).rows[0].c;
 ok("análise técnica não abre o Estágio 2", q === 0);
 
@@ -397,7 +410,7 @@ const sendToQuarantine = async (serial) => {
   const st = await one("tec", `select public.start_disassembly('${serial}')`);
   const ev = await one("tec", `select public.finish_disassembly('${st}')`);
   const mt = await one("tec", `select public.finish_evaluation('${ev}')`);
-  return one("tec", `select public.finish_maintenance('${mt}', array[]::text[], array[]::text[])`);
+  return one("tec", `select public.finish_maintenance('${mt}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 };
 ok("manutenção aprovada vai para quarentena (SER20)", (await sendToQuarantine("SER20")) === "quarentena");
 ok("manutenção aprovada vai para quarentena (SER21)", (await sendToQuarantine("SER21")) === "quarentena");
@@ -439,7 +452,7 @@ const roundOne = async () => {
   const st = await one("tec", `select public.start_disassembly('SER30')`);
   const ev = await one("tec", `select public.finish_disassembly('${st}')`);
   const mt = await one("tec", `select public.finish_evaluation('${ev}')`);
-  const out = await one("tec", `select public.finish_maintenance('${mt}', array[]::text[], array[]::text[])`);
+  const out = await one("tec", `select public.finish_maintenance('${mt}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
   return { st, ev, mt, out };
 };
 const r1 = await roundOne();
@@ -476,7 +489,7 @@ ok("a avaliação nasce na rodada 2", q.round === 2 && q.stage === "avaliacao", 
 const mt2 = await one("tec2", `select public.finish_evaluation('${ev2}')`);
 q = (await db.query(`select round, stage from public.repair_stages where id='${mt2}'`)).rows[0];
 ok("a manutenção nasce na rodada 2", q.round === 2 && q.stage === "manutencao");
-ok("rodada 2 também vai para a quarentena", (await one("tec2", `select public.finish_maintenance('${mt2}', array[]::text[], array[]::text[])`)) === "quarentena");
+ok("rodada 2 também vai para a quarentena", (await one("tec2", `select public.finish_maintenance('${mt2}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`)) === "quarentena");
 r = await as("tec", `select serial from public.quarantine_pending() where serial = 'SER30'`);
 ok("a rodada 2 espera a quarentena de novo", r.rows.length === 1, JSON.stringify(r));
 q = (await db.query(`select count(*)::int c from public.repair_stages where os_id=(select id from public.service_orders where serial='SER30')`)).rows[0].c;
@@ -528,7 +541,7 @@ ok("troca de periférico reabre a manutenção reprovada", q.status === "em_anda
 const pend5 = (await db.query(`select id from public.stock_requests where stage_id='${m5}' and status='pendente'`)).rows[0].id;
 await as("tec", `select public.cancel_stock_request('${pend5}','peça já está na bancada')`);
 await as("tec", `select public.save_repair_checklist('${m5}','fechado','{"t3":"fail"}')`);
-r = await as("tec", `select public.finish_maintenance('${m5}', array[]::text[], array['t3'])`);
+r = await as("tec", `select public.finish_maintenance('${m5}', array[]::text[], array['t3'], p_analysis_note => 'Motivo de teste')`);
 ok("falha de novo na manutenção: volta para a fila", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
 q = await qrow("SER5");
 ok("a fila recomeça como aguardando (ciclo novo)", q.status === "aguardando" && q.result === null, JSON.stringify(q));
@@ -536,7 +549,7 @@ ok("a fila recomeça como aguardando (ciclo novo)", q.status === "aguardando" &&
 // ---- Cronômetro da Análise técnica
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('SER40','OS-40','${U.tec}')`);
 const e40 = await one("tec", `select public.finish_disassembly('${await one("tec", `select public.start_disassembly('SER40')`)}')`);
-await as("tec", `select public.finish_evaluation('${e40}', 'analise')`);
+await as("tec", `select public.finish_evaluation('${e40}', 'analise', 'Motivo de teste')`);
 const a40 = (await db.query(`select id from public.repair_analysis_queue where serial='SER40'`)).rows[0].id;
 r = await as("ana", `select public.analysis_timer_set('${a40}', 'produtivo')`);
 ok("sem começar a análise ninguém mexe no cronômetro", Boolean(r.err), JSON.stringify(r));
@@ -621,7 +634,7 @@ r = await as("ana", `select public.create_stock_request('SER40', 'Parafuso', 'de
 const p40 = r.rows?.[0] && Object.values(r.rows[0])[0];
 ok("o analista pede peça na manutenção dele", !!p40, JSON.stringify(r));
 await as("ana", `select public.cancel_stock_request('${p40}','achei o parafuso')`);
-r = await as("ana", `select public.finish_maintenance('${m40}', array[]::text[], array['t3'])`);
+r = await as("ana", `select public.finish_maintenance('${m40}', array[]::text[], array['t3'], p_analysis_note => 'Motivo de teste')`);
 ok("finalizando a montagem, vai direto para a quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
 bt = await one("ana", `select public.analysis_timer_totals('${a40}', 'reparo_placa')`);
 ok("finalizar encerra o cronômetro do reparo", bt.open_kind === null && bt.produtivo >= 0, JSON.stringify(bt));
@@ -641,7 +654,7 @@ ok("e sai da lista de aguardando", r.rows.length === 0);
 const toBoard = async (serial, os) => {
   await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('${serial}','${os}','${U.tec}')`);
   const ev = await one("tec", `select public.finish_disassembly('${await one("tec", `select public.start_disassembly('${serial}')`)}')`);
-  await as("tec", `select public.finish_evaluation('${ev}', 'analise')`);
+  await as("tec", `select public.finish_evaluation('${ev}', 'analise', 'Motivo de teste')`);
   const id = (await db.query(`select id from public.repair_analysis_queue where serial='${serial}'`)).rows[0].id;
   await as("ana", `select public.start_analysis('${id}')`);
   await as("ana", `select public.finish_analysis('${id}', 'reparo_placa')`);
@@ -679,7 +692,7 @@ q = (await db.query(`select sent_by from public.repair_analysis_queue where seri
 ok("a manutenção reprovada guarda quem mandou", q.sent_by === U.tec, JSON.stringify(q));
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('SER50','OS-50','${U.tec}')`);
 const e50 = await one("tec2", `select public.finish_disassembly('${await one("tec2", `select public.start_disassembly('SER50')`)}')`);
-await as("tec2", `select public.finish_evaluation('${e50}', 'analise')`);
+await as("tec2", `select public.finish_evaluation('${e50}', 'analise', 'Motivo de teste')`);
 q = (await db.query(`select sent_by, technician_id from public.repair_analysis_queue q join public.repair_stages s on s.id = q.stage_id where q.serial='SER50'`)).rows[0];
 ok("quem mandou é quem concluiu a avaliação (técnico 2)", q.sent_by === U.tec2 && q.technician_id === U.tec2, JSON.stringify(q));
 q = (await db.query(`select sent_at, created_at from public.repair_analysis_queue where serial='SER5'`)).rows[0];
@@ -691,7 +704,7 @@ U.adm = "00000000-0000-0000-0000-000000000010";
 const sentByAdmin = async (serial, os) => {
   await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('${serial}','${os}','${U.tec}')`);
   const ev = await one("tec", `select public.finish_disassembly('${await one("tec", `select public.start_disassembly('${serial}')`)}')`);
-  await as("adm", `select public.finish_evaluation('${ev}', 'analise')`);
+  await as("adm", `select public.finish_evaluation('${ev}', 'analise', 'Motivo de teste')`);
   return (await db.query(`select id from public.repair_analysis_queue where serial='${serial}'`)).rows[0].id;
 };
 const x60 = await sentByAdmin("SER60", "OS-60");
@@ -764,7 +777,7 @@ q = (await db.query(`select stage_id from public.stock_requests where id='${t70a
 ok("a peça definitiva acompanha o aparelho no Estágio 2", q.stage_id === m70, JSON.stringify(q));
 q = (await db.query(`select count(*)::int c from public.stock_requests where os_id=(select id from public.service_orders where serial='SER70') and analysis_id is null`)).rows[0].c;
 ok("nenhum pedido extra foi criado", q === 0, String(q));
-r = await as("adm", `select public.finish_maintenance('${m70}', array[]::text[], array[]::text[])`);
+r = await as("adm", `select public.finish_maintenance('${m70}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("o Estágio 2 só finaliza depois do estoque receber a devolução", r.err === "return_unconfirmed", JSON.stringify(r));
 
 // sem peça definitiva, troca de periférico continua exigindo peça
@@ -825,12 +838,10 @@ ok("a peça devolvida espera o estoquista receber", q.status === "aguardando_rec
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('SER80','OS-80','${U.tec}')`);
 const s80 = await one("tec", `select public.start_disassembly('SER80')`);
 const m80 = await one("tec", `select public.finish_evaluation('${await one("tec", `select public.finish_disassembly('${s80}')`)}')`);
-r = await as("tec", `select public.finish_maintenance('${m80}', array[]::text[], array[]::text[], true, 'cliente quer', '{}', true)`);
+r = await as("tec", `select public.finish_maintenance('${m80}', array[]::text[], array[]::text[], true, 'cliente quer', '{}', true, p_analysis_note => 'Motivo de teste')`);
 ok("vidro e revenda ao mesmo tempo é recusado", r.err?.includes("dados incompletos"), JSON.stringify(r));
-r = await as("tec", `select public.finish_maintenance('${m80}', array['t1'], array[]::text[], false, null, '{}', true)`);
-ok("vidro também exige os testes respondidos", r.err === "tests_pending", JSON.stringify(r));
-r = await as("tec", `select public.finish_maintenance('${m80}', array[]::text[], array[]::text[], false, null, '{}', true)`);
-ok("manutenção finaliza com destino vidro", r.rows?.[0] && Object.values(r.rows[0])[0] === "vidro", JSON.stringify(r));
+r = await as("tec", `select public.finish_maintenance('${m80}', array['t1'], array['t3'], false, null, '{}', true, p_analysis_note => 'Motivo de teste')`);
+ok("manutenção finaliza com destino vidro, sem exigir o checklist", r.rows?.[0] && Object.values(r.rows[0])[0] === "vidro", JSON.stringify(r));
 q = (await db.query(`select origin, responsible_id, status from public.repair_glass_jobs where serial='SER80'`)).rows[0];
 ok("abre o mesmo serviço de vidro, devolvendo a quem fez a manutenção", q && q.origin === "manutencao" && q.responsible_id === U.tec && q.status === "aguardando", JSON.stringify(q));
 q = (await db.query(`select part from public.stock_requests where os_id=(select id from public.service_orders where serial='SER80') order by part`)).rows;
@@ -847,7 +858,7 @@ await as("vid", `select public.complete_glass('${job80}')`);
 await as("vid", `select public.finish_glass('${job80}')`);
 q = (await db.query(`select status, outcome from public.repair_stages where id='${m80}'`)).rows[0];
 ok("depois do vidro, a manutenção é reaberta para o técnico", q.status === "em_andamento" && q.outcome === null, JSON.stringify(q));
-r = await as("tec", `select public.finish_maintenance('${m80}', array[]::text[], array[]::text[])`);
+r = await as("tec", `select public.finish_maintenance('${m80}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("e então finaliza para a quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
 
 // ---- Vidro: o display morreu no processo
@@ -868,7 +879,7 @@ q = (await db.query(`select part, purpose, qty, status, stage_id, requested_by f
 ok("o display é pedido ao estoque, na manutenção do responsável", q && q.purpose === "definitiva" && q.qty === 1 && q.status === "pendente" && q.stage_id === m90 && q.requested_by === U.vid, JSON.stringify(q));
 q = (await db.query(`select status, display_requested from public.repair_glass_jobs where id='${job90}'`)).rows[0];
 ok("o serviço de vidro registra que o display foi pedido", q.status === "concluido" && q.display_requested === true, JSON.stringify(q));
-r = await as("tec", `select public.finish_maintenance('${m90}', array[]::text[], array[]::text[])`);
+r = await as("tec", `select public.finish_maintenance('${m90}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("o técnico só finaliza depois de receber o display", r.err === "request_pending", JSON.stringify(r));
 
 // ---- Estágio 2: tempo de manutenção e tempo de montagem
@@ -916,7 +927,7 @@ ok("o analista pede mais peça durante o reparo", !!f96, JSON.stringify(r));
 r = await as("ana", `select public.repair_timer_set('${m96}', 'produtivo', 'manutencao')`);
 ok("o analista conta o tempo da troca", !r.err, JSON.stringify(r));
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'k96')`, [JSON.stringify([{ id: d96.id }, { id: f96 }])]);
-r = await as("ana", `select public.finish_maintenance('${m96}', array[]::text[], array[]::text[])`);
+r = await as("ana", `select public.finish_maintenance('${m96}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("o analista finaliza: aprovado vai para a quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
 r = await as("tec", `select serial, technician from public.quarantine_pending() where serial = 'SER96'`);
 ok("aguarda a quarentena, enviado pelo analista", r.rows.length === 1 && r.rows[0].technician === "Ana", JSON.stringify(r));
@@ -940,14 +951,14 @@ await as("ana", `select public.define_test_destiny('${t98}', 'utilizacao_definit
 const m98 = Object.values((await as("ana", `select public.finish_board_repair('${x98}', 'Troca do CI de áudio', 'quarentena')`)).rows[0])[0];
 const d98 = Object.values((await as("ana", `select public.create_stock_request('SER98', 'Display', 'definitiva', 2)`)).rows[0])[0];
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'k98b')`, [JSON.stringify([{ id: d98 }])]);
-const sub98 = Object.values((await as("ana", `select public.request_replacement('${d98}', 1)`)).rows[0])[0];
+const sub98 = Object.values((await as("ana", `select public.request_replacement('${d98}', 1, 'falha_tecnica', 'Display sem imagem')`)).rows[0])[0];
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'k98c')`, [JSON.stringify([{ id: sub98 }])]);
 const ret98 = (await db.query(`select id from public.stock_returns where request_id='${d98}' and reason='substituicao_defeito'`)).rows[0].id;
 await as("est", `select public.confirm_stock_return('${ret98}', 'com_defeito')`);
 let items98 = await one("ana", `select public.repair_maintenance_items('${m98}')`);
 const count = (items) => items.reduce((n, i) => n + (i.qtd ?? 1), 0);
 ok("lista: placa, peça de teste usada e displays (o defeituoso não conta duas vezes)", items98.length === 4 && items98[0].tipo === "placa" && count(items98) === 4, JSON.stringify(items98));
-r = await as("ana", `select public.finish_maintenance('${m98}', array[]::text[], array[]::text[])`);
+r = await as("ana", `select public.finish_maintenance('${m98}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 ok("finaliza para a quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
 q = (await db.query(`select maintenance_count, maintenance_items from public.repair_stages where id='${m98}'`)).rows[0];
 ok("o total de manutenções fica gravado na etapa (4)", q.maintenance_count === 4 && q.maintenance_items.length === 4, JSON.stringify(q));
@@ -958,7 +969,7 @@ await as("ana", `select public.start_analysis('${x99}')`);
 await as("ana", `select public.finish_analysis('${x99}', 'reparo_placa')`);
 await as("ana", `select public.start_board_repair('${x99}')`);
 const m99 = Object.values((await as("ana", `select public.finish_board_repair('${x99}', 'Reparo de trilha', 'estagio2')`)).rows[0])[0];
-r = await as("adm", `select public.finish_maintenance('${m99}', array[]::text[], array[]::text[])`);
+r = await as("adm", `select public.finish_maintenance('${m99}', array[]::text[], array[]::text[], p_analysis_note => 'Motivo de teste')`);
 q = (await db.query(`select maintenance_count from public.repair_stages where id='${m99}'`)).rows[0];
 ok("a placa conta só para quem a reparou", q.maintenance_count === 0, JSON.stringify([r, q]));
 
@@ -1066,7 +1077,7 @@ q = (await db.query(`select stage, status, legacy, technician_id, round from pub
 ok("o checklist abre a manutenção do técnico, marcada como aparelho antigo", q.stage === "manutencao" && q.status === "em_andamento" && q.legacy === true && q.technician_id === U.tec && q.round === 1, JSON.stringify(q));
 ok("iniciar de novo devolve o mesmo checklist", (await one("tec", `select public.start_legacy_maintenance('antigo1 ')`)) === l1);
 await as("tec", `select public.save_repair_checklist('${l1}', 'fechado', '{"t3":"ok"}')`);
-r = await as("tec", `select public.finish_maintenance('${l1}', array[]::text[], array['t3'])`);
+r = await as("tec", `select public.finish_maintenance('${l1}', array[]::text[], array['t3'], p_analysis_note => 'Motivo de teste')`);
 ok("tudo aprovado vai para a quarentena", r.rows?.[0] && Object.values(r.rows[0])[0] === "quarentena", JSON.stringify(r));
 r = await as("tec", `select serial from public.quarantine_pending() where serial = 'ANTIGO1'`);
 ok("e aparece na lista de aguardando da quarentena", r.rows.length === 1);
@@ -1078,24 +1089,24 @@ ok("sem criar OS nova", q === 1);
 
 const l2 = await one("tec", `select public.start_legacy_maintenance('ANTIGO2')`);
 await as("tec", `select public.save_repair_checklist('${l2}', 'fechado', '{"t3":"ok"}')`);
-r = await as("tec", `select public.finish_maintenance('${l2}', array[]::text[], array['t3'], false, null, '{}', false, true)`);
+r = await as("tec", `select public.finish_maintenance('${l2}', array[]::text[], array['t3'], false, null, '{}', false, true, p_analysis_note => 'Motivo de teste')`);
 ok("análise técnica escolhida mesmo sem reprovação", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
 q = (await db.query(`select status, source from public.repair_analysis_queue where serial='ANTIGO2'`)).rows[0];
 ok("e entra na fila da Análise técnica", q && q.status === "aguardando" && q.source === "manutencao", JSON.stringify(q));
-r = await as("tec", `select public.finish_maintenance('${l2}', array[]::text[], array[]::text[], false, null, '{}', true, true)`);
+r = await as("tec", `select public.finish_maintenance('${l2}', array[]::text[], array[]::text[], false, null, '{}', true, true, p_analysis_note => 'Motivo de teste')`);
 ok("vidro e análise ao mesmo tempo é recusado", Boolean(r.err), JSON.stringify(r));
 
 const l3 = await one("tec", `select public.start_legacy_maintenance('ANTIGO3')`);
-r = await as("tec", `select public.finish_maintenance('${l3}', array[]::text[], array[]::text[], false, null, '{}', true, true)`);
+r = await as("tec", `select public.finish_maintenance('${l3}', array[]::text[], array[]::text[], false, null, '{}', true, true, p_analysis_note => 'Motivo de teste')`);
 ok("vidro e análise juntos não são aceitos", r.err?.includes("dados incompletos"), JSON.stringify(r));
-r = await as("tec", `select public.finish_maintenance('${l3}', array[]::text[], array[]::text[], false, null, '{}', true)`);
+r = await as("tec", `select public.finish_maintenance('${l3}', array[]::text[], array[]::text[], false, null, '{}', true, p_analysis_note => 'Motivo de teste')`);
 ok("vidro a partir do checklist", r.rows?.[0] && Object.values(r.rows[0])[0] === "vidro", JSON.stringify(r));
 q = (await db.query(`select origin, responsible_id from public.repair_glass_jobs where serial='ANTIGO3'`)).rows[0];
 ok("abre o mesmo serviço de vidro", q && q.origin === "manutencao" && q.responsible_id === U.tec, JSON.stringify(q));
 
 const l4 = await one("tec", `select public.start_legacy_maintenance('ANTIGO4')`);
 await as("tec", `select public.save_repair_checklist('${l4}', 'fechado', '{"t3":"fail"}')`);
-r = await as("tec", `select public.finish_maintenance('${l4}', array[]::text[], array['t3'])`);
+r = await as("tec", `select public.finish_maintenance('${l4}', array[]::text[], array['t3'], p_analysis_note => 'Motivo de teste')`);
 ok("quarentena com teste reprovado vai para a análise técnica", r.rows?.[0] && Object.values(r.rows[0])[0] === "analise", JSON.stringify(r));
 
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('ANTIGO5','OS-A5','${U.tec}')`);
@@ -1118,8 +1129,37 @@ ok("fora do período não conta", myOld.ativos === 0);
 await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('SER3','OS-3','${U.tec}')`);
 const b1 = await one("tec", `select public.start_disassembly('SER3')`);
 const b2 = await one("tec", `select public.finish_evaluation('${await one("tec", `select public.finish_disassembly('${b1}')`)}')`);
-r = await as("tec", `select public.finish_maintenance('${b2}', array[]::text[], array[]::text[], true, 'cliente pediu revenda')`);
+r = await as("tec", `select public.finish_maintenance('${b2}', array[]::text[], array[]::text[], true, 'cliente pediu revenda', p_analysis_note => 'Motivo de teste')`);
 ok("revenda com justificativa", r.rows?.[0] && Object.values(r.rows[0])[0] === "revenda", JSON.stringify(r));
+
+// ---- PT (perda total): aprovação pendente para administradores e supervisores
+const ptStage = async (serial) => {
+  await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('${serial}','OS-${serial}','${U.tec}')`);
+  const d = await one("tec", `select public.start_disassembly('${serial}')`);
+  return one("tec", `select public.finish_evaluation('${await one("tec", `select public.finish_disassembly('${d}')`)}')`);
+};
+const pt1 = await ptStage("SERPT1");
+r = await as("tec", `select public.finish_maintenance('${pt1}', array['t1'], array['t3'], p_pt => true)`);
+ok("PT sem motivo recusado", r.err === "pt_reason_required", JSON.stringify(r));
+r = await as("tec", `select public.finish_maintenance('${pt1}', array['t1'], array['t3'], false, 'Placa queimada sem reparo', p_pt => true)`);
+ok("PT não exige o checklist e fica pendente", r.rows?.[0] && Object.values(r.rows[0])[0] === "pt", JSON.stringify(r));
+const ptReq = (await db.query(`select id, status, reason from public.repair_pt_requests where serial='SERPT1'`)).rows[0];
+ok("pedido de PT gravado com o motivo", ptReq?.status === "pendente" && ptReq.reason === "Placa queimada sem reparo", JSON.stringify(ptReq));
+r = await as("tec", `select public.decide_pt('${ptReq.id}', true)`);
+ok("técnico não aprova PT", !!r.err, JSON.stringify(r));
+r = await as("sup", `select public.decide_pt('${ptReq.id}', false)`);
+ok("reprovar PT exige comentário", r.err === "pt_note_required", JSON.stringify(r));
+r = await as("sup", `select public.decide_pt('${ptReq.id}', false, 'Dá para trocar a placa')`);
+ok("supervisor reprova PT", !r.err, JSON.stringify(r));
+q = (await db.query(`select status, outcome from public.repair_stages where id='${pt1}'`)).rows[0];
+ok("PT reprovado devolve a manutenção ao técnico", q.status === "em_andamento" && q.outcome === null, JSON.stringify(q));
+r = await as("tec", `select public.finish_maintenance('${pt1}', array[]::text[], array[]::text[], false, 'Sem placa disponível', p_pt => true)`);
+const ptReq2 = (await db.query(`select id from public.repair_pt_requests where serial='SERPT1' and status='pendente'`)).rows[0];
+r = await as("sup", `select public.decide_pt('${ptReq2.id}', true)`);
+q = (await db.query(`select s.status, s.outcome, p.status ps from public.repair_stages s join public.repair_pt_requests p on p.stage_id = s.id where p.id='${ptReq2.id}'`)).rows[0];
+ok("supervisor aprova PT e o aparelho fecha como PT", !r.err && q.status === "concluida" && q.outcome === "pt" && q.ps === "aprovado", JSON.stringify([r, q]));
+r = await as("sup", `select public.decide_pt('${ptReq2.id}', false, 'mudei de ideia')`);
+ok("PT já decidido não muda", r.err === "pt_closed", JSON.stringify(r));
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);

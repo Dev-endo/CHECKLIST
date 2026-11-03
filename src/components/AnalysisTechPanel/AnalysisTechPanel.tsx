@@ -215,6 +215,11 @@ function Analysis({ client, userId, isAdmin }: { client: AppSupabaseClient; user
                 {SOURCE_LABELS[item.source]} · na fila desde {when(item.createdAt)}
                 {item.startedBy && item.startedAt ? ` · análise de ${item.startedBy} desde ${when(item.startedAt)}` : ""}
               </p>
+              {item.sendNote && (
+                <p className={styles.sendNote}>
+                  <strong>Motivo do envio:</strong> {item.sendNote}
+                </p>
+              )}
               {item.failedTests.length > 0 && (
                 <ul className={styles.failed} aria-label="Testes reprovados">
                   {item.failedTests.map((entry) => (

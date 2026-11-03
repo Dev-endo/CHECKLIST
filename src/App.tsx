@@ -27,6 +27,7 @@ import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
 import { ReviewSection } from "./components/ReviewSection/ReviewSection";
 import { DashboardPanel } from "./components/Dashboard/DashboardPanel";
+import { PtApprovalPanel } from "./components/PtApproval/PtApprovalPanel";
 import { StatusBar } from "./components/StatusBar/StatusBar";
 import { useToast } from "./components/Toast/ToastProvider";
 import {
@@ -273,6 +274,7 @@ export default function App() {
         {activeTab === "os" && client && <ServiceOrderPanel client={client} canCorrect={Boolean(user && canCorrectOs(user.roles))} />}
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
         {activeTab === "dashboard" && client && <DashboardPanel client={client} />}
+        {activeTab === "aprovacao_pt" && client && <PtApprovalPanel client={client} />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 
         {activeTab === "checklist" && (

@@ -9,6 +9,7 @@ import {
   summarizeMaintenance,
   pendingTests,
   phaseCatalog,
+  phaseFailed,
   requiredTests,
   toggleBlockResult,
   toSaved,
@@ -29,8 +30,8 @@ const ready = (over: Partial<FinishInput> = {}): FinishInput => ({
 const SHARED = ["tela-e-touch", "sensor-de-proximidade", "cameras", "microfones"];
 
 describe("repair checklist", () => {
-  it("tests display, proximity, cameras and microphones with the device closed", () => {
-    expect(requiredTests("fechado")).toEqual(SHARED);
+  it("tests display, proximity, cameras, microphones and the speaker with the device closed", () => {
+    expect(requiredTests("fechado")).toEqual([...SHARED, "alto-falante"]);
   });
 
   it("tests those four and every other test with the device open", () => {
@@ -51,7 +52,7 @@ describe("repair checklist", () => {
       expect(open.filter((x) => x === id)).toHaveLength(1);
     }
     expect(itemIds("fechado").sort()).toEqual(
-      ["tela-branca", "tela-preta", "tela-ondulacao", "teclado", "truetone", "freeform", "prox", "foco", "lentes", "frontal", "flash", "mic-inf", "mic-tras", "mic-front"].sort(),
+      ["tela-branca", "tela-preta", "tela-ondulacao", "teclado", "truetone", "freeform", "prox", "foco", "lentes", "frontal", "flash", "mic-inf", "mic-tras", "mic-front", "altofalante"].sort(),
     );
   });
 
@@ -65,7 +66,7 @@ describe("repair checklist", () => {
   });
 
   it("counts the required tests still unanswered", () => {
-    expect(pendingTests("fechado", {})).toHaveLength(4);
+    expect(pendingTests("fechado", {})).toHaveLength(5);
     expect(pendingTests("aberto", allOk("aberto"))).toEqual([]);
   });
 
@@ -97,7 +98,7 @@ describe("finishBlockers", () => {
         returnsWaiting: 2,
       }),
     );
-    expect(blockers.join("|")).toMatch(/aparelho fechado: faltam 4/);
+    expect(blockers.join("|")).toMatch(/aparelho fechado: faltam 5/);
     expect(blockers.join("|")).toMatch(/aparelho aberto: confirme/);
     expect(blockers.join("|")).toMatch(/1 solicitação/);
     expect(blockers.join("|")).toMatch(/1 peça\(s\) de teste/);
@@ -105,7 +106,7 @@ describe("finishBlockers", () => {
   });
 
   it("requires a reason for resale", () => {
-    expect(finishBlockers(ready({ destination: "revenda", resaleReason: "x" }))).toEqual(["Revenda exige uma justificativa"]);
+    expect(finishBlockers(ready({ destination: "revenda", resaleReason: "x" }))).toEqual(["Revenda exige o motivo"]);
     expect(finishBlockers(ready({ destination: "revenda", resaleReason: "cliente pediu" }))).toEqual([]);
   });
 });
@@ -149,5 +150,40 @@ describe("summarizeMaintenance", () => {
       ]),
     ).toEqual({ count: 4, lines: ["Reparo em placa: Troca do CI de áudio", "Bateria", "Display (2)"] });
     expect(summarizeMaintenance([])).toEqual({ count: 0, lines: [] });
+  });
+});
+
+describe("phaseFailed / skipPhases", () => {
+  it("detects a failed required test and lets the closed phase be skipped", () => {
+    const first = requiredTests("aberto")[0] as string;
+    const aberto = { ...allOk("aberto"), [first]: "fail" as const };
+    expect(phaseFailed("aberto", aberto)).toBe(true);
+    expect(phaseFailed("aberto", allOk("aberto"))).toBe(false);
+    const blockers = finishBlockers(ready({ results: { aberto, fechado: {} }, skipPhases: ["fechado"] }));
+    expect(blockers.join("|")).not.toMatch(/fechado/);
+  });
+});
+
+describe("analysis note", () => {
+  it("requires a reason when the device goes to the technical analysis", () => {
+    const toAnalysis = ready({ destination: "analise" });
+    expect(finishBlockers(toAnalysis).join("|")).toMatch(/motivo do envio/);
+    expect(finishBlockers({ ...toAnalysis, analysisNote: "Sem imagem na tela" })).toEqual([]);
+    expect(finishBlockers(ready()).join("|")).not.toMatch(/motivo do envio/);
+  });
+});
+
+describe("PT e vidro", () => {
+  const blank = () => ready({ results: { aberto: {}, fechado: {} } });
+
+  it("does not require the checklist for Vidro or PT", () => {
+    expect(finishBlockers({ ...blank(), destination: "vidro" })).toEqual([]);
+    expect(finishBlockers({ ...blank(), destination: "pt", resaleReason: "Placa queimada" })).toEqual([]);
+    expect(finishBlockers({ ...blank(), destination: "auto" }).length).toBeGreaterThan(0);
+  });
+
+  it("requires the reason for PT and sends it to approval", () => {
+    expect(finishBlockers({ ...blank(), destination: "pt" })).toEqual(["PT exige o motivo"]);
+    expect(expectedOutcome(blank().results, "pt")).toBe("pt");
   });
 });

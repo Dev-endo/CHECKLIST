@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import {
   choiceTests,
@@ -34,19 +34,13 @@ import { PartRequestForm } from "../RepairParts/PartRequestForm";
 import { RequestList } from "../RepairParts/RequestList";
 import { RepairTimer } from "../RepairStage1/RepairTimer";
 import { useToast } from "../Toast/ToastProvider";
+import { PtRejection } from "../PtApproval/PtRejection";
 import { FinishPanel } from "./FinishPanel";
 import { StageHistory } from "./StageHistory";
 import stage1Styles from "../RepairStage1/RepairStage1.module.css";
 import styles from "./RepairStage2.module.css";
 
 const LIST_POLL_MS = 15_000;
-
-/** Checklist manutenção (aparelhos antigos): os destinos possíveis. */
-const LEGACY_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
-  { id: "auto", label: "Quarentena", hint: "Tudo aprovado. Com algum teste reprovado, o aparelho vai para a Análise técnica." },
-  { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado." },
-  { id: "vidro", label: "Vidro", hint: "Pede Vidro e Aro ao estoque e abre o serviço na aba Vidro; depois o aparelho volta para você finalizar." },
-];
 
 const since = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -120,6 +114,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
   const [busy, setBusy] = useState(false);
   const [destination, setDestination] = useState<FinishDestination>("auto");
   const [resaleReason, setResaleReason] = useState("");
+  const [analysisNote, setAnalysisNote] = useState("");
 
   const { asset, order, stages, requests, returns, reload: reloadDevice } = useRepairDevice(client, serial, () =>
     toast("Não foi possível carregar o aparelho. Tente de novo."),
@@ -199,6 +194,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
     returnsWaiting: returns.filter((r) => r.status === "aguardando_recebimento").length,
     destination,
     resaleReason,
+    analysisNote,
   });
   const outcome = expectedOutcome(checklists.results, destination);
 
@@ -216,7 +212,9 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
         choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
         destination,
         resaleReason,
+        analysisNote,
       });
+      setAnalysisNote("");
       toast(`Manutenção finalizada: ${OUTCOME_LABELS[result]}`);
       reload();
     } catch (error) {
@@ -239,6 +237,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
     setSerial("");
     setDestination("auto");
     setResaleReason("");
+    setAnalysisNote("");
     setMineReloads((n) => n + 1);
   };
 
@@ -322,6 +321,8 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 </p>
               )}
 
+              {running && <PtRejection client={client} stageId={maintenance.id} />}
+
               {maintenance.status === "aguardando_pecas" && (
                 <p className={stage1Styles.hint} role="status">
                   Aguardando peças: este aparelho abre sozinho para manutenção quando o estoque resolver todos os pedidos de peça da OS. Dá para
@@ -348,22 +349,6 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 onToggle={() => void timer.toggle().then(refreshAssembly)} onFinish={() => void timer.finish().then(refreshAssembly)}
               />
 
-              <h2 className={stage1Styles.heading}>Montagem</h2>
-              <RepairTimer
-                title="Montagem"
-                hideWait
-                totals={assembly.totals}
-                action={assembly.action}
-                busy={assembly.busy}
-                disabled={!running}
-                onToggle={() => void assembly.toggle().then(refreshTimer)} onFinish={() => void assembly.finish().then(refreshTimer)}
-              />
-              <p className={stage1Styles.hint}>
-                {assemblyOnly
-                  ? "Sem troca de peça, use só a montagem. Os dois cronômetros não correm juntos: começar um para o outro."
-                  : "Aparelho sem manutenção (ou já com o vidro feito) pode ser só montado. Os dois cronômetros não correm juntos: começar um para o outro."}
-              </p>
-
               {running && <PartRequestForm client={client} serial={serial} onSent={afterRequestChange} />}
 
               <h2 className={stage1Styles.heading}>Solicitações de peça da OS {order.osNumber}</h2>
@@ -373,7 +358,8 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
               )}
 
               {PHASES.map((phase) => (
-                <section key={phase} className={styles.phase} aria-label={PHASE_LABELS[phase]}>
+                <Fragment key={phase}>
+                <section className={styles.phase} aria-label={PHASE_LABELS[phase]}>
                   <h2 className={stage1Styles.heading}>{PHASE_LABELS[phase]}</h2>
                   {!checklists.loaded ? (
                     <p className={styles.muted}>Carregando…</p>
@@ -391,6 +377,27 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                     />
                   )}
                 </section>
+                {/* Montagem: depois dos testes com o aparelho aberto. */}
+                  {phase === "aberto" && !legacy && (
+                    <div className={styles.phase}>
+                    <h2 className={stage1Styles.heading}>Montagem</h2>
+                    <RepairTimer
+                      title="Montagem"
+                      hideWait
+                      totals={assembly.totals}
+                      action={assembly.action}
+                      busy={assembly.busy}
+                      disabled={!running}
+                      onToggle={() => void assembly.toggle().then(refreshTimer)} onFinish={() => void assembly.finish().then(refreshTimer)}
+                    />
+                    <p className={stage1Styles.hint}>
+                      {assemblyOnly
+                        ? "Sem troca de peça, use só a montagem. Os dois cronômetros não correm juntos: começar um para o outro."
+                        : "Aparelho sem manutenção (ou já com o vidro feito) pode ser só montado. Os dois cronômetros não correm juntos: começar um para o outro."}
+                    </p>
+                    </div>
+                  )}
+                </Fragment>
               ))}
 
               {running && (
@@ -403,10 +410,11 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                   unsaved={checklists.unsaved}
                   onDestination={setDestination}
                   onReason={setResaleReason}
+                  analysisNote={analysisNote}
+                  onAnalysisNote={setAnalysisNote}
                   onFinish={() => void finish()}
                   title={assemblyOnly ? "Finalizar checklist e montagem" : undefined}
                   onlyAuto={assemblyOnly}
-                  destinations={legacy ? LEGACY_DESTINATIONS : undefined}
                   maintenanceItems={maintenanceItems}
                 />
               )}

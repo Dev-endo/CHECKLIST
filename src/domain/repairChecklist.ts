@@ -25,7 +25,8 @@ export const BATTERY_KEY = "_bateria";
 export const MISSING_PARTS_CATALOG: readonly ChecklistBlock[] = buildCatalog(MISSING_PARTS_BLOCKS);
 
 // Catálogos da manutenção -----------------------------------------------------------------------------------------
-// Display, proximidade, câmeras e microfones são testados com o aparelho fechado E com ele aberto.
+// Display, proximidade, câmeras e microfones são testados com o aparelho fechado E com ele aberto; o alto-falante
+// também é testado fechado.
 // Todos os outros testes, só com o aparelho aberto. Os testes são os do checklist de manutenção; onde um tópico
 // misturava grupos (sensores, áudio), ele foi dividido sem mudar o texto dos testes.
 
@@ -60,7 +61,10 @@ const OPEN_ONLY = [
   SYSTEM,
 ];
 
-const CLOSED_CATALOG: readonly ChecklistBlock[] = buildCatalog(SHARED);
+/** Testes só com o aparelho fechado (o alto-falante também é testado aberto, dentro de "Auricular e alto-falante"). */
+const CLOSED_ONLY = [{ title: "Alto-falante", items: itemsOf("audio-e-microfones", ["altofalante"]) }];
+
+const CLOSED_CATALOG: readonly ChecklistBlock[] = buildCatalog([...SHARED, ...CLOSED_ONLY]);
 const OPEN_CATALOG: readonly ChecklistBlock[] = buildCatalog([...SHARED, ...OPEN_ONLY]);
 
 /** Tópicos de cada fase. */
@@ -121,9 +125,27 @@ export function pendingTests(phase: ChecklistPhase, results: Results): string[] 
   return requiredTests(phase).filter((id) => !results[id]);
 }
 
-/** Destino escolhido ao finalizar: automático (quarentena ou análise pelos testes), vidro ou revenda. */
-/** "analise": Análise técnica escolhida mesmo sem teste reprovado (aba Checklist manutenção). */
-export type FinishDestination = "auto" | "vidro" | "revenda" | "analise";
+/**
+ * Destino escolhido ao finalizar: automático (quarentena ou análise pelos testes), Análise técnica (mesmo sem teste
+ * reprovado), vidro (sem exigir o checklist), revenda (com motivo) ou PT, perda total (com motivo; espera a
+ * aprovação de um administrador ou supervisor).
+ */
+export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt";
+
+/** Destinos que não exigem o checklist: o aparelho vai para o vidro (e volta) ou espera a aprovação do PT. */
+export const skipsChecklist = (destination: FinishDestination) => destination === "vidro" || destination === "pt";
+
+/** Destinos que exigem um motivo escrito (o mesmo campo). */
+export const needsReason = (destination: FinishDestination) => destination === "revenda" || destination === "pt";
+
+/** Opções de destino ao finalizar (Reparo, Estágio 2, e Checklist manutenção). */
+export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
+  { id: "auto", label: "Quarentena", hint: "Tudo aprovado. Com algum teste reprovado, o aparelho vai para a Análise técnica." },
+  { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado." },
+  { id: "vidro", label: "Vidro", hint: "Não precisa do checklist: pede Vidro e Aro e abre o serviço na aba Vidro; depois o aparelho volta para você." },
+  { id: "revenda", label: "Revenda", hint: "Exige o motivo." },
+  { id: "pt", label: "PT (perda total)", hint: "Exige o motivo e não precisa do checklist. Fica pendente até um administrador ou supervisor aprovar." },
+];
 
 export interface FinishInput {
   results: Record<ChecklistPhase, Results>;
@@ -131,7 +153,14 @@ export interface FinishInput {
   returnsWaiting: number;
   destination: FinishDestination;
   resaleReason: string;
+  /** Fases que não precisam ser feitas (ex.: Checklist manutenção: fechado, quando o aberto teve falha). */
+  skipPhases?: readonly ChecklistPhase[];
+  /** Motivo do envio para a Análise técnica: obrigatório quando o aparelho vai para lá. */
+  analysisNote?: string;
 }
+
+/** Tamanho mínimo da justificativa de envio para a Análise técnica (o banco confere o mesmo). */
+export const ANALYSIS_NOTE_MIN = 5;
 
 /**
  * O que ainda impede finalizar a manutenção, em português. A conferência de verdade é do banco; esta lista
@@ -140,6 +169,7 @@ export interface FinishInput {
 export function finishBlockers(input: FinishInput): string[] {
   const blockers: string[] = [];
   for (const phase of PHASES) {
+    if (skipsChecklist(input.destination) || input.skipPhases?.includes(phase)) continue;
     const missing = pendingTests(phase, input.results[phase]).length;
     if (missing) blockers.push(`${PHASE_LABELS[phase]}: faltam ${missing} teste(s) obrigatório(s)`);
     const confirmations = missingPhaseConfirmations(phase, input.results[phase]);
@@ -150,7 +180,11 @@ export function finishBlockers(input: FinishInput): string[] {
   const noDestiny = input.requests.filter((r) => r.purpose === "teste" && r.status === "entregue" && !r.testDestiny).length;
   if (noDestiny) blockers.push(`${noDestiny} peça(s) de teste entregue(s) sem destino: utilize ou devolva`);
   if (input.returnsWaiting) blockers.push(`${input.returnsWaiting} devolução(ões) aguardando o estoque confirmar o recebimento`);
-  if (input.destination === "revenda" && input.resaleReason.trim().length < 5) blockers.push("Revenda exige uma justificativa");
+  if (input.destination === "revenda" && input.resaleReason.trim().length < 5) blockers.push("Revenda exige o motivo");
+  if (input.destination === "pt" && input.resaleReason.trim().length < 5) blockers.push("PT exige o motivo");
+  if (expectedOutcome(input.results, input.destination) === "analise" && (input.analysisNote ?? "").trim().length < ANALYSIS_NOTE_MIN) {
+    blockers.push("Escreva o motivo do envio para a Análise técnica");
+  }
   return blockers;
 }
 
@@ -158,7 +192,8 @@ export function finishBlockers(input: FinishInput): string[] {
 export function expectedOutcome(
   results: Record<ChecklistPhase, Results>,
   destination: FinishDestination,
-): "quarentena" | "analise" | "revenda" | "vidro" {
+): "quarentena" | "analise" | "revenda" | "vidro" | "pt" {
+  if (destination === "pt") return "pt";
   if (destination === "revenda") return "revenda";
   if (destination === "vidro") return "vidro";
   if (destination === "analise") return "analise";
@@ -169,11 +204,18 @@ export function expectedOutcome(
   return failed ? "analise" : "quarentena";
 }
 
+/** Algum teste obrigatório da fase reprovado (os de escolha não contam). */
+export function phaseFailed(phase: ChecklistPhase, results: Results): boolean {
+  const choice = new Set(choiceTests(phase));
+  return requiredTests(phase).some((id) => results[id] === "fail" && !choice.has(id));
+}
+
 export const OUTCOME_LABELS = {
   quarentena: "Quarentena",
   vidro: "Vidro",
   analise: "Fila de Análise",
   revenda: "Revenda",
+  pt: "PT (aprovação pendente)",
 } as const;
 
 // Testes reprovados (o que a manutenção gravou na fila da Análise) ----------------------------------------------

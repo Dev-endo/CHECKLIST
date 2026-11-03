@@ -234,3 +234,22 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.noteField textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}

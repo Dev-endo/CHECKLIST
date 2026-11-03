@@ -69,6 +69,13 @@ export function describeRepairError(error: { code?: string; message?: string } |
   const text = error?.message ?? "";
   if (error?.code === "23505") return "Já existe uma peça de teste desse tipo aberta ou sem destino nesta OS.";
   if (text.includes("no_os")) return "Registre a OS do aparelho antes.";
+  if (text.includes("pt_reason_required")) return "PT exige o motivo.";
+  if (text.includes("pt_note_required")) return "Para reprovar o PT, escreva o comentário para o técnico.";
+  if (text.includes("pt_closed")) return "Este PT já foi decidido.";
+  if (text.includes("pt_pending")) return "Este aparelho tem um PT aguardando aprovação.";
+  if (text.includes("analysis_note_required")) return "Escreva o motivo do envio para a Análise técnica.";
+  if (text.includes("replace_failure_required")) return "Escolha o tipo de falha: Falha técnica ou Falha de teste.";
+  if (text.includes("replace_reason_required")) return "Explique por que está substituindo a peça.";
   if (error?.code === "42501" || text.includes("sem permissão")) return "Seu perfil não pode fazer isso.";
   if (text.includes("pedido já fechado")) return "Essa solicitação já foi fechada.";
   if (text.includes("stage_closed")) return "Essa etapa já foi concluída.";
@@ -99,6 +106,13 @@ export const CONDITION_LABELS: Record<ReturnCondition, string> = {
   funcional: "Funcional",
   com_defeito: "Com defeito",
   necessita_avaliacao: "Necessita avaliação",
+};
+
+/** Por que a peça definitiva foi substituída. */
+export type ReplaceFailure = "falha_tecnica" | "falha_teste";
+export const REPLACE_FAILURE_LABELS: Record<ReplaceFailure, string> = {
+  falha_tecnica: "Falha técnica",
+  falha_teste: "Falha de teste",
 };
 
 export const RETURN_REASON_LABELS: Record<ReturnReason, string> = {

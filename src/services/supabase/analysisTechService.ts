@@ -19,6 +19,8 @@ export interface AnalysisItem {
   source: "estagio1" | "manutencao";
   status: "aguardando" | "em_analise";
   failedTests: FailedTestEntry[];
+  /** Por que o aparelho foi enviado para a análise (escrito por quem enviou). */
+  sendNote: string | null;
   /** Técnico responsável: o aparelho volta para ele no Estágio 2. */
   technician: string;
   /** Quem mandou o aparelho para a análise técnica (a quem devolver). */
@@ -42,6 +44,7 @@ interface QueueRow {
   source: AnalysisItem["source"];
   status: AnalysisItem["status"];
   failed_tests: unknown;
+  send_note: string | null;
   created_at: string;
   started_at: string | null;
   started_by: string | null;
@@ -59,7 +62,7 @@ export async function fetchAnalysisQueue(client: AppSupabaseClient): Promise<Ana
     loose(client)
       .from("repair_analysis_queue")
       .select(
-        "id, serial, source, status, failed_tests, created_at, started_at, started_by, sent_at, service_orders(os_number), repair_stages(profiles!technician_id(name, email)), profiles!started_by(name, email), sender:profiles!sent_by(name, email)",
+        "id, serial, source, status, failed_tests, send_note, created_at, started_at, started_by, sent_at, service_orders(os_number), repair_stages(profiles!technician_id(name, email)), profiles!started_by(name, email), sender:profiles!sent_by(name, email)",
       )
       .in("status", ["aguardando", "em_analise"])
       .order("created_at", { ascending: true })
@@ -77,6 +80,7 @@ export async function fetchAnalysisQueue(client: AppSupabaseClient): Promise<Ana
       source: row.source,
       status: row.status,
       failedTests: parseFailedTests(row.failed_tests),
+      sendNote: row.send_note,
       technician: personName(row.repair_stages?.profiles),
       sentBy: personName(row.sender ?? row.repair_stages?.profiles),
       sentAt: row.sent_at,

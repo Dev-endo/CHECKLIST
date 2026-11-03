@@ -1,4 +1,12 @@
-import { OUTCOME_LABELS, summarizeMaintenance, type FinishDestination, type MaintenanceItem } from "../../domain/repairChecklist";
+import {
+  FINISH_DESTINATIONS,
+  needsReason,
+  OUTCOME_LABELS,
+  skipsChecklist,
+  summarizeMaintenance,
+  type FinishDestination,
+  type MaintenanceItem,
+} from "../../domain/repairChecklist";
 import { Button } from "../Button/Button";
 import styles from "./RepairStage2.module.css";
 
@@ -22,15 +30,12 @@ interface FinishPanelProps {
   destinations?: readonly { id: FinishDestination; label: string; hint: string }[];
   /** Esconde a caixa "Manutenções que contam para você" (Checklist manutenção não troca peça). */
   hideCount?: boolean;
+  /** Motivo do envio para a Análise técnica (o campo aparece quando o destino é a análise). */
+  analysisNote?: string;
+  onAnalysisNote?: (value: string) => void;
 }
 
-/** Fim da manutenção: o que ainda falta e o destino (automático, vidro ou revenda excepcional, com justificativa). */
-const DESTINATIONS: { id: FinishDestination; label: string; hint: string }[] = [
-  { id: "auto", label: "Pelos testes", hint: "Quarentena se tudo foi aprovado; fila de Análise se algum teste foi reprovado." },
-  { id: "vidro", label: "Vidro", hint: "Pede Vidro e Aro ao estoque e abre o serviço na aba Vidro; depois o aparelho volta para você finalizar." },
-  { id: "revenda", label: "Revenda", hint: "Destino excepcional: exige justificativa." },
-];
-
+/** Fim da manutenção: o que ainda falta e o destino (quarentena, análise técnica, vidro, revenda ou PT). */
 export function FinishPanel({
   blockers,
   outcome,
@@ -44,8 +49,10 @@ export function FinishPanel({
   title = "Finalizar manutenção",
   onlyAuto = false,
   maintenanceItems = [],
-  destinations = DESTINATIONS,
+  destinations = FINISH_DESTINATIONS,
   hideCount = false,
+  analysisNote = "",
+  onAnalysisNote,
 }: FinishPanelProps) {
   const blocked = blockers.length > 0;
   const summary = summarizeMaintenance(maintenanceItems);
@@ -98,10 +105,33 @@ export function FinishPanel({
         ))}
       </fieldset>
       )}
-      {destination === "revenda" && (
+      {outcome === "analise" && onAnalysisNote && (
         <label className={styles.reason}>
-          Justificativa (obrigatória)
-          <textarea value={resaleReason} rows={2} maxLength={500} disabled={busy} onChange={(e) => onReason(e.target.value)} />
+          Por que o aparelho vai para a Análise técnica? (obrigatório)
+          <textarea
+            value={analysisNote}
+            rows={3}
+            maxLength={1000}
+            disabled={busy}
+            placeholder="Descreva o defeito ou o motivo do envio"
+            onChange={(e) => onAnalysisNote(e.target.value)}
+          />
+        </label>
+      )}
+      {!onlyAuto && skipsChecklist(destination) && (
+        <p className={styles.muted}>Não precisa do checklist para este destino (se fez algum teste, ele fica salvo).</p>
+      )}
+      {!onlyAuto && needsReason(destination) && (
+        <label className={styles.reason}>
+          {destination === "pt" ? "Motivo do PT (obrigatório)" : "Motivo da revenda (obrigatório)"}
+          <textarea
+            value={resaleReason}
+            rows={3}
+            maxLength={1000}
+            disabled={busy}
+            placeholder={destination === "pt" ? "Por que o aparelho é perda total?" : "Por que o aparelho vai para a revenda?"}
+            onChange={(e) => onReason(e.target.value)}
+          />
         </label>
       )}
 

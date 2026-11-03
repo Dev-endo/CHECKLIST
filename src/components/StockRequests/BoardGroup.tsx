@@ -5,6 +5,7 @@ import {
   isOpenRequest,
   MOVEMENT_LABELS,
   PURPOSE_LABELS,
+  REPLACE_FAILURE_LABELS,
   STATUS_LABELS,
   type BoardGroup as Group,
 } from "../../domain/repairStages";
@@ -110,6 +111,12 @@ export function BoardGroup({ client, group, selected, onToggle, onChanged }: Boa
                   {when(r.createdAt)}
                 </span>
               </div>
+              {r.replaceFailure && (
+                <p className={styles.muted}>
+                  Substituição · <strong>{REPLACE_FAILURE_LABELS[r.replaceFailure]}</strong>
+                  {r.replaceReason ? `: ${r.replaceReason}` : ""}
+                </p>
+              )}
 
               <div className={styles.actions}>
                 {open && (

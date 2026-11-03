@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider";
-import { MISSING_PARTS_CATALOG, missingPartsPending } from "../../domain/repairChecklist";
+import { ANALYSIS_NOTE_MIN, MISSING_PARTS_CATALOG, missingPartsPending } from "../../domain/repairChecklist";
 import {
   describeRepairError,
   destinationAvailable,
@@ -55,6 +55,9 @@ function Stage1({ client, userId, technician }: Stage1Props) {
   const [mine, setMine] = useState<OpenStage[]>([]);
   const [busy, setBusy] = useState(false);
   const [destination, setDestination] = useState<Stage1Destination>("manutencao");
+  // Motivo do envio para a Análise técnica (obrigatório nesse destino).
+  const [analysisNote, setAnalysisNote] = useState("");
+  const noteMissing = destination === "analise" && analysisNote.trim().length < ANALYSIS_NOTE_MIN;
   // Ativo que já tem OS: o técnico escolhe registrar outra OS ou, se reprovou na quarentena, continuar com a mesma.
   const [newOs, setNewOs] = useState(false);
   const { asset, order, stages, requests, returns, canRedo, reload: reloadDevice } = useRepairDevice(client, serial, () =>
@@ -178,9 +181,10 @@ function Stage1({ client, userId, technician }: Stage1Props) {
     if (!confirmed) return;
     setBusy(true);
     try {
-      await finishEvaluation(client, evaluation.id, destination);
+      await finishEvaluation(client, evaluation.id, destination, analysisNote);
       toast(`Avaliação técnica concluída: ${label}`);
       setDestination("manutencao");
+      setAnalysisNote("");
       reload();
     } catch (error) {
       fail(error, "Não foi possível concluir a avaliação técnica.");
@@ -362,7 +366,22 @@ function Stage1({ client, userId, technician }: Stage1Props) {
                           </label>
                         );
                       })}
-                      <Button disabled={busy || !destinationAvailable(destination, openRequests.length)} onClick={() => void concludeEvaluation()}>
+                      {destination === "analise" && (
+                        <label className={styles.noteField}>
+                          Por que o aparelho vai para a Análise técnica? (obrigatório)
+                          <textarea
+                            value={analysisNote}
+                            rows={3}
+                            maxLength={1000}
+                            placeholder="Descreva o defeito ou o motivo do envio"
+                            onChange={(e) => setAnalysisNote(e.target.value)}
+                          />
+                        </label>
+                      )}
+                      <Button
+                        disabled={busy || noteMissing || !destinationAvailable(destination, openRequests.length)}
+                        onClick={() => void concludeEvaluation()}
+                      >
                         Concluir avaliação técnica
                       </Button>
                     </fieldset>

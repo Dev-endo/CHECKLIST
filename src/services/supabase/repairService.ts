@@ -1,4 +1,4 @@
-import type { RequestPurpose, RequestStatus, Stage1Destination, TestDestiny, TimerKind, TimerTotals } from "../../domain/repairStages";
+import type { ReplaceFailure, RequestPurpose, RequestStatus, Stage1Destination, TestDestiny, TimerKind, TimerTotals } from "../../domain/repairStages";
 import type { MaintenanceItem } from "../../domain/repairChecklist";
 import type { AppSupabaseClient } from "./client";
 
@@ -49,7 +49,7 @@ export interface RepairStage {
   /** Só na avaliação técnica concluída: para onde o aparelho foi. */
   destination: Stage1Destination | null;
   /** Só na manutenção concluída: para onde o aparelho foi. */
-  outcome: "quarentena" | "analise" | "revenda" | "vidro" | null;
+  outcome: "quarentena" | "analise" | "revenda" | "vidro" | "pt" | null;
 }
 
 interface StageRow {
@@ -133,7 +133,7 @@ export interface LegacyChecklist {
   id: string;
   serial: string;
   status: RepairStageStatus;
-  outcome: "quarentena" | "analise" | "vidro" | "revenda" | null;
+  outcome: "quarentena" | "analise" | "vidro" | "revenda" | "pt" | null;
   startedAt: string;
   finishedAt: string | null;
   osNumber: string;
@@ -203,8 +203,12 @@ export const finishDisassembly = (client: AppSupabaseClient, stageId: string) =>
  * Conclui a avaliação técnica e manda o aparelho para o destino escolhido. Devolve o id do Estágio 2 quando há
  * (manutenção ou aguardando peças); vidro e análise técnica encerram o Estágio 1 e devolvem null.
  */
-export const finishEvaluation = (client: AppSupabaseClient, stageId: string, destination: Stage1Destination) =>
-  call<string | null>(client, "finish_evaluation", { p_stage_id: stageId, p_destination: destination });
+export const finishEvaluation = (client: AppSupabaseClient, stageId: string, destination: Stage1Destination, note = "") =>
+  call<string | null>(client, "finish_evaluation", {
+    p_stage_id: stageId,
+    p_destination: destination,
+    p_note: destination === "analise" ? note.trim() : null,
+  });
 
 // Cronômetro ------------------------------------------------------------------------------------------------
 
@@ -262,6 +266,9 @@ export interface StockRequest {
   /** "analise": pedida pelo analista durante a Análise técnica. */
   originStage: RepairStageName | "analise" | null;
   replacesRequestId: string | null;
+  /** Substituição: tipo de falha e por que o técnico substituiu a peça. */
+  replaceFailure: ReplaceFailure | null;
+  replaceReason: string | null;
   createdAt: string;
   cancelReason: string | null;
   testDestiny: TestDestiny | null;
@@ -276,13 +283,15 @@ export interface RequestRow {
   status: RequestStatus;
   origin_stage: StockRequest["originStage"];
   replaces_request_id: string | null;
+  replace_failure: ReplaceFailure | null;
+  replace_reason: string | null;
   created_at: string;
   cancel_reason: string | null;
   test_destiny: TestDestiny | null;
 }
 
 export const REQUEST_COLUMNS =
-  "id, part, purpose, qty, qty_delivered, status, origin_stage, replaces_request_id, created_at, cancel_reason, test_destiny";
+  "id, part, purpose, qty, qty_delivered, status, origin_stage, replaces_request_id, replace_failure, replace_reason, created_at, cancel_reason, test_destiny";
 
 export const toRequest = (row: RequestRow): StockRequest => ({
   id: row.id,
@@ -293,6 +302,8 @@ export const toRequest = (row: RequestRow): StockRequest => ({
   status: row.status,
   originStage: row.origin_stage,
   replacesRequestId: row.replaces_request_id,
+  replaceFailure: row.replace_failure,
+  replaceReason: row.replace_reason,
   createdAt: row.created_at,
   cancelReason: row.cancel_reason,
   testDestiny: row.test_destiny,
@@ -333,19 +344,23 @@ export const finishMaintenance = (
     requiredOpen: string[];
     requiredClosed: string[];
     choice: string[];
-    destination: "auto" | "vidro" | "revenda" | "analise";
+    destination: "auto" | "vidro" | "revenda" | "analise" | "pt";
     resaleReason: string;
+    /** Motivo do envio para a Análise técnica (obrigatório quando o aparelho vai para lá). */
+    analysisNote?: string;
   },
 ) =>
-  call<"quarentena" | "analise" | "revenda" | "vidro">(client, "finish_maintenance", {
+  call<"quarentena" | "analise" | "revenda" | "vidro" | "pt">(client, "finish_maintenance", {
     p_stage_id: input.stageId,
     p_required_open: input.requiredOpen,
     p_required_closed: input.requiredClosed,
     p_resale: input.destination === "revenda",
-    p_resale_reason: input.destination === "revenda" ? input.resaleReason.trim() : null,
+    p_resale_reason: input.destination === "revenda" || input.destination === "pt" ? input.resaleReason.trim() : null,
     p_choice: input.choice,
     p_glass: input.destination === "vidro",
     p_analysis: input.destination === "analise",
+    p_analysis_note: input.analysisNote?.trim() || null,
+    p_pt: input.destination === "pt",
   });
 
 /** Manutenções que contam para quem finaliza a etapa (a placa que ele reparou e cada peça usada de vez). */

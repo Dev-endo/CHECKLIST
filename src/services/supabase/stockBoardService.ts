@@ -1,4 +1,4 @@
-import type { ReturnCondition, ReturnReason, TestDestiny } from "../../domain/repairStages";
+import type { ReplaceFailure, ReturnCondition, ReturnReason, TestDestiny } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "./client";
 import { call, loose, REQUEST_COLUMNS, rows, toRequest, type RequestRow, type StockRequest } from "./repairService";
 
@@ -59,8 +59,17 @@ export const defineTestDestiny = (client: AppSupabaseClient, requestId: string, 
   call<string | null>(client, "define_test_destiny", { p_id: requestId, p_destiny: destiny });
 
 /** Peça definitiva entregue com defeito: cria a substituta e a devolução da defeituosa. */
-export const requestReplacement = (client: AppSupabaseClient, requestId: string, qty: number) =>
-  call<string>(client, "request_replacement", { p_request_id: requestId, p_qty: qty });
+export const requestReplacement = (
+  client: AppSupabaseClient,
+  requestId: string,
+  input: { qty: number; failure: ReplaceFailure; reason: string },
+) =>
+  call<string>(client, "request_replacement", {
+    p_request_id: requestId,
+    p_qty: input.qty,
+    p_failure: input.failure,
+    p_reason: input.reason.trim(),
+  });
 
 // Quadro do estoquista ------------------------------------------------------------------------------------------
 

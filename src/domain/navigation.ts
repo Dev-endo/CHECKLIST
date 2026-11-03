@@ -19,6 +19,8 @@ const GROUPS: { id: string; label: string; tabs: readonly TabId[] }[] = [
   // A consulta de OS fica em Estoque.
   { id: "estoque", label: "Estoque", tabs: ["solicitacoes", "os"] },
   { id: "analise", label: "Análise", tabs: ["dashboard"] },
+  // Pedidos de perda total esperando administrador ou supervisor.
+  { id: "aprovacao_pt", label: "Aprovação PT", tabs: ["aprovacao_pt"] },
   { id: "admin", label: "Administração", tabs: ["admin"] },
 ];
 
@@ -42,6 +44,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   quarentena: "Quarentena",
   registros: "Análise (antiga)",
   dashboard: "Análise",
+  aprovacao_pt: "Aprovação PT",
   admin: "Administração",
 };
 

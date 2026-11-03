@@ -15,6 +15,7 @@ describe("navGroups", () => {
       ["Vidro", ["vidro"]],
       ["Estoque", ["solicitacoes", "os"]],
       ["Análise", ["dashboard"]],
+      ["Aprovação PT", ["aprovacao_pt"]],
       ["Administração", ["admin"]],
     ]);
   });
@@ -40,6 +41,7 @@ describe("navGroups", () => {
     expect(summary("supervisor")).toEqual([
       ["Quarentena", ["quarentena"]],
       ["Análise", ["dashboard"]],
+      ["Aprovação PT", ["aprovacao_pt"]],
     ]);
   });
 

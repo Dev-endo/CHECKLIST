@@ -1,0 +1,106 @@
+.heading {
+  margin: 20px 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.approved {
+  border-left-color: var(--ok);
+}
+
+.rejectedItem {
+  border-left-color: var(--danger, var(--muted));
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.serial {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.tag {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.meta {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.reason {
+  margin: 6px 0 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.reject {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.reject textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.rejected {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--danger, var(--accent));
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.rejected p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

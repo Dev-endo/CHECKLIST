@@ -69,6 +69,7 @@ export type TabId =
   | "os"
   | "registros"
   | "dashboard"
+  | "aprovacao_pt"
   | "admin";
 
 /** Supervisor e admin enxergam os checklists de todos. */
@@ -121,6 +122,11 @@ export function canSeeDashboard(role: Roles): boolean {
   return hasRole(role, "admin", "supervisor");
 }
 
+/** Aba Aprovação PT (perda total): supervisor e admin. */
+export function canApprovePt(role: Roles): boolean {
+  return hasRole(role, "admin", "supervisor");
+}
+
 /**
  * Avisos do estoque (solicitação nova, devolução): só quem tem a função de estoquista. O admin vê todas as abas, mas
  * só recebe aviso das funções atribuídas a ele.
@@ -161,6 +167,7 @@ export function accessibleTabs(role: Roles): TabId[] {
   if (canManageStock(role)) tabs.push("solicitacoes");
   if (canViewOs(role)) tabs.push("os");
   if (canSeeDashboard(role)) tabs.push("dashboard");
+  if (canApprovePt(role)) tabs.push("aprovacao_pt");
   if (canManageUsers(role)) tabs.push("admin");
   return tabs;
 }

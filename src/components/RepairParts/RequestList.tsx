@@ -7,9 +7,11 @@ import {
   isOpenRequest,
   pendingBalance,
   PURPOSE_LABELS,
+  REPLACE_FAILURE_LABELS,
   RETURN_REASON_LABELS,
   replaceableQty,
   STATUS_LABELS,
+  type ReplaceFailure,
   type TestDestiny,
 } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
@@ -41,6 +43,8 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
   const [action, setAction] = useState<Action>(null);
   const [reason, setReason] = useState("");
   const [replaceQty, setReplaceQty] = useState(1);
+  const [failure, setFailure] = useState<ReplaceFailure | null>(null);
+  const [replaceReason, setReplaceReason] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (!requests.length) return <p className={styles.empty}>Nenhuma peça solicitada nesta OS.</p>;
@@ -53,6 +57,8 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
       setAction(null);
       setReason("");
       setReplaceQty(1);
+      setFailure(null);
+      setReplaceReason("");
       onChanged();
     } catch (error) {
       toast(describeRepairError(error as { code?: string; message?: string }, fallback));
@@ -99,6 +105,12 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
               )}
             </div>
 
+            {r.replaceFailure && (
+              <p className={styles.reason}>
+                <strong>{REPLACE_FAILURE_LABELS[r.replaceFailure]}</strong>
+                {r.replaceReason ? `: ${r.replaceReason}` : ""}
+              </p>
+            )}
             {r.status === "cancelada" && r.cancelReason && <p className={styles.reason}>Motivo: {r.cancelReason}</p>}
             {r.testDestiny && <p className={styles.reason}>Peça de teste: {DESTINY_LABELS[r.testDestiny]}.</p>}
 
@@ -140,7 +152,7 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
             )}
 
             {action?.kind === "replace" && action.id === r.id && (
-              <div className={styles.cancelBox}>
+              <div className={styles.replaceBox}>
                 <label className={styles.ask}>
                   Quantas vieram com defeito?{" "}
                   <input
@@ -152,21 +164,49 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
                     onChange={(e) => setReplaceQty(Math.min(replaceableQty(r.qtyDelivered, replaced), Math.max(1, Number(e.target.value) || 1)))}
                   />
                 </label>
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(
-                      () => requestReplacement(client, r.id, replaceQty),
-                      "Substituição solicitada: devolva a peça com defeito ao estoque",
-                      "Não foi possível solicitar a substituição.",
-                    )
-                  }
-                >
-                  Solicitar substituição
-                </Button>
-                <Button variant="ghost" disabled={busy} onClick={() => setAction(null)}>
-                  Voltar
-                </Button>
+                <div className={styles.failures} role="radiogroup" aria-label="Tipo de falha">
+                  {(Object.keys(REPLACE_FAILURE_LABELS) as ReplaceFailure[]).map((value) => (
+                    <label key={value} className={[styles.purpose, failure === value ? styles.purposeOn : ""].join(" ")}>
+                      <input type="radio" name={`failure-${r.id}`} checked={failure === value} onChange={() => setFailure(value)} />
+                      <span>{REPLACE_FAILURE_LABELS[value]}</span>
+                    </label>
+                  ))}
+                </div>
+                <textarea
+                  className={styles.replaceReason}
+                  value={replaceReason}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Explique por que está substituindo a peça (obrigatório)"
+                  aria-label="Por que está substituindo a peça"
+                  onChange={(e) => setReplaceReason(e.target.value)}
+                />
+                <div className={styles.cancelBox}>
+                  <Button
+                    disabled={busy || !failure || replaceReason.trim().length < 5}
+                    onClick={() =>
+                      failure &&
+                      void run(
+                        () => requestReplacement(client, r.id, { qty: replaceQty, failure, reason: replaceReason }),
+                        "Substituição solicitada: devolva a peça com defeito ao estoque",
+                        "Não foi possível solicitar a substituição.",
+                      )
+                    }
+                  >
+                    Solicitar substituição
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setAction(null);
+                      setFailure(null);
+                      setReplaceReason("");
+                    }}
+                  >
+                    Voltar
+                  </Button>
+                </div>
               </div>
             )}
           </li>

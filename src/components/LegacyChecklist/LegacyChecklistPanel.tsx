@@ -3,10 +3,12 @@ import { useAuth } from "../../auth/AuthProvider";
 import {
   choiceTests,
   expectedOutcome,
+  FINISH_DESTINATIONS,
   finishBlockers,
   PHASE_KIND,
   PHASE_LABELS,
   phaseCatalog,
+  phaseFailed,
   PHASES,
   requiredTests,
   type FinishDestination,
@@ -28,6 +30,7 @@ import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
 import { Checklist } from "../Checklist/Checklist";
 import { OsField } from "../DeviceForm/OsField";
+import { PtRejection } from "../PtApproval/PtRejection";
 import { FinishPanel } from "../RepairStage2/FinishPanel";
 import { useToast } from "../Toast/ToastProvider";
 import stage1Styles from "../RepairStage1/RepairStage1.module.css";
@@ -36,13 +39,13 @@ import styles from "./LegacyChecklist.module.css";
 
 const LOOKUP_DEBOUNCE_MS = 400;
 
-const DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
-  { id: "auto", label: "Quarentena", hint: "Tudo aprovado. Com algum teste reprovado, o aparelho vai para a Análise técnica." },
-  { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado." },
-  { id: "vidro", label: "Vidro", hint: "Pede Vidro e Aro ao estoque e abre o serviço na aba Vidro; depois o checklist volta para você finalizar." },
-];
-
-const DESTINATION_LABELS = { quarentena: "Quarentena", analise: "Análise técnica", vidro: "Vidro", revenda: "Revenda" } as const;
+const DESTINATION_LABELS = {
+  quarentena: "Quarentena",
+  analise: "Análise técnica",
+  vidro: "Vidro",
+  revenda: "Revenda",
+  pt: "PT (aprovação pendente)",
+} as const;
 
 const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const hour = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -61,6 +64,7 @@ function problemFor(error: unknown): Problem {
   if (text.includes("no_os")) return { kind: "no_os" };
   if (text.includes("disassembly_open")) return { kind: "message", text: "Este aparelho está no Estágio 1 do Reparo: siga por lá." };
   if (text.includes("in_repair")) return { kind: "message", text: "Este aparelho está no Estágio 2 do Reparo: siga por lá." };
+  if (text.includes("pt_pending")) return { kind: "message", text: "Este aparelho tem um PT aguardando a aprovação de um administrador ou supervisor." };
   if (text.includes("in_glass")) return { kind: "message", text: "Este aparelho está no Vidro. O checklist volta para quem o enviou quando o vidro terminar." };
   return { kind: "message", text: describeRepairError(error as { code?: string; message?: string }, "Não foi possível abrir o checklist. Tente de novo.") };
 }
@@ -98,6 +102,9 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   const [opening, setOpening] = useState(false);
   const [tries, setTries] = useState(0);
   const [destination, setDestination] = useState<FinishDestination>("auto");
+  const [analysisNote, setAnalysisNote] = useState("");
+  // Motivo da revenda ou do PT.
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastDone, setLastDone] = useState<{ serial: string; outcome: keyof typeof DESTINATION_LABELS } | null>(null);
   const [mine, setMine] = useState<OpenStage[]>([]);
@@ -170,9 +177,19 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   const editable = Boolean(stageId) || !(serial && problem?.kind === "message");
   const checklists = useRepairChecklists(client, stageId, editable && !busy, (error) => toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível salvar as marcações.")), true);
 
+  // Falha com o aparelho aberto: o checklist fechado não precisa ser feito (o aparelho já não vai para a quarentena).
+  const openFailed = phaseFailed("aberto", checklists.results.aberto);
   const blockers = [
     ...(stageId ? [] : ["Bipe o serial do aparelho"]),
-    ...finishBlockers({ results: checklists.results, requests: [], returnsWaiting: 0, destination, resaleReason: "" }),
+    ...finishBlockers({
+      results: checklists.results,
+      requests: [],
+      returnsWaiting: 0,
+      destination,
+      resaleReason: reason,
+      skipPhases: openFailed ? ["fechado"] : [],
+      analysisNote,
+    }),
   ];
   const outcome = expectedOutcome(checklists.results, destination);
 
@@ -180,6 +197,8 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     setTyped("");
     setSerial("");
     setDestination("auto");
+    setAnalysisNote("");
+    setReason("");
     input.current?.focus();
   };
 
@@ -192,10 +211,11 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       const result = await finishMaintenance(client, {
         stageId,
         requiredOpen: requiredTests("aberto"),
-        requiredClosed: requiredTests("fechado"),
+        requiredClosed: openFailed ? [] : requiredTests("fechado"),
         choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
         destination,
-        resaleReason: "",
+        resaleReason: reason,
+        analysisNote,
       });
       setLastDone({ serial, outcome: result });
       setReloads((n) => n + 1);
@@ -208,7 +228,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     }
   };
 
-  const counts = { quarentena: 0, analise: 0, vidro: 0, revenda: 0 };
+  const counts = { quarentena: 0, analise: 0, vidro: 0, revenda: 0, pt: 0 };
   for (const item of today ?? []) if (item.outcome) counts[item.outcome] += 1;
   const breakdown = (Object.keys(counts) as (keyof typeof counts)[])
     .filter((key) => counts[key] > 0)
@@ -220,7 +240,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       <header>
         <h1 className={appStyles.title}>Checklist manutenção</h1>
         <p className={appStyles.subtitle}>
-          Bipe o serial, faça os testes com o aparelho aberto e fechado e finalize: quarentena, análise técnica ou vidro.
+          Bipe o serial, faça os testes com o aparelho aberto e fechado e finalize: quarentena, análise técnica, vidro, revenda ou PT.
         </p>
       </header>
 
@@ -298,6 +318,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       </div>
 
       {serial && opening && <p className={stage1Styles.hint}>Abrindo o checklist…</p>}
+      {stageId && <PtRejection client={client} stageId={stageId} />}
       {stageId && opened && (
         <p className={stage1Styles.hint} role="status">
           {opened.resumed
@@ -331,7 +352,11 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       {PHASES.map((phase) => (
         <section key={phase} className={stage2Styles.phase} aria-label={PHASE_LABELS[phase]}>
           <h2 className={stage1Styles.heading}>{PHASE_LABELS[phase]}</h2>
-          {!checklists.loaded ? (
+          {phase === "fechado" && openFailed ? (
+            <p className={stage1Styles.hint}>
+              Não precisa fazer: o aparelho teve falha nos testes com ele aberto. Finalize e escolha o destino (Análise técnica ou Vidro).
+            </p>
+          ) : !checklists.loaded ? (
             <p className={stage2Styles.muted}>Carregando…</p>
           ) : (
             <Checklist
@@ -354,13 +379,15 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         blockers={blockers}
         outcome={outcome}
         destination={destination}
-        resaleReason=""
+        resaleReason={reason}
         busy={busy}
         unsaved={Boolean(stageId) && checklists.unsaved}
         onDestination={setDestination}
-        onReason={() => undefined}
+        onReason={setReason}
         onFinish={() => void finish()}
-        destinations={DESTINATIONS}
+        destinations={FINISH_DESTINATIONS}
+        analysisNote={analysisNote}
+        onAnalysisNote={setAnalysisNote}
         hideCount
       />
     </>

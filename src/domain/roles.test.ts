@@ -19,7 +19,7 @@ describe("accessibleTabs", () => {
     expect(accessibleTabs("estoquista")).toEqual(["quarentena", "solicitacoes", "os"]);
     expect(accessibleTabs("analista")).toEqual(["quarentena", "analise_tecnica", "reparo_placa", "analise_montagem"]);
     expect(accessibleTabs("tecnico_vidro")).toEqual(["quarentena", "vidro"]);
-    expect(accessibleTabs("supervisor")).toEqual(["quarentena", "dashboard"]);
+    expect(accessibleTabs("supervisor")).toEqual(["quarentena", "dashboard", "aprovacao_pt"]);
     expect(canRegisterOs("estoquista")).toBe(false);
     expect(canRegisterOs("tecnico")).toBe(true);
   });
@@ -37,6 +37,7 @@ describe("accessibleTabs", () => {
       "solicitacoes",
       "os",
       "dashboard",
+      "aprovacao_pt",
       "admin",
     ]);
   });
@@ -59,7 +60,7 @@ describe("accessibleTabs", () => {
 
   it("adds up the tabs of every function a person has", () => {
     expect(accessibleTabs(["tecnico", "tecnico_vidro"])).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena", "vidro"]);
-    expect(accessibleTabs(["estoquista", "supervisor"])).toEqual(["quarentena", "solicitacoes", "os", "dashboard"]);
+    expect(accessibleTabs(["estoquista", "supervisor"])).toEqual(["quarentena", "solicitacoes", "os", "dashboard", "aprovacao_pt"]);
   });
 
   it("gives nothing to who has no function yet", () => {

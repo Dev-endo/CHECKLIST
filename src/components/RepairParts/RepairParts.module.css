@@ -227,3 +227,32 @@
   color: var(--accent);
   font-weight: 700;
 }
+
+.replaceBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.failures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.replaceReason {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
