@@ -30,8 +30,8 @@ const ready = (over: Partial<FinishInput> = {}): FinishInput => ({
 const SHARED = ["tela-e-touch", "sensor-de-proximidade", "cameras", "microfones"];
 
 describe("repair checklist", () => {
-  it("tests display, proximity, cameras, microphones and the speaker with the device closed", () => {
-    expect(requiredTests("fechado")).toEqual([...SHARED, "alto-falante"]);
+  it("tests display, proximity, cameras, microphones, the speaker and the buttons with the device closed", () => {
+    expect(requiredTests("fechado")).toEqual([...SHARED, "alto-falante", "botoes-fisicos"]);
   });
 
   it("tests those four and every other test with the device open", () => {
@@ -52,7 +52,7 @@ describe("repair checklist", () => {
       expect(open.filter((x) => x === id)).toHaveLength(1);
     }
     expect(itemIds("fechado").sort()).toEqual(
-      ["tela-branca", "tela-preta", "tela-ondulacao", "teclado", "truetone", "freeform", "prox", "foco", "lentes", "frontal", "flash", "mic-inf", "mic-tras", "mic-front", "altofalante"].sort(),
+      ["tela-branca", "tela-preta", "tela-ondulacao", "teclado", "truetone", "freeform", "prox", "foco", "lentes", "frontal", "flash", "mic-inf", "mic-tras", "mic-front", "altofalante", "botoes"].sort(),
     );
   });
 
@@ -66,7 +66,7 @@ describe("repair checklist", () => {
   });
 
   it("counts the required tests still unanswered", () => {
-    expect(pendingTests("fechado", {})).toHaveLength(5);
+    expect(pendingTests("fechado", {})).toHaveLength(6);
     expect(pendingTests("aberto", allOk("aberto"))).toEqual([]);
   });
 
@@ -98,7 +98,7 @@ describe("finishBlockers", () => {
         returnsWaiting: 2,
       }),
     );
-    expect(blockers.join("|")).toMatch(/aparelho fechado: faltam 5/);
+    expect(blockers.join("|")).toMatch(/aparelho fechado: faltam 6/);
     expect(blockers.join("|")).toMatch(/aparelho aberto: confirme/);
     expect(blockers.join("|")).toMatch(/1 solicitação/);
     expect(blockers.join("|")).toMatch(/1 peça\(s\) de teste/);

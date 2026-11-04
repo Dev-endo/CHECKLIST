@@ -26,7 +26,7 @@ export const MISSING_PARTS_CATALOG: readonly ChecklistBlock[] = buildCatalog(MIS
 
 // Catálogos da manutenção -----------------------------------------------------------------------------------------
 // Display, proximidade, câmeras e microfones são testados com o aparelho fechado E com ele aberto; o alto-falante
-// também é testado fechado.
+// e os botões também são testados fechados.
 // Todos os outros testes, só com o aparelho aberto. Os testes são os do checklist de manutenção; onde um tópico
 // misturava grupos (sensores, áudio), ele foi dividido sem mudar o texto dos testes.
 
@@ -61,8 +61,14 @@ const OPEN_ONLY = [
   SYSTEM,
 ];
 
-/** Testes só com o aparelho fechado (o alto-falante também é testado aberto, dentro de "Auricular e alto-falante"). */
-const CLOSED_ONLY = [{ title: "Alto-falante", items: itemsOf("audio-e-microfones", ["altofalante"]) }];
+/**
+ * Testes só com o aparelho fechado. O alto-falante e os botões também são testados abertos, dentro de "Auricular e
+ * alto-falante" e "Botões e vibração". "Botões físicos" (e não "Botões") para o tópico não ter o mesmo id do item.
+ */
+const CLOSED_ONLY = [
+  { title: "Alto-falante", items: itemsOf("audio-e-microfones", ["altofalante"]) },
+  { title: "Botões físicos", items: itemsOf("botoes-e-vibracao", ["botoes"]) },
+];
 
 const CLOSED_CATALOG: readonly ChecklistBlock[] = buildCatalog([...SHARED, ...CLOSED_ONLY]);
 const OPEN_CATALOG: readonly ChecklistBlock[] = buildCatalog([...SHARED, ...OPEN_ONLY]);
