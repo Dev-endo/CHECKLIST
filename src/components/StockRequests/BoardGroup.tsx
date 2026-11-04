@@ -79,7 +79,7 @@ export function BoardGroup({ client, group, selected, onToggle, onChanged }: Boa
         <span>{first?.model ?? "Modelo não encontrado"}</span>
         {first?.unit && <span className={styles.muted}>{first.unit}</span>}
         <span className={styles.os}>OS {group.osNumber}</span>
-        <span className={styles.muted}>Técnico: {requesters}</span>
+        <span className={styles.muted}>Solicitado por: {requesters}</span>
       </header>
 
       <ul className={styles.rows}>
@@ -108,7 +108,7 @@ export function BoardGroup({ client, group, selected, onToggle, onChanged }: Boa
                 <span className={styles.status}>{STATUS_LABELS[r.status]}</span>
                 <span className={styles.muted}>
                   {r.originStage ? `${STAGE_LABELS[r.originStage]} · ` : ""}
-                  {when(r.createdAt)}
+                  {r.requester} · {when(r.createdAt)}
                 </span>
               </div>
               {r.replaceFailure && (

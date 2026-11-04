@@ -1,4 +1,4 @@
-// Testa as migrations 44-78 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-79 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-78 aplicadas (2x)");
+console.log("migrations 44-79 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
