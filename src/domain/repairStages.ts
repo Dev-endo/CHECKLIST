@@ -137,6 +137,7 @@ export const MOVEMENT_LABELS: Record<string, string> = {
   recebimento: "Recebimento confirmado",
   retorno_disponivel: "Voltou ao estoque disponível",
   segregacao: "Segregada (fora do disponível)",
+  baixa_definitiva: "Estoque ciente do uso definitivo",
 };
 
 /** Só peça recebida e classificada como funcional volta ao estoque disponível. */
@@ -183,8 +184,15 @@ export function groupByDevice<T extends BoardRequest>(requests: readonly T[]): B
 }
 
 /** Texto do aviso ao estoquista para uma solicitação nova ou uma devolução aguardando recebimento. */
-export function alertMessage(item: { kind: "solicitacao" | "devolucao"; requester: string; part: string; qty: number; purpose: RequestPurpose | null }): string {
+export function alertMessage(item: {
+  kind: "solicitacao" | "devolucao" | "uso_definitivo";
+  requester: string;
+  part: string;
+  qty: number;
+  purpose: RequestPurpose | null;
+}): string {
   if (item.kind === "devolucao") return `${item.requester} devolveu ${item.part}: confirme o recebimento`;
+  if (item.kind === "uso_definitivo") return `${item.requester} vai usar definitivamente a peça de teste ${item.part}: dê baixa no estoque`;
   const amount = item.qty > 1 ? `${item.qty}× ` : "";
   return `${item.requester} solicitou ${amount}${item.part} para ${item.purpose === "teste" ? "teste" : "manutenção"}`;
 }

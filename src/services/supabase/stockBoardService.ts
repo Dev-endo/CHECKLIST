@@ -207,11 +207,80 @@ export async function fetchMovements(client: AppSupabaseClient, requestId: strin
   }));
 }
 
+// Peça de teste que ficou no aparelho ---------------------------------------------------------------------------
+
+export interface KeptTestPart {
+  id: string;
+  part: string;
+  qty: number;
+  serial: string;
+  osNumber: string;
+  model: string | null;
+  unit: string | null;
+  /** Quem pediu a peça de teste. */
+  requester: string;
+  /** Quem decidiu ficar com ela. */
+  keptBy: string;
+  keptAt: string;
+  /** Quando o estoque ficou ciente (null = aguardando). */
+  ackAt: string | null;
+  ackBy: string | null;
+}
+
+interface KeptRow {
+  id: string;
+  part: string;
+  qty_delivered: number;
+  serial: string;
+  test_destiny_at: string;
+  test_kept_ack_at: string | null;
+  service_orders: { os_number: string } | null;
+  requester: Person;
+  keeper: Person;
+  acker: Person;
+}
+
+const KEPT_SELECT =
+  "id, part, qty_delivered, serial, test_destiny_at, test_kept_ack_at, service_orders(os_number), " +
+  "requester:profiles!requested_by(name, email), keeper:profiles!test_destiny_by(name, email), acker:profiles!test_kept_ack_by(name, email)";
+
+/** Peças de teste que o técnico decidiu usar de vez: as que o estoque ainda não viu e as vistas nos últimos `days` dias. */
+export async function fetchKeptTestParts(client: AppSupabaseClient, days = 7): Promise<{ waiting: KeptTestPart[]; seen: KeptTestPart[] }> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const base = () => loose(client).from("stock_requests").select(KEPT_SELECT).eq("test_destiny", "utilizacao_definitiva");
+  const [waiting, seen] = await Promise.all([
+    rows<KeptRow>(base().is("test_kept_ack_at", null).order("test_destiny_at").limit(200)),
+    rows<KeptRow>(base().gte("test_kept_ack_at", since).order("test_kept_ack_at", { ascending: false }).limit(100)),
+  ]);
+  const assets = await assetsBySerial(client, [...waiting, ...seen].map((row) => row.serial));
+  const toKept = (row: KeptRow): KeptTestPart => {
+    const asset = assets.get(row.serial.trim().toLowerCase());
+    return {
+      id: row.id,
+      part: row.part,
+      qty: row.qty_delivered,
+      serial: row.serial,
+      osNumber: row.service_orders?.os_number ?? "—",
+      model: asset?.model ?? null,
+      unit: asset?.unit ?? null,
+      requester: personName(row.requester),
+      keptBy: personName(row.keeper),
+      keptAt: row.test_destiny_at,
+      ackAt: row.test_kept_ack_at,
+      ackBy: row.acker ? personName(row.acker) : null,
+    };
+  };
+  return { waiting: waiting.map(toKept), seen: seen.map(toKept) };
+}
+
+/** Estoquista: ciente da peça de teste que ficou no aparelho (dá baixa). */
+export const ackKeptTestPart = (client: AppSupabaseClient, requestId: string) => call<null>(client, "ack_test_kept", { p_id: requestId });
+
 // Aviso ao estoquista --------------------------------------------------------------------------------------------
 
 export interface AlertItem {
   id: string;
-  kind: "solicitacao" | "devolucao";
+  kind: "solicitacao" | "devolucao" | "uso_definitivo";
   requester: string;
   part: string;
   qty: number;
@@ -226,9 +295,13 @@ export interface AlertItem {
 /** O que espera o estoque: solicitações pendentes e devoluções aguardando recebimento (consulta leve, sem histórico). */
 export async function fetchAlertItems(client: AppSupabaseClient): Promise<AlertItem[]> {
   const returnSelect = `${RETURN_COLUMNS}, serial, service_orders(os_number), profiles!requested_by(name, email)`;
-  const [requests, waiting] = await Promise.all([
+  const [requests, waiting, kept] = await Promise.all([
     rows<BoardRow>(loose(client).from("stock_requests").select(BOARD_SELECT).eq("status", "pendente").order("created_at").limit(50)),
     rows<BoardReturnRow>(loose(client).from("stock_returns").select(returnSelect).eq("status", "aguardando_recebimento").order("requested_at").limit(50)),
+    // Sem a migration 81 a coluna não existe: o aviso segue sem esse item.
+    rows<KeptRow>(
+      loose(client).from("stock_requests").select(KEPT_SELECT).eq("test_destiny", "utilizacao_definitiva").is("test_kept_ack_at", null).order("test_destiny_at").limit(50),
+    ).catch(() => [] as KeptRow[]),
   ]);
   return [
     ...requests.map<AlertItem>((row) => ({
@@ -250,6 +323,17 @@ export async function fetchAlertItems(client: AppSupabaseClient): Promise<AlertI
       qty: row.qty,
       purpose: null,
       reason: row.reason,
+      serial: row.serial,
+      osNumber: row.service_orders?.os_number ?? "—",
+    })),
+    ...kept.map<AlertItem>((row) => ({
+      id: `kept-${row.id}`,
+      kind: "uso_definitivo",
+      requester: personName(row.keeper),
+      part: row.part,
+      qty: row.qty_delivered,
+      purpose: "teste",
+      reason: null,
       serial: row.serial,
       osNumber: row.service_orders?.os_number ?? "—",
     })),

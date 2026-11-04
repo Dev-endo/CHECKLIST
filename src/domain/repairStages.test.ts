@@ -87,6 +87,9 @@ describe("alertMessage", () => {
     expect(alertMessage({ kind: "solicitacao", requester: "Ana", part: "Bateria", qty: 1, purpose: "teste" })).toBe("Ana solicitou Bateria para teste");
     expect(alertMessage({ kind: "solicitacao", requester: "Ana", part: "Display", qty: 3, purpose: "definitiva" })).toBe("Ana solicitou 3× Display para manutenção");
     expect(alertMessage({ kind: "devolucao", requester: "Ana", part: "Bateria", qty: 1, purpose: null })).toBe("Ana devolveu Bateria: confirme o recebimento");
+    expect(alertMessage({ kind: "uso_definitivo", requester: "Ana", part: "Bateria", qty: 1, purpose: "teste" })).toBe(
+      "Ana vai usar definitivamente a peça de teste Bateria: dê baixa no estoque",
+    );
   });
 });
 

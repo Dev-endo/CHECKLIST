@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -1173,6 +1173,24 @@ await as("est", `select public.deliver_stock_requests($1::jsonb, 'kw1')`, [JSON.
 ok("com outro pedido aberto, a espera continua", (await openKind()) === "espera_peca", String(await openKind()));
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'kw2')`, [JSON.stringify([{ id: partWaitB }])]);
 ok("peças entregues: a espera para e o cronômetro fica pausado", (await openKind()) === "pausa", String(await openKind()));
+
+// ---- Peça de teste usada definitivamente aparece para o estoque (migration 81)
+const keptPart = await one("tec", `select public.create_stock_request('SERW1', 'Câmera', 'teste', 1)`);
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'kk1')`, [JSON.stringify([{ id: keptPart }])]);
+await as("tec", `select public.define_test_destiny('${keptPart}','utilizacao_definitiva')`);
+r = await as("est", `select count(*)::int c from public.stock_requests where test_destiny='utilizacao_definitiva' and test_kept_ack_at is null and id='${keptPart}'`);
+ok("uso definitivo fica aguardando o estoque", !r.err && r.rows[0].c === 1, JSON.stringify(r));
+r = await as("tec", `select public.ack_test_kept('${keptPart}')`);
+ok("técnico não dá baixa pelo estoque", !!r.err && /permissão/.test(r.err), JSON.stringify(r));
+r = await as("est", `select public.ack_test_kept('${keptPart}')`);
+ok("estoquista fica ciente do uso definitivo", !r.err, JSON.stringify(r));
+r = await as("est", `select public.ack_test_kept('${keptPart}')`);
+ok("ciente de novo não duplica", !r.err, JSON.stringify(r));
+q = (await db.query(`select (select test_kept_ack_by from public.stock_requests where id='${keptPart}') = '${U.est}' as who,
+  (select count(*)::int from public.stock_movements where request_id='${keptPart}' and kind='baixa_definitiva') as n`)).rows[0];
+ok("baixa registra quem viu e uma movimentação só", q.who === true && q.n === 1, JSON.stringify(q));
+r = await as("est", `select public.ack_test_kept('${partWaitA}')`);
+ok("baixa só vale para peça de teste usada de vez", !!r.err, JSON.stringify(r));
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);

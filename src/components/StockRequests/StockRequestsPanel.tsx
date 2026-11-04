@@ -10,12 +10,15 @@ import {
 } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
+  ackKeptTestPart,
   confirmReturn,
   deliverRequests,
   fetchBoard,
   fetchBoardReturns,
+  fetchKeptTestParts,
   type BoardRequest,
   type BoardReturn,
+  type KeptTestPart,
 } from "../../services/supabase/stockBoardService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
@@ -25,7 +28,7 @@ import styles from "./StockRequests.module.css";
 
 const POLL_MS = 10_000;
 
-type View = "abertas" | "devolucoes" | "historico";
+type View = "abertas" | "devolucoes" | "uso" | "historico";
 
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -36,6 +39,7 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
   const [view, setView] = useState<View>("abertas");
   const [board, setBoard] = useState<BoardRequest[]>([]);
   const [returns, setReturns] = useState<{ waiting: BoardReturn[]; segregated: BoardReturn[] }>({ waiting: [], segregated: [] });
+  const [kept, setKept] = useState<{ waiting: KeptTestPart[]; seen: KeptTestPart[] }>({ waiting: [], seen: [] });
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -58,8 +62,17 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
           setSelected((prev) => new Set([...prev].filter((id) => open.has(id))));
         })
         .catch(() => active && setFailed(true));
+    // Separado: sem a migration 81 só esta lista fica vazia, o resto do quadro segue.
+    const loadKept = () =>
+      fetchKeptTestParts(client)
+        .then((found) => active && setKept(found))
+        .catch(() => undefined);
     void load();
-    const poll = setInterval(() => void load(), POLL_MS);
+    void loadKept();
+    const poll = setInterval(() => {
+      void load();
+      void loadKept();
+    }, POLL_MS);
     return () => {
       active = false;
       clearInterval(poll);
@@ -74,6 +87,7 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
     pendente: open.filter((r) => r.status === "pendente").length,
     sem_estoque: open.filter((r) => r.status === "sem_estoque").length,
     devolucoes: returns.waiting.length,
+    uso: kept.waiting.length,
   };
 
   const toggle = (id: string) =>
@@ -120,6 +134,19 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
     }
   };
 
+  const acknowledge = async (item: KeptTestPart) => {
+    setBusy(true);
+    try {
+      await ackKeptTestPart(client, item.id);
+      toast(`${item.part}: baixa registrada`);
+      reload();
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível registrar. Tente de novo."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const tab = (id: View, label: string, count?: number, alert = false) => (
     <button key={id} type="button" className={styles.tab} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}>
       {label}
@@ -145,6 +172,7 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
       <nav className={styles.tabs} aria-label="Visões do estoque">
         {tab("abertas", "Em aberto", open.length)}
         {tab("devolucoes", "Devoluções", counts.devolucoes, counts.devolucoes > 0)}
+        {tab("uso", "Uso definitivo", counts.uso, counts.uso > 0)}
         {tab("historico", "Histórico (7 dias)")}
       </nav>
 
@@ -212,6 +240,56 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
                   <span className={styles.tag}>{item.condition ? CONDITION_LABELS[item.condition] : "—"}</span>
                   <span className={styles.muted}>
                     {item.serial} · OS {item.osNumber} · {RETURN_REASON_LABELS[item.reason]} · recebida em {when(item.receivedAt)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {view === "uso" && (
+        <>
+          <h2 className={styles.heading}>Peças de teste que ficaram no aparelho</h2>
+          <p className={styles.muted}>
+            O técnico decidiu usar definitivamente a peça emprestada para teste. Ela não volta ao estoque: dê baixa e clique em Ciente.
+          </p>
+          {!kept.waiting.length && <p className={styles.muted}>Nenhuma peça de teste aguardando baixa.</p>}
+          <ul className={styles.rows}>
+            {kept.waiting.map((item) => (
+              <li key={item.id} className={[styles.row, styles.s_sem_estoque].join(" ")}>
+                <div className={styles.line}>
+                  <strong className={styles.part}>{item.part}</strong>
+                  <span className={styles.qty}>{item.qty}</span>
+                  <span className={styles.tag}>Teste → definitiva</span>
+                  <span className={styles.muted}>
+                    {item.serial} · OS {item.osNumber} · {item.model ?? "modelo não encontrado"}
+                    {item.unit ? ` · ${item.unit}` : ""}
+                  </span>
+                </div>
+                <p className={styles.muted}>
+                  Decidido por <strong>{item.keptBy}</strong> em {when(item.keptAt)}
+                  {item.requester !== item.keptBy ? ` · pedida por ${item.requester}` : ""}
+                </p>
+                <div className={styles.actions}>
+                  <Button disabled={busy} onClick={() => void acknowledge(item)}>
+                    Ciente (baixa no estoque)
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <h2 className={styles.heading}>Baixas dos últimos 7 dias</h2>
+          {!kept.seen.length && <p className={styles.muted}>Nenhuma baixa no período.</p>}
+          <ul className={styles.rows}>
+            {kept.seen.map((item) => (
+              <li key={item.id} className={styles.row}>
+                <div className={styles.line}>
+                  <strong className={styles.part}>{item.part}</strong>
+                  <span className={styles.qty}>{item.qty}</span>
+                  <span className={styles.muted}>
+                    {item.serial} · OS {item.osNumber} · decidido por {item.keptBy} em {when(item.keptAt)} · ciente: {item.ackBy ?? "—"} em {when(item.ackAt)}
                   </span>
                 </div>
               </li>

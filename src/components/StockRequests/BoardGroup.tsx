@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   deliverableQty,
   describeRepairError,
+  DESTINY_LABELS,
   isOpenRequest,
   MOVEMENT_LABELS,
   PURPOSE_LABELS,
@@ -101,6 +102,7 @@ export function BoardGroup({ client, group, selected, onToggle, onChanged }: Boa
                 <strong className={styles.part}>{r.part}</strong>
                 <span className={styles.tag}>{PURPOSE_LABELS[r.purpose]}</span>
                 {r.replacesRequestId && <span className={styles.tag}>Substituição</span>}
+                {r.testDestiny && <span className={styles.tag}>{DESTINY_LABELS[r.testDestiny]}</span>}
                 <span className={styles.qty}>
                   {r.qtyDelivered}/{r.qty}
                   {open && r.qtyDelivered > 0 ? ` · saldo ${balance}` : ""}
