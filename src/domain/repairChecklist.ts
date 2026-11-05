@@ -141,13 +141,20 @@ export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt" 
 /** Destinos que não exigem o checklist: o aparelho vai para o vidro (e volta) ou espera a aprovação do PT. */
 export const skipsChecklist = (destination: FinishDestination) => destination === "vidro" || destination === "pt" || destination === "bloqueado";
 
+/**
+ * Fases do checklist que não precisam ser feitas para o destino. Na Análise técnica não precisa dos testes com o
+ * aparelho fechado (o aberto continua obrigatório); vidro, PT e bloqueado dispensam as duas.
+ */
+export const skippedPhases = (destination: FinishDestination): readonly ChecklistPhase[] =>
+  skipsChecklist(destination) ? PHASES : destination === "analise" ? ["fechado"] : [];
+
 /** Destinos que exigem um motivo escrito (o mesmo campo). */
 export const needsReason = (destination: FinishDestination) => destination === "revenda" || destination === "pt" || destination === "bloqueado";
 
 /** Opções de destino ao finalizar (Reparo, Estágio 2, e Checklist manutenção). */
 export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
   { id: "auto", label: "Quarentena", hint: "Tudo aprovado. Com algum teste reprovado, o aparelho vai para a Análise técnica." },
-  { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado." },
+  { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado. Não precisa dos testes com o aparelho fechado." },
   { id: "vidro", label: "Vidro", hint: "Não precisa do checklist: pede Vidro e Aro e abre o serviço na aba Vidro; depois o aparelho volta para você." },
   { id: "revenda", label: "Revenda", hint: "Exige o motivo." },
   { id: "pt", label: "PT (perda total)", hint: "Exige o motivo e não precisa do checklist. Fica pendente até um administrador ou supervisor aprovar." },
@@ -177,7 +184,7 @@ export const ANALYSIS_NOTE_MIN = 5;
 export function finishBlockers(input: FinishInput): string[] {
   const blockers: string[] = [];
   for (const phase of PHASES) {
-    if (skipsChecklist(input.destination) || input.skipPhases?.includes(phase)) continue;
+    if (skippedPhases(input.destination).includes(phase) || input.skipPhases?.includes(phase)) continue;
     const missing = pendingTests(phase, input.results[phase]).length;
     if (missing) blockers.push(`${PHASE_LABELS[phase]}: faltam ${missing} teste(s) obrigatório(s)`);
     const confirmations = missingPhaseConfirmations(phase, input.results[phase]);

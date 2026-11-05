@@ -32,7 +32,7 @@ interface RequestListProps {
 
 const STAGE_LABELS = { desmontagem: "Desmontagem", avaliacao: "Avaliação técnica", manutencao: "Estágio 2", analise: "Análise técnica" } as const;
 
-type Action = { kind: "cancel"; id: string } | { kind: "replace"; id: string } | null;
+type Action = { kind: "cancel"; id: string } | { kind: "replace"; id: string } | { kind: "return"; id: string } | null;
 
 /**
  * Solicitações da OS com o status de cada uma. O técnico cancela (com justificativa) enquanto nada foi entregue,
@@ -45,6 +45,8 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
   const [replaceQty, setReplaceQty] = useState(1);
   const [failure, setFailure] = useState<ReplaceFailure | null>(null);
   const [replaceReason, setReplaceReason] = useState("");
+  // Motivo da devolução da peça de teste (obrigatório).
+  const [returnReason, setReturnReason] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (!requests.length) return <p className={styles.empty}>Nenhuma peça solicitada nesta OS.</p>;
@@ -59,6 +61,7 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
       setReplaceQty(1);
       setFailure(null);
       setReplaceReason("");
+      setReturnReason("");
       onChanged();
     } catch (error) {
       toast(describeRepairError(error as { code?: string; message?: string }, fallback));
@@ -67,9 +70,9 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
     }
   };
 
-  const destiny = (id: string, value: TestDestiny) =>
+  const destiny = (id: string, value: TestDestiny, why?: string) =>
     run(
-      () => defineTestDestiny(client, id, value),
+      () => defineTestDestiny(client, id, value, why),
       value === "devolucao" ? "Devolução solicitada: o estoque confirma o recebimento" : "Peça de teste mantida como definitiva",
       "Não foi possível definir o destino da peça.",
     );
@@ -121,9 +124,39 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
                 <Button disabled={disabled || busy} onClick={() => void destiny(r.id, "utilizacao_definitiva")}>
                   Utilizar definitivamente
                 </Button>
-                <Button variant="ghost" disabled={disabled || busy} onClick={() => void destiny(r.id, "devolucao")}>
+                <Button variant="ghost" disabled={disabled || busy} onClick={() => setAction({ kind: "return", id: r.id })}>
                   Solicitar devolução
                 </Button>
+              </div>
+            )}
+
+            {action?.kind === "return" && action.id === r.id && (
+              <div className={styles.replaceBox}>
+                <textarea
+                  className={styles.replaceReason}
+                  value={returnReason}
+                  rows={3}
+                  maxLength={500}
+                  autoFocus
+                  placeholder="Por que está devolvendo a peça? (obrigatório)"
+                  aria-label="Por que está devolvendo a peça"
+                  onChange={(e) => setReturnReason(e.target.value)}
+                />
+                <div className={styles.cancelBox}>
+                  <Button disabled={busy || returnReason.trim().length < 5} onClick={() => void destiny(r.id, "devolucao", returnReason)}>
+                    Confirmar devolução
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setAction(null);
+                      setReturnReason("");
+                    }}
+                  >
+                    Voltar
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -133,6 +166,7 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
                 {ret.status === "aguardando_recebimento"
                   ? "aguardando o estoque confirmar o recebimento"
                   : `recebida pelo estoque (${ret.condition ? CONDITION_LABELS[ret.condition] : "—"})`}
+                {ret.note ? ` · Motivo: ${ret.note}` : ""}
               </p>
             ))}
 

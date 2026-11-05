@@ -4,6 +4,7 @@ import {
   describeFailedTest,
   expectedOutcome,
   finishBlockers,
+  skippedPhases,
   fromSaved,
   parseFailedTests,
   summarizeMaintenance,
@@ -179,6 +180,29 @@ describe("analysis note", () => {
     expect(finishBlockers(toAnalysis).join("|")).toMatch(/motivo do envio/);
     expect(finishBlockers({ ...toAnalysis, analysisNote: "Sem imagem na tela" })).toEqual([]);
     expect(finishBlockers(ready()).join("|")).not.toMatch(/motivo do envio/);
+  });
+});
+
+describe("Análise técnica não exige o checklist fechado", () => {
+  const openOnly = () => ready({ destination: "analise", analysisNote: "Sem imagem na tela", results: { aberto: { ...allOk("aberto"), "confirm:imei": "ok" }, fechado: {} } });
+
+  it("skips only the closed phase when the destination is the technical analysis", () => {
+    expect(skippedPhases("analise")).toEqual(["fechado"]);
+    expect(skippedPhases("auto")).toEqual([]);
+    expect(skippedPhases("vidro")).toEqual(["aberto", "fechado"]);
+    expect(finishBlockers(openOnly())).toEqual([]);
+  });
+
+  it("still requires the open tests and the reason for the analysis", () => {
+    const first = requiredTests("aberto")[0] as string;
+    const missingOpen = ready({ destination: "analise", analysisNote: "Sem imagem", results: { aberto: { ...allOk("aberto"), [first]: "" }, fechado: {} } });
+    expect(finishBlockers(missingOpen).join("|")).toMatch(/aberto: faltam 1/);
+    expect(finishBlockers({ ...openOnly(), analysisNote: "" }).join("|")).toMatch(/motivo do envio/);
+  });
+
+  it("keeps requiring the closed tests for the other destinations", () => {
+    const blockers = finishBlockers(ready({ destination: "auto", results: { aberto: { ...allOk("aberto"), "confirm:imei": "ok" }, fechado: {} } }));
+    expect(blockers.join("|")).toMatch(/fechado: faltam/);
   });
 });
 

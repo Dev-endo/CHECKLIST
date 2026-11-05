@@ -116,6 +116,9 @@ export function FinishPanel({
           />
         </label>
       )}
+      {!onlyAuto && destination === "analise" && (
+        <p className={styles.muted}>Para a Análise técnica não precisa dos testes com o aparelho fechado (se fez algum, ele fica salvo).</p>
+      )}
       {!onlyAuto && skipsChecklist(destination) && (
         <p className={styles.muted}>Não precisa do checklist para este destino (se fez algum teste, ele fica salvo).</p>
       )}

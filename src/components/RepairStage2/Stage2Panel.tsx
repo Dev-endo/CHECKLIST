@@ -4,6 +4,7 @@ import {
   choiceTests,
   expectedOutcome,
   finishBlockers,
+  skippedPhases,
   OUTCOME_LABELS,
   PHASE_KIND,
   PHASE_LABELS,
@@ -213,7 +214,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
       const result = await finishMaintenance(client, {
         stageId: maintenance.id,
         requiredOpen: requiredTests("aberto"),
-        requiredClosed: requiredTests("fechado"),
+        requiredClosed: skippedPhases(destination).includes("fechado") ? [] : requiredTests("fechado"),
         choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
         destination,
         resaleReason,

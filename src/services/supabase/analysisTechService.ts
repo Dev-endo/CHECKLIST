@@ -2,7 +2,7 @@ import { parseFailedTests, type FailedTestEntry } from "../../domain/repairCheck
 import type { RequestPurpose } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "./client";
 import { call, loose, REQUEST_COLUMNS, rows, toRequest, toTimerTotals, type RequestRow, type StockRequest, type TimerApi } from "./repairService";
-import type { StockReturn } from "./stockBoardService";
+import { withReturnNotes, type StockReturn } from "./stockBoardService";
 import { assetsBySerial } from "./stockBoardService";
 
 /** Aba Análise técnica: fila de aparelhos, começar e finalizar a análise. */
@@ -250,7 +250,7 @@ export async function fetchAnalysisParts(
   );
   return {
     requests,
-    returns: back.map((row) => ({
+    returns: await withReturnNotes(client, back.map((row): StockReturn => ({
       id: row.id,
       requestId: row.request_id,
       part: row.part,
@@ -260,7 +260,8 @@ export async function fetchAnalysisParts(
       requestedAt: row.requested_at,
       receivedAt: row.received_at,
       condition: row.condition,
-    })),
+      note: null,
+    }))),
   };
 }
 

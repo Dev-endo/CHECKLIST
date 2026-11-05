@@ -77,6 +77,7 @@ export function describeRepairError(error: { code?: string; message?: string } |
   if (text.includes("blocked_reason_required")) return "Bloqueado exige o motivo (pelo menos 5 letras).";
   if (text.includes("goal_note_required")) return "Escreva a justificativa da meta (pelo menos 5 letras).";
   if (text.includes("replace_failure_required")) return "Escolha o tipo de falha: Falha técnica ou Falha de teste.";
+  if (text.includes("return_reason_required")) return "Explique por que está devolvendo a peça (pelo menos 5 letras).";
   if (text.includes("replace_reason_required")) return "Explique por que está substituindo a peça.";
   if (error?.code === "42501" || text.includes("sem permissão")) return "Seu perfil não pode fazer isso.";
   if (text.includes("pedido já fechado")) return "Essa solicitação já foi fechada.";

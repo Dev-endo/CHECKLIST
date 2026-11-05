@@ -216,6 +216,7 @@ export function StockRequestsPanel({ client }: { client: AppSupabaseClient }) {
                   <span className={styles.muted}>
                     {item.serial} · OS {item.osNumber} · {item.model ?? "modelo não encontrado"} · {item.requester} · {when(item.requestedAt)}
                   </span>
+                  {item.note && <span className={styles.muted}>Motivo: {item.note}</span>}
                 </div>
                 <div className={styles.actions}>
                   <span className={styles.ask}>Condição da peça recebida:</span>

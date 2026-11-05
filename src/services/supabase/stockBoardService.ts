@@ -19,6 +19,8 @@ export interface StockReturn {
   requestedAt: string;
   receivedAt: string | null;
   condition: ReturnCondition | null;
+  /** Motivo escrito ao solicitar a devolução da peça de teste (migration 89); vazio nas antigas. */
+  note: string | null;
 }
 
 interface ReturnRow {
@@ -45,18 +47,33 @@ const toReturn = (row: ReturnRow): StockReturn => ({
   requestedAt: row.requested_at,
   receivedAt: row.received_at,
   condition: row.condition,
+  note: null,
 });
+
+/** Junta o motivo de cada devolução. Sem a coluna (migration 89 ainda não rodou), segue sem o motivo. */
+export async function withReturnNotes<T extends { id: string; note: string | null }>(client: AppSupabaseClient, list: T[]): Promise<T[]> {
+  if (!list.length) return list;
+  try {
+    const found = await rows<{ id: string; request_note: string | null }>(
+      loose(client).from("stock_returns").select("id, request_note").in("id", list.map((item) => item.id)),
+    );
+    const notes = new Map(found.map((row) => [row.id, row.request_note]));
+    return list.map((item) => ({ ...item, note: notes.get(item.id) ?? null }));
+  } catch {
+    return list;
+  }
+}
 
 export async function fetchReturns(client: AppSupabaseClient, osId: string): Promise<StockReturn[]> {
   const found = await rows<ReturnRow>(
     loose(client).from("stock_returns").select(RETURN_COLUMNS).eq("os_id", osId).order("requested_at", { ascending: true }),
   );
-  return found.map(toReturn);
+  return withReturnNotes(client, found.map(toReturn));
 }
 
-/** Destino da peça de teste entregue: utilizar de vez ou devolver (sem justificativa). */
-export const defineTestDestiny = (client: AppSupabaseClient, requestId: string, destiny: TestDestiny) =>
-  call<string | null>(client, "define_test_destiny", { p_id: requestId, p_destiny: destiny });
+/** Destino da peça de teste entregue: utilizar de vez (sem motivo) ou devolver (o motivo é obrigatório). */
+export const defineTestDestiny = (client: AppSupabaseClient, requestId: string, destiny: TestDestiny, reason?: string) =>
+  call<string | null>(client, "define_test_destiny", { p_id: requestId, p_destiny: destiny, p_reason: reason?.trim() || null });
 
 /** Peça definitiva entregue com defeito: cria a substituta e a devolução da defeituosa. */
 export const requestReplacement = (
@@ -158,7 +175,8 @@ export async function fetchBoardReturns(client: AppSupabaseClient): Promise<{ wa
     requester: personName(row.profiles),
     model: assets.get(row.serial.trim().toLowerCase())?.model ?? null,
   });
-  return { waiting: waiting.map(toBoard), segregated: received.map(toBoard) };
+  const noted = await withReturnNotes(client, [...waiting.map(toBoard), ...received.map(toBoard)]);
+  return { waiting: noted.slice(0, waiting.length), segregated: noted.slice(waiting.length) };
 }
 
 export const setRequestStatus = (client: AppSupabaseClient, id: string, status: "em_separacao" | "sem_estoque") =>

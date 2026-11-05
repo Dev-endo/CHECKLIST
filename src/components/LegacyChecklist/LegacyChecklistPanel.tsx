@@ -5,6 +5,7 @@ import {
   expectedOutcome,
   FINISH_DESTINATIONS,
   finishBlockers,
+  skippedPhases,
   PHASE_KIND,
   PHASE_LABELS,
   phaseCatalog,
@@ -289,7 +290,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       const result = await finishMaintenance(client, {
         stageId,
         requiredOpen: requiredTests("aberto"),
-        requiredClosed: openFailed ? [] : requiredTests("fechado"),
+        requiredClosed: openFailed || skippedPhases(finalDestination).includes("fechado") ? [] : requiredTests("fechado"),
         choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
         destination: finalDestination,
         resaleReason: reason,

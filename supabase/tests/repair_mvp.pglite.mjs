@@ -1,4 +1,4 @@
-// Testa as migrations 44-88 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-89 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-88 aplicadas (2x)");
+console.log("migrations 44-89 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -160,7 +160,7 @@ ok("técnico cancela o próprio pedido", !r.err, JSON.stringify(r));
 // ---- Destino do teste
 r = await as("tec", `select public.define_test_destiny('${tBat}','utilizacao_definitiva')`);
 ok("destino: utilização definitiva", !r.err, JSON.stringify(r));
-r = await as("tec", `select public.define_test_destiny('${tBat}','devolucao')`);
+r = await as("tec", `select public.define_test_destiny('${tBat}', 'devolucao', 'Peça não serviu')`);
 ok("destino só pode ser definido uma vez", r.err?.includes("destino já definido"));
 const baixaTotal = (await db.query(`select coalesce(sum(stock_effect),0)::int s from public.stock_movements where request_id='${tBat}'`)).rows[0].s;
 ok("utilização definitiva não gera 2ª baixa", baixaTotal === -1, String(baixaTotal));
@@ -170,9 +170,29 @@ const tBat2 = Object.values(r.rows[0])[0];
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'k5')`, [JSON.stringify([{ id: tBat2 }])]);
 r = await req("tec", "Bateria", "teste");
 ok("sem destino, teste entregue ainda bloqueia o tipo", r.code === "23505", JSON.stringify(r));
-r = await as("tec", `select public.define_test_destiny('${tBat2}','devolucao')`);
+r = await as("tec", `select public.define_test_destiny('${tBat2}', 'devolucao', 'Peça não serviu')`);
 const ret1 = r.rows?.[0] && Object.values(r.rows[0])[0];
 ok("destino: devolução cria devolução", !!ret1, JSON.stringify(r));
+
+// ---- Devolução exige motivo
+r = await req("tec", "Bateria", "teste");
+const tBat3 = Object.values(r.rows[0])[0];
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'k5b')`, [JSON.stringify([{ id: tBat3 }])]);
+r = await as("tec", `select public.define_test_destiny('${tBat3}', 'devolucao')`);
+ok("devolução sem motivo recusada", r.err?.includes("return_reason_required"), JSON.stringify(r));
+r = await as("tec", `select public.define_test_destiny('${tBat3}', 'devolucao', '  abc ')`);
+ok("motivo curto recusado", r.err?.includes("return_reason_required"), JSON.stringify(r));
+ok("recusada não define o destino", (await db.query(`select test_destiny from public.stock_requests where id='${tBat3}'`)).rows[0].test_destiny === null);
+r = await as("tec", `select public.define_test_destiny('${tBat3}', 'devolucao', '  Veio com defeito de fábrica  ')`);
+const ret3 = r.rows?.[0] && Object.values(r.rows[0])[0];
+ok("devolução com motivo criada", !!ret3, JSON.stringify(r));
+ok("motivo gravado na devolução, sem espaços", (await db.query(`select request_note from public.stock_returns where id='${ret3}'`)).rows[0].request_note === "Veio com defeito de fábrica");
+await as("est", `select public.confirm_stock_return('${ret3}','funcional')`);
+r = await req("tec", "Bateria", "teste");
+const tBat4 = Object.values(r.rows[0])[0];
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'k5c')`, [JSON.stringify([{ id: tBat4 }])]);
+r = await as("tec", `select public.define_test_destiny('${tBat4}', 'utilizacao_definitiva')`);
+ok("utilização definitiva continua sem motivo", !r.err, JSON.stringify(r));
 
 // ---- Recebimento (só estoque)
 r = await as("tec", `select public.confirm_stock_return('${ret1}','funcional')`);
@@ -760,7 +780,7 @@ ok("não finaliza com peça de teste aberta", r.err === "analysis_parts_pending"
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'k70')`, [JSON.stringify([{ id: t70a }, { id: t70b }])]);
 r = await as("ana", `select public.finish_analysis('${x70}', 'troca_periferico')`);
 ok("não finaliza com peça de teste entregue sem destino", r.err === "analysis_parts_pending", JSON.stringify(r));
-r = await as("ana", `select public.define_test_destiny('${t70b}', 'devolucao')`);
+r = await as("ana", `select public.define_test_destiny('${t70b}', 'devolucao', 'Peça não serviu')`);
 ok("analista devolve a peça de teste ao estoque", !r.err, JSON.stringify(r));
 q = (await db.query(`select status, reason from public.stock_returns where request_id='${t70b}'`)).rows[0];
 ok("a devolução espera o estoquista confirmar o recebimento", q && q.status === "aguardando_recebimento" && q.reason === "devolucao_teste", JSON.stringify(q));
@@ -824,7 +844,7 @@ ok("o reparo não finaliza com peça de teste pendente", r.err === "analysis_par
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'k73')`, [JSON.stringify([{ id: t73a }, { id: t73b }])]);
 r = await as("ana", `select public.finish_board_repair('${x73}', 'Reparo do CI de carga', 'estagio2')`);
 ok("nem com peça entregue sem destino", r.err === "analysis_parts_pending", JSON.stringify(r));
-await as("ana", `select public.define_test_destiny('${t73a}', 'devolucao')`);
+await as("ana", `select public.define_test_destiny('${t73a}', 'devolucao', 'Peça não serviu')`);
 await as("ana", `select public.define_test_destiny('${t73b}', 'utilizacao_definitiva')`);
 r = await as("ana", `select public.finish_board_repair('${x73}', 'Reparo do CI de carga', 'estagio2')`);
 const m73 = r.rows?.[0] && Object.values(r.rows[0])[0];
@@ -1269,7 +1289,7 @@ const mParts = [];
 for (const part of ["Câmera", "Tela", "Bateria", "Conector", "Alto-falante"]) mParts.push(await one("tec", `select public.create_stock_request('SERM1', $1, 'teste', 1)`, [part]));
 const mDef = await one("tec", `select public.create_stock_request('SERM1', 'Flex', 'definitiva', 5)`);
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'm83a')`, [JSON.stringify([...mParts, mDef].map(id => ({ id })))]);
-for (const id of mParts) await as("tec", `select public.define_test_destiny('${id}', 'devolucao')`);
+for (const id of mParts) await as("tec", `select public.define_test_destiny('${id}', 'devolucao', 'Peça não serviu')`);
 const mSub = await one("tec", `select public.request_replacement('${mDef}', 3, 'falha_tecnica', 'Flex com defeito')`);
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'm83b')`, [JSON.stringify([{ id: mSub }])]);
 for (const row of (await db.query(`select id from public.stock_returns where serial_key = 'serm1'`)).rows) {
