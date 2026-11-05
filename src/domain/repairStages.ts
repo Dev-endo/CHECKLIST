@@ -74,6 +74,8 @@ export function describeRepairError(error: { code?: string; message?: string } |
   if (text.includes("pt_closed")) return "Este PT já foi decidido.";
   if (text.includes("pt_pending")) return "Este aparelho tem um PT aguardando aprovação.";
   if (text.includes("analysis_note_required")) return "Escreva o motivo do envio para a Análise técnica.";
+  if (text.includes("blocked_reason_required")) return "Bloqueado exige o motivo (pelo menos 5 letras).";
+  if (text.includes("goal_note_required")) return "Escreva a justificativa da meta (pelo menos 5 letras).";
   if (text.includes("replace_failure_required")) return "Escolha o tipo de falha: Falha técnica ou Falha de teste.";
   if (text.includes("replace_reason_required")) return "Explique por que está substituindo a peça.";
   if (error?.code === "42501" || text.includes("sem permissão")) return "Seu perfil não pode fazer isso.";
@@ -213,6 +215,26 @@ export const STAGE1_DESTINATIONS: readonly { id: Stage1Destination; label: strin
   },
 ];
 
+/** Resposta a "O aparelho é vidro?" (Estágio 1 e Checklist manutenção). */
+export type GlassAnswer = "nao" | "so_vidro" | "vidro_mais";
+
+export const GLASS_LABELS: Record<GlassAnswer, string> = {
+  nao: "Não",
+  so_vidro: "Só vidro",
+  vidro_mais: "Vidro e outra manutenção",
+};
+
+/**
+ * Destinos do Estágio 1 pela resposta "O aparelho é vidro?": só vidro vai direto para o Vidro; vidro e outra
+ * manutenção segue para o Estágio 2 (com Vidro e Aro já pedidos); sem vidro, o fluxo normal (sem o destino Vidro).
+ */
+export function stage1Destinations(glass: GlassAnswer | null): Stage1Destination[] {
+  if (glass === "so_vidro") return ["vidro"];
+  if (glass === "vidro_mais") return ["manutencao", "aguardando_pecas"];
+  if (glass === "nao") return ["manutencao", "analise", "aguardando_pecas"];
+  return [];
+}
+
 /** Aguardando peças só faz sentido com pedido aberto; os outros destinos estão sempre disponíveis. */
 export const destinationAvailable = (destination: Stage1Destination, openRequests: number): boolean =>
   destination !== "aguardando_pecas" || openRequests > 0;
@@ -228,6 +250,7 @@ const OUTCOME_PLACES: Record<string, string> = {
   analise: "na fila de Análise",
   revenda: "em revenda",
   vidro: "no vidro",
+  bloqueado: "bloqueado",
 };
 
 /** Onde o ativo está agora, em uma frase, para quem bipa um aparelho que já passou pelo Estágio 1. */

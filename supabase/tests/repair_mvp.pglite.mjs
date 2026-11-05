@@ -1,4 +1,4 @@
-// Testa as migrations 44-80 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-88 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-80 aplicadas (2x)");
+console.log("migrations 44-88 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -1028,7 +1028,7 @@ ok("reparos = soma das manutenções contadas", sum.reparos === reparos && repar
 r = await as("sup", `select serial, os_number, person, detail from public.repair_dashboard_devices('vidro', ${range})`);
 ok("ao clicar no balão: aparelho por aparelho (vidro)", r.rows.length > 0 && r.rows.every((x) => x.serial && x.os_number), JSON.stringify(r.rows.slice(0, 2)));
 r = await as("sup", `select * from public.repair_dashboard_devices('reparos', ${range}) where serial = 'SER98'`);
-ok("reparos lista o aparelho com as manutenções", r.rows.length === 1 && r.rows[0].detail === "4 manutenções", JSON.stringify(r.rows));
+ok("reparos lista o aparelho com as manutenções", r.rows.length === 1 && r.rows[0].detail.startsWith("4 manutenções"), JSON.stringify(r.rows));
 r = await as("sup", `select * from public.repair_dashboard_devices('quarentena', current_date + 10, current_date + 20)`);
 ok("fora do período não aparece", r.rows.length === 0);
 
@@ -1191,6 +1191,181 @@ q = (await db.query(`select (select test_kept_ack_by from public.stock_requests 
 ok("baixa registra quem viu e uma movimentação só", q.who === true && q.n === 1, JSON.stringify(q));
 r = await as("est", `select public.ack_test_kept('${partWaitA}')`);
 ok("baixa só vale para peça de teste usada de vez", !!r.err, JSON.stringify(r));
+
+// ---- Vidro e outra manutenção (migration 82)
+const eG = await evalOf("SERG1", "OS-G1");
+const mG = await one("tec", `select public.finish_evaluation('${eG}', 'manutencao', null, true)`);
+q = (await db.query(`select needs_glass from public.repair_stages where id = '${mG}'`)).rows[0];
+ok("vidro e outra manutenção: Estágio 2 marcado", q?.needs_glass === true, JSON.stringify(q));
+q = (await db.query(`select part, glass, stage_id::text, status from public.stock_requests where serial_key = 'serg1' order by part`)).rows;
+ok("Vidro e Aro pedidos já no Estágio 1, presos ao Estágio 2", q.length === 2 && q.every(x => x.glass && x.stage_id === mG && x.status === "pendente"), JSON.stringify(q));
+const glassDef = await one("tec", `select public.create_stock_request('SERG1', 'Bateria', 'definitiva', 1)`);
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'g82a')`, [JSON.stringify([{ id: glassDef }])]);
+q = (await db.query(`select public.repair_finish_blockers(os_id) b from public.repair_stages where id = '${mG}'`)).rows[0];
+ok("pedido de vidro em aberto não trava a finalização", Array.isArray(q.b) && q.b.length === 0, JSON.stringify(q));
+r = await as("tec", `select public.finish_maintenance('${mG}', array['t1'], array['t3'], p_glass => true)`);
+ok("finaliza para o vidro sem checklist, com Vidro e Aro ainda pendentes", !r.err && r.rows[0].finish_maintenance === "vidro", JSON.stringify(r));
+q = (await db.query(`select (select count(*)::int from public.stock_requests where serial_key = 'serg1' and glass) n,
+  (select count(*)::int from public.repair_glass_jobs where serial_key = 'serg1') jobs,
+  (select needs_glass from public.repair_stages where id = '${mG}') flag,
+  (select maintenance_count from public.repair_stages where id = '${mG}') cnt`)).rows[0];
+ok("não pede Vidro e Aro de novo; abre o serviço de vidro", q.n === 2 && q.jobs === 1 && q.flag === false, JSON.stringify(q));
+ok("só a peça do técnico conta como manutenção (vidro não)", q.cnt === 1, JSON.stringify(q));
+await as("est", `select public.deliver_stock_requests((select jsonb_agg(jsonb_build_object('id', id)) from public.stock_requests where serial_key = 'serg1' and glass), 'g82b')`);
+q = (await db.query(`select public.repair_maintenance_items('${mG}') i`)).rows[0];
+ok("peças do vidro entregues continuam fora das manutenções", JSON.stringify(q.i).includes("Bateria") && !JSON.stringify(q.i).includes("Vidro"), JSON.stringify(q));
+
+// Só vidro: como antes (vai direto, pede as peças marcadas como vidro).
+const eG2 = await evalOf("SERG2", "OS-G2");
+await as("tec", `select public.finish_evaluation('${eG2}', 'vidro')`);
+q = (await db.query(`select count(*)::int n, bool_and(glass) g from public.stock_requests where serial_key = 'serg2'`)).rows[0];
+ok("só vidro: pede Vidro e Aro (marcados como vidro)", q.n === 2 && q.g === true, JSON.stringify(q));
+
+// Aguardando peças não espera o vidro.
+const eG3 = await evalOf("SERG3", "OS-G3");
+const g3part = await one("tec", `select public.create_stock_request('SERG3', 'Tela', 'definitiva', 1)`);
+const mG3 = await one("tec", `select public.finish_evaluation('${eG3}', 'aguardando_pecas', null, true)`);
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'g82c')`, [JSON.stringify([{ id: g3part }])]);
+q = (await db.query(`select status from public.repair_stages where id = '${mG3}'`)).rows[0];
+ok("aguardando peças abre o Estágio 2 sem esperar o vidro", q.status === "em_andamento", JSON.stringify(q));
+
+// Checklist manutenção: o técnico marca vidro e outra manutenção.
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('ANTIGOG','OS-AG','${U.tec}')`);
+const lg = await one("tec", `select public.start_legacy_maintenance('ANTIGOG')`);
+r = await as("tec2", `select public.request_glass_parts('${lg}')`);
+ok("outro técnico não pede o vidro do checklist alheio", !!r.err, JSON.stringify(r));
+r = await as("tec", `select public.request_glass_parts('${lg}')`);
+ok("checklist manutenção: pede Vidro e Aro", !r.err, JSON.stringify(r));
+await as("tec", `select public.request_glass_parts('${lg}')`);
+q = (await db.query(`select count(*)::int n from public.stock_requests where serial_key = 'antigog' and glass`)).rows[0];
+ok("pedir de novo não duplica", q.n === 2, JSON.stringify(q));
+r = await as("tec", `select public.finish_maintenance('${lg}', array['t1'], array['t3'], p_glass => true)`);
+q = (await db.query(`select count(*)::int n from public.stock_requests where serial_key = 'antigog' and glass`)).rows[0];
+ok("checklist manutenção vai para o vidro sem pedir de novo", !r.err && q.n === 2, JSON.stringify([r, q]));
+
+// ---- Meta diária (migration 82)
+q = await one("tec", `select public.repair_my_goal()`);
+ok("meta: conta quarentena e vidro do dia", q && q.meta === 6 && q.vidro >= 2 && q.liberados === q.quarentena + q.vidro, JSON.stringify(q));
+r = await as("tec", `select public.set_goal_note('  ok ')`);
+ok("justificativa curta é recusada", !!r.err && /goal_note_required/.test(r.err), JSON.stringify(r));
+r = await as("tec", `select public.set_goal_note('Muitas peças em falta hoje')`);
+await as("tec", `select public.set_goal_note('Muitas peças em falta hoje (2)')`);
+q = await one("tec", `select public.repair_my_goal()`);
+ok("justificativa salva (e reescrita no mesmo dia)", !r.err && q.justificativa === "Muitas peças em falta hoje (2)", JSON.stringify(q));
+r = await as("tec2", `select count(*)::int c from public.repair_goal_notes`);
+ok("um técnico não lê a justificativa do outro", !r.err && r.rows[0].c === 0, JSON.stringify(r));
+r = await as("tec", `insert into public.repair_goal_notes (user_id, day, note) values ('${U.tec}', current_date - 1, 'direto no banco')`);
+ok("justificativa só pela função", !!r.err, JSON.stringify(r));
+r = await as("sup", `select * from public.repair_dashboard_person_daily('${U.tec}', current_date - 1, current_date + 1)`);
+ok("análise mostra a justificativa no dia", !r.err && r.rows.some(x => x.justificativa === "Muitas peças em falta hoje (2)"), JSON.stringify(r));
+r = await as("sup", `select * from public.repair_dashboard_people(current_date - 30, current_date + 1)`);
+ok("análise: coluna de peças de teste usadas de vez", !r.err && r.rows.length > 0 && r.rows.every(x => x.testes_usados !== undefined) && r.rows.some(x => Number(x.testes_usados) > 0), JSON.stringify(r.rows?.map(x => [x.name, x.manutencoes, x.testes_usados])));
+
+// ---- Manutenções visíveis (migration 83): o exemplo do estoque
+// 10 entregues: 5 de teste (devolvidas) + 5 definitivas; 3 das 5 substituídas por defeito => 5 manutenções.
+const eM = await evalOf("SERM1", "OS-M1");
+const mM = await one("tec", `select public.finish_evaluation('${eM}')`);
+const mParts = [];
+for (const part of ["Câmera", "Tela", "Bateria", "Conector", "Alto-falante"]) mParts.push(await one("tec", `select public.create_stock_request('SERM1', $1, 'teste', 1)`, [part]));
+const mDef = await one("tec", `select public.create_stock_request('SERM1', 'Flex', 'definitiva', 5)`);
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'm83a')`, [JSON.stringify([...mParts, mDef].map(id => ({ id })))]);
+for (const id of mParts) await as("tec", `select public.define_test_destiny('${id}', 'devolucao')`);
+const mSub = await one("tec", `select public.request_replacement('${mDef}', 3, 'falha_tecnica', 'Flex com defeito')`);
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'm83b')`, [JSON.stringify([{ id: mSub }])]);
+for (const row of (await db.query(`select id from public.stock_returns where serial_key = 'serm1'`)).rows) {
+  await as("est", `select public.confirm_stock_return('${row.id}', 'funcional', 'm83-${row.id}')`);
+}
+r = await as("tec", `select public.finish_maintenance('${mM}', array[]::text[], array[]::text[])`);
+ok("exemplo: finaliza a manutenção", !r.err, JSON.stringify(r));
+q = (await db.query(`select public.repair_stage_parts_flow('${mM}') f, maintenance_count c from public.repair_stages where id = '${mM}'`)).rows[0];
+ok("exemplo: 10 entregues, 5 testes devolvidos, 3 substituídas", q.f.entregues === 10 && q.f.devolvidas === 5 && q.f.substituidas === 3, JSON.stringify(q));
+ok("exemplo: substituir não soma, são 5 manutenções", q.c === 5, JSON.stringify(q));
+q = await one("tec", `select public.repair_my_goal()`);
+ok("técnico vê as manutenções de hoje", q.manutencao && q.manutencao.manutencoes >= 5 && q.manutencao.entregues >= 10 && q.manutencao.substituidas >= 3, JSON.stringify(q));
+r = await as("sup", `select * from public.repair_dashboard_maintenance(current_date - 1, current_date + 1)`);
+ok("análise > manutenções por técnico", !r.err && r.rows.some(x => x.user_id === U.tec && Number(x.manutencoes) >= 5 && Number(x.substituidas) >= 3), JSON.stringify(r));
+r = await as("sup", `select * from public.repair_dashboard_maintenance_daily('${U.tec}', current_date - 1, current_date + 1)`);
+ok("análise > manutenções por dia", !r.err && r.rows.length >= 1 && Number(r.rows[0].manutencoes) >= 5, JSON.stringify(r));
+r = await as("tec", `select count(*)::int c from public.repair_dashboard_maintenance(current_date - 1, current_date + 1)`);
+ok("técnico não vê a análise dos outros", !r.err && r.rows[0].c === 0, JSON.stringify(r));
+
+// ---- Produtividade individual (migration 84)
+const today = (await db.query(`select (now() at time zone 'America/Sao_Paulo')::date::text d`)).rows[0].d;
+r = await as("sup", `select * from public.repair_productivity($1::date)`, [today]);
+const prodTec = r.rows?.find(x => x.user_id === U.tec);
+ok("produtividade: lista o técnico com a meta do dia", !r.err && prodTec && prodTec.meta === 6 && typeof prodTec.batida === "boolean", JSON.stringify(r.err ?? prodTec));
+ok("produtividade: meta batida quando liberou 6 ou mais", prodTec && prodTec.batida === (prodTec.liberados >= 6), JSON.stringify(prodTec));
+ok("produtividade: traz a justificativa e as manutenções", prodTec && prodTec.justificativa === "Muitas peças em falta hoje (2)" && prodTec.manutencoes >= 5, JSON.stringify(prodTec));
+ok("produtividade: técnico sem trabalho também aparece", r.rows?.some(x => x.user_id === U.tec2), JSON.stringify(r.rows?.map(x => x.name)));
+r = await as("sup", `select * from public.repair_productivity_devices('${U.tec}', $1::date)`, [today]);
+ok("produtividade: aparelhos feitos no dia", !r.err && r.rows.some(x => x.serial === "SERM1" && x.destino === "quarentena" && x.manutencoes === 5 && x.conta_meta === true)
+  && r.rows.some(x => x.origem === "Estágio 1" && x.destino === "vidro"), JSON.stringify(r.err ?? r.rows.map(x => [x.serial, x.origem, x.destino, x.manutencoes])));
+r = await as("tec", `select count(*)::int c from public.repair_productivity($1::date)`, [today]);
+ok("produtividade: técnico não vê a dos outros", !r.err && r.rows[0].c === 0, JSON.stringify(r));
+
+// ---- Destino Bloqueado (migration 85)
+const bl1 = await ptStage("SERBL1");
+r = await as("tec", `select public.finish_maintenance('${bl1}', array['t1'], array['t3'], p_blocked => true)`);
+ok("bloqueado sem motivo recusado", r.err === "blocked_reason_required", JSON.stringify(r));
+r = await as("tec", `select public.finish_maintenance('${bl1}', array['t1'], array['t3'], false, 'Bloqueio de conta', p_blocked => true, p_pt => true)`);
+ok("bloqueado e PT juntos são recusados", !!r.err, JSON.stringify(r));
+r = await as("tec", `select public.finish_maintenance('${bl1}', array['t1'], array['t3'], false, 'Bloqueio de conta iCloud', p_blocked => true)`);
+ok("bloqueado não exige o checklist", !r.err && r.rows[0].finish_maintenance === "bloqueado", JSON.stringify(r));
+q = (await db.query(`select outcome, resale_reason from public.repair_stages where id = '${bl1}'`)).rows[0];
+ok("bloqueado guarda o motivo", q.outcome === "bloqueado" && q.resale_reason === "Bloqueio de conta iCloud", JSON.stringify(q));
+
+// ---- Análise: balão Bloqueados e lista de manutenções (migration 86)
+q = await one("sup", `select public.repair_dashboard_summary(current_date - 1, current_date + 1)`);
+ok("balão de bloqueados", q && q.bloqueados >= 1, JSON.stringify(q));
+r = await as("sup", `select * from public.repair_dashboard_devices('bloqueados', current_date - 1, current_date + 1)`);
+ok("bloqueados: aparelho com o motivo", !r.err && r.rows.some(x => x.serial === "SERBL1" && x.detail === "Motivo: Bloqueio de conta iCloud"), JSON.stringify(r));
+r = await as("sup", `select * from public.repair_dashboard_devices('reparos', current_date - 1, current_date + 1)`);
+ok("reparos feitos: mostra as peças", !r.err && r.rows.some(x => x.serial === "SERM1" && x.detail === "5 manutenções: Flex ×5"), JSON.stringify(r.rows?.map(x => [x.serial, x.detail])));
+r = await as("sup", `select * from public.repair_dashboard_maintenance_devices('${U.tec}', current_date - 1, current_date + 1)`);
+const m86 = r.rows?.find(x => x.serial === "SERM1");
+ok("manutenções aparelho por aparelho", !r.err && m86 && m86.manutencoes === 5 && m86.entregues === 10 && m86.devolvidas === 5 && m86.substituidas === 3 && /Flex/.test(m86.itens), JSON.stringify(m86 ?? r));
+ok("lista também os finalizados sem peça", r.rows.some(x => x.manutencoes === 0 && x.itens === null), JSON.stringify(r.rows.map(x => [x.serial, x.manutencoes, x.itens])));
+r = await as("tec", `select count(*)::int c from public.repair_dashboard_maintenance_devices('${U.tec}', current_date - 1, current_date + 1)`);
+ok("técnico não abre a lista da análise", !r.err && r.rows[0].c === 0, JSON.stringify(r));
+
+// ---- Revenda fora da Análise e da meta (migration 87): SER3 foi finalizado como revenda pelo "tec".
+q = (await db.query(`select outcome from public.repair_stages where serial = 'SER3' and stage = 'manutencao'`)).rows[0];
+ok("SER3 é revenda", q?.outcome === "revenda", JSON.stringify(q));
+r = await as("sup", `select serial from public.repair_dashboard_maintenance_devices('${U.tec}', current_date - 1, current_date + 1)`);
+ok("revenda fora da lista de manutenções", !r.err && r.rows.length > 0 && !r.rows.some(x => x.serial === "SER3"), JSON.stringify(r));
+r = await as("sup", `select serial from public.repair_productivity_devices('${U.tec}', (now() at time zone 'America/Sao_Paulo')::date)`);
+ok("revenda fora da produtividade individual", !r.err && !r.rows.some(x => x.serial === "SER3"), JSON.stringify(r));
+const revOnly = (await db.query(`select st.id from public.repair_stages st where st.serial = 'SER3' and st.stage = 'manutencao'`)).rows[0].id;
+await db.exec(`update public.repair_stages set technician_id = '${U.sup}' where id = '${revOnly}'`);
+r = await as("sup", `select user_id from public.repair_dashboard_people(current_date - 1, current_date + 1)`);
+ok("quem só liberou revenda não aparece no Colaborador", !r.err && !r.rows.some(x => x.user_id === U.sup), JSON.stringify(r));
+r = await as("sup", `select user_id from public.repair_dashboard_maintenance(current_date - 1, current_date + 1)`);
+ok("nem na aba Manutenções", !r.err && !r.rows.some(x => x.user_id === U.sup), JSON.stringify(r));
+await db.exec(`update public.repair_stages set technician_id = '${U.tec}' where id = '${revOnly}'`);
+
+// ---- Checklist manutenção começado por outro técnico (migration 88)
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('ANTIGOT','OS-AT','${U.tec}')`);
+const lt = await one("tec", `select public.start_legacy_maintenance('ANTIGOT')`);
+await as("tec", `select public.save_repair_checklist('${lt}', 'aberto', '{"t1":"ok"}'::jsonb)`);
+r = await as("tec2", `select public.start_legacy_maintenance('ANTIGOT')`);
+ok("outro técnico bipa: avisa quem começou", r.err === "legacy_other_owner", JSON.stringify(r));
+r = await as("tec2", `select public.save_repair_checklist('${lt}', 'aberto', '{"t1":"ok"}'::jsonb)`);
+ok("sem aceitar, não mexe no checklist do outro", !!r.err, JSON.stringify(r));
+q = (await db.query(`select technician_id::text t from public.repair_stages where id = '${lt}'`)).rows[0];
+ok("Não: continua com o dono", q.t === U.tec, JSON.stringify(q));
+const lt2 = await one("tec2", `select public.take_legacy_checklist('ANTIGOT')`);
+ok("Sim: o mesmo checklist passa para quem bipou", lt2 === lt, JSON.stringify([lt, lt2]));
+q = (await db.query(`select (select technician_id::text from public.repair_stages where id = '${lt}') t,
+  (select count(*)::int from public.repair_checklist_results where stage_id = '${lt}') n,
+  (select detail -> 'marcacoes_anteriores' -> 'aberto' ->> 't1' from public.repair_events where stage_id = '${lt}' and action = 'checklist_manutencao_assumido') old`)).rows[0];
+ok("Sim: começa do zero e guarda as marcações anteriores no histórico", q.t === U.tec2 && q.n === 0 && q.old === "ok", JSON.stringify(q));
+r = await as("tec2", `select public.start_legacy_maintenance('ANTIGOT')`);
+ok("depois de aceitar, bipar de novo abre normal", !r.err && r.rows[0].start_legacy_maintenance === lt, JSON.stringify(r));
+await as("tec2", `select public.save_repair_checklist('${lt}', 'aberto', '{"t1":"ok","t2":"ok"}'::jsonb)`);
+r = await as("tec2", `select public.finish_maintenance('${lt}', array['t1','t2'], array[]::text[])`);
+ok("e grava e finaliza", !r.err && r.rows[0].finish_maintenance === "quarentena", JSON.stringify(r));
+r = await as("tec", `select public.take_legacy_checklist('ANTIGOT')`);
+ok("não assume checklist já finalizado", r.err === "stage_closed", JSON.stringify(r));
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);

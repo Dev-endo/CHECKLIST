@@ -87,6 +87,7 @@ export function RequestList({ client, requests, returns = [], disabled = false, 
               <strong className={styles.part}>{r.part}</strong>
               <span className={styles.tag}>{PURPOSE_LABELS[r.purpose]}</span>
               {r.replacesRequestId && <span className={styles.tag}>Substituição</span>}
+              {r.glass && <span className={styles.tag}>Para o vidro</span>}
               <span className={styles.qty}>
                 {r.qtyDelivered}/{r.qty}
                 {isOpenRequest(r.status) && r.qtyDelivered > 0 ? ` · faltam ${pendingBalance(r.qty, r.qtyDelivered)}` : ""}

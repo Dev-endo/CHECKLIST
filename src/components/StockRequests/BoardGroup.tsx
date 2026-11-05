@@ -102,6 +102,7 @@ export function BoardGroup({ client, group, selected, onToggle, onChanged }: Boa
                 <strong className={styles.part}>{r.part}</strong>
                 <span className={styles.tag}>{PURPOSE_LABELS[r.purpose]}</span>
                 {r.replacesRequestId && <span className={styles.tag}>Substituição</span>}
+              {r.glass && <span className={styles.tag}>Para o vidro</span>}
                 {r.testDestiny && <span className={styles.tag}>{DESTINY_LABELS[r.testDestiny]}</span>}
                 <span className={styles.qty}>
                   {r.qtyDelivered}/{r.qty}

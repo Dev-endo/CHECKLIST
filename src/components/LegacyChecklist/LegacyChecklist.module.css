@@ -77,3 +77,40 @@
 .muted {
   color: var(--muted);
 }
+
+.glass {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.owner {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.owner p {
+  margin: 0 0 6px;
+}
+
+.osBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.osBox > p {
+  margin: 0;
+  font-size: 14px;
+}

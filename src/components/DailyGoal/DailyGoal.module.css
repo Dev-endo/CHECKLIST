@@ -1,0 +1,113 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.done {
+  border-color: var(--ok);
+  border-left-color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.value {
+  font-family: var(--mono);
+  font-size: 28px;
+}
+
+.of {
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.detail {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.done .bar {
+  background: var(--ok);
+}
+
+.success {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.note textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.saved {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.maint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.maintValue {
+  font-family: var(--mono);
+  font-size: 22px;
+}

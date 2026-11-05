@@ -5,8 +5,11 @@ import {
   describeRepairError,
   destinationAvailable,
   deviceWhereabouts,
+  GLASS_LABELS,
   isOpenRequest,
   STAGE1_DESTINATIONS,
+  stage1Destinations,
+  type GlassAnswer,
   type Stage1Destination,
 } from "../../domain/repairStages";
 import { useRepairChecklists } from "../../hooks/useRepairChecklists";
@@ -23,6 +26,7 @@ import {
 } from "../../services/supabase/repairService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
+import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
 import { Checklist } from "../Checklist/Checklist";
 import { OsField } from "../DeviceForm/OsField";
 import { PartRequestForm } from "../RepairParts/PartRequestForm";
@@ -55,9 +59,13 @@ function Stage1({ client, userId, technician }: Stage1Props) {
   const [mine, setMine] = useState<OpenStage[]>([]);
   const [busy, setBusy] = useState(false);
   const [destination, setDestination] = useState<Stage1Destination>("manutencao");
+  // "O aparelho é vidro?": obrigatório antes de concluir a avaliação técnica.
+  const [glass, setGlass] = useState<GlassAnswer | null>(null);
+  const allowed = stage1Destinations(glass);
+  const chosen: Stage1Destination | null = allowed.includes(destination) ? destination : (allowed[0] ?? null);
   // Motivo do envio para a Análise técnica (obrigatório nesse destino).
   const [analysisNote, setAnalysisNote] = useState("");
-  const noteMissing = destination === "analise" && analysisNote.trim().length < ANALYSIS_NOTE_MIN;
+  const noteMissing = chosen === "analise" && analysisNote.trim().length < ANALYSIS_NOTE_MIN;
   // Ativo que já tem OS: o técnico escolhe registrar outra OS ou, se reprovou na quarentena, continuar com a mesma.
   const [newOs, setNewOs] = useState(false);
   const { asset, order, stages, requests, returns, canRedo, reload: reloadDevice } = useRepairDevice(client, serial, () =>
@@ -172,18 +180,21 @@ function Stage1({ client, userId, technician }: Stage1Props) {
   };
 
   const concludeEvaluation = async () => {
-    if (!evaluation) return;
-    const label = STAGE1_DESTINATIONS.find((d) => d.id === destination)?.label ?? destination;
-    const confirmed =
-      destination === "manutencao"
+    if (!evaluation || !chosen || !glass) return;
+    const label = STAGE1_DESTINATIONS.find((d) => d.id === chosen)?.label ?? chosen;
+    const withGlass = glass === "vidro_mais";
+    const confirmed = withGlass
+      ? window.confirm(`Vidro e outra manutenção: pedir Vidro e Aro ao estoque e enviar o aparelho para: ${label}? Ao finalizar o Estágio 2, ele vai para o vidro.`)
+      : chosen === "manutencao"
         ? confirmOpenRequests("o Estágio 2")
         : window.confirm(`Enviar o aparelho para: ${label}? Isso encerra o Estágio 1.`);
     if (!confirmed) return;
     setBusy(true);
     try {
-      await finishEvaluation(client, evaluation.id, destination, analysisNote);
-      toast(`Avaliação técnica concluída: ${label}`);
+      await finishEvaluation(client, evaluation.id, chosen, analysisNote, withGlass);
+      toast(withGlass ? `Avaliação técnica concluída: ${label} (Vidro e Aro pedidos)` : `Avaliação técnica concluída: ${label}`);
       setDestination("manutencao");
+      setGlass(null);
       setAnalysisNote("");
       reload();
     } catch (error) {
@@ -346,45 +357,59 @@ function Stage1({ client, userId, technician }: Stage1Props) {
                     onToggle={() => void evaluationTimer.toggle()} onFinish={() => void evaluationTimer.finish()}
                   />
                   {evaluationRunning && (
-                    <fieldset className={styles.destinations} disabled={busy}>
-                      <legend>Para onde vai o aparelho?</legend>
-                      {STAGE1_DESTINATIONS.map((option) => {
-                        const available = destinationAvailable(option.id, openRequests.length);
-                        return (
-                          <label key={option.id} className={[styles.destination, destination === option.id ? styles.destinationOn : ""].join(" ")}>
-                            <input
-                              type="radio"
-                              name="stage1-destination"
-                              checked={destination === option.id}
-                              disabled={!available}
-                              onChange={() => setDestination(option.id)}
-                            />
-                            <span>
-                              <strong>{option.label}</strong>
-                              <span className={styles.hint}>{available ? option.hint : "Só com solicitação de peça em aberto."}</span>
-                            </span>
-                          </label>
-                        );
-                      })}
-                      {destination === "analise" && (
+                    <div className={styles.destinations}>
+                      <ChoiceCards
+                        name="stage1-glass"
+                        legend="O aparelho é vidro?"
+                        value={glass}
+                        onChange={setGlass}
+                        disabled={busy}
+                        options={[
+                          { id: "nao", label: GLASS_LABELS.nao, hint: "Segue o fluxo normal." },
+                          { id: "so_vidro", label: GLASS_LABELS.so_vidro, hint: "Pede Vidro e Aro e vai direto para o Vidro (sem Estágio 2)." },
+                          {
+                            id: "vidro_mais",
+                            label: GLASS_LABELS.vidro_mais,
+                            hint: "Pede Vidro e Aro agora e vai para o Estágio 2. Ao finalizar a manutenção, vai para o vidro sem checklist.",
+                          },
+                        ]}
+                      />
+                      {glass && glass !== "so_vidro" && (
+                        <ChoiceCards
+                          name="stage1-destination"
+                          legend="Para onde vai o aparelho?"
+                          value={chosen}
+                          onChange={setDestination}
+                          disabled={busy}
+                          options={STAGE1_DESTINATIONS.filter((option) => allowed.includes(option.id)).map((option) => {
+                            const available = destinationAvailable(option.id, openRequests.length);
+                            return { ...option, hint: available ? option.hint : "Só com solicitação de peça em aberto.", disabled: !available };
+                          })}
+                        />
+                      )}
+                      {chosen === "analise" && (
                         <label className={styles.noteField}>
                           Por que o aparelho vai para a Análise técnica? (obrigatório)
                           <textarea
                             value={analysisNote}
                             rows={3}
                             maxLength={1000}
+                            disabled={busy}
                             placeholder="Descreva o defeito ou o motivo do envio"
                             onChange={(e) => setAnalysisNote(e.target.value)}
                           />
                         </label>
                       )}
-                      <Button
-                        disabled={busy || noteMissing || !destinationAvailable(destination, openRequests.length)}
-                        onClick={() => void concludeEvaluation()}
-                      >
-                        Concluir avaliação técnica
-                      </Button>
-                    </fieldset>
+                      <div className={styles.actions}>
+                        <Button
+                          disabled={busy || !glass || !chosen || noteMissing || !destinationAvailable(chosen, openRequests.length)}
+                          onClick={() => void concludeEvaluation()}
+                        >
+                          Concluir avaliação técnica
+                        </Button>
+                        {!glass && <span className={styles.hint}>Responda se o aparelho é vidro.</span>}
+                      </div>
+                    </div>
                   )}
                 </>
               ) : (

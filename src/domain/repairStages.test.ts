@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertMessage, deviceWhereabouts, batchMessage, deliverableQty, groupByDevice, replaceableQty, returnsToStock, canCancelRequest, describeRepairError, formatDuration, isOpenRequest, liveTotals, pendingBalance, timerAction, type TimerTotals } from "./repairStages";
+import { alertMessage, stage1Destinations, deviceWhereabouts, batchMessage, deliverableQty, groupByDevice, replaceableQty, returnsToStock, canCancelRequest, describeRepairError, formatDuration, isOpenRequest, liveTotals, pendingBalance, timerAction, type TimerTotals } from "./repairStages";
 
 const totals = (over: Partial<TimerTotals> = {}): TimerTotals => ({ produtivo: 0, pausa: 0, espera_peca: 0, openKind: null, ...over });
 
@@ -102,5 +102,14 @@ describe("deviceWhereabouts", () => {
     expect(deviceWhereabouts({ evaluation: null, maintenance: { status: "aguardando_pecas" } })).toBe("aguardando peças para o Estágio 2");
     expect(deviceWhereabouts({ evaluation: null, maintenance: { status: "concluida", outcome: "quarentena" } })).toBe("na quarentena");
     expect(deviceWhereabouts({ evaluation: null, maintenance: { status: "concluida", outcome: "revenda" } })).toBe("em revenda");
+  });
+});
+
+describe("stage1Destinations", () => {
+  it("follows the answer to 'is it glass?'", () => {
+    expect(stage1Destinations(null)).toEqual([]);
+    expect(stage1Destinations("so_vidro")).toEqual(["vidro"]);
+    expect(stage1Destinations("vidro_mais")).toEqual(["manutencao", "aguardando_pecas"]);
+    expect(stage1Destinations("nao")).toEqual(["manutencao", "analise", "aguardando_pecas"]);
   });
 });

@@ -8,6 +8,7 @@ import {
   type MaintenanceItem,
 } from "../../domain/repairChecklist";
 import { Button } from "../Button/Button";
+import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
 import styles from "./RepairStage2.module.css";
 
 interface FinishPanelProps {
@@ -93,17 +94,14 @@ export function FinishPanel({
       )}
 
       {!onlyAuto && (
-      <fieldset className={styles.destinationChoice} disabled={busy}>
-        <legend>Para onde o aparelho vai?</legend>
-        {destinations.map((option) => (
-          <label key={option.id} className={styles.resale}>
-            <input type="radio" name="finish-destination" checked={destination === option.id} onChange={() => onDestination(option.id)} />
-            <span>
-              <strong>{option.label}</strong> <span className={styles.muted}>{option.hint}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
+        <ChoiceCards
+          name="finish-destination"
+          legend="Para onde o aparelho vai?"
+          options={destinations}
+          value={destination}
+          onChange={onDestination}
+          disabled={busy}
+        />
       )}
       {outcome === "analise" && onAnalysisNote && (
         <label className={styles.reason}>
@@ -123,13 +121,19 @@ export function FinishPanel({
       )}
       {!onlyAuto && needsReason(destination) && (
         <label className={styles.reason}>
-          {destination === "pt" ? "Motivo do PT (obrigatório)" : "Motivo da revenda (obrigatório)"}
+          {destination === "pt" ? "Motivo do PT (obrigatório)" : destination === "bloqueado" ? "Motivo do bloqueio (obrigatório)" : "Motivo da revenda (obrigatório)"}
           <textarea
             value={resaleReason}
             rows={3}
             maxLength={1000}
             disabled={busy}
-            placeholder={destination === "pt" ? "Por que o aparelho é perda total?" : "Por que o aparelho vai para a revenda?"}
+            placeholder={
+              destination === "pt"
+                ? "Por que o aparelho é perda total?"
+                : destination === "bloqueado"
+                  ? "Qual o bloqueio? (conta, MDM, operadora…)"
+                  : "Por que o aparelho vai para a revenda?"
+            }
             onChange={(e) => onReason(e.target.value)}
           />
         </label>

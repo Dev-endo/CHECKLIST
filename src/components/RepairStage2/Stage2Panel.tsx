@@ -172,6 +172,11 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
   }, [client, maintenanceId, partsKey]);
   const running = maintenance?.status === "em_andamento";
   const finished = maintenance?.status === "concluida";
+  // Vidro e outra manutenção (marcado no Estágio 1): Vidro e Aro já pedidos; o destino Vidro já vem escolhido.
+  const needsGlass = Boolean(running && maintenance?.needsGlass);
+  useEffect(() => {
+    if (needsGlass) setDestination("vidro");
+  }, [maintenanceId, needsGlass]);
 
   const onTimerError = (error: unknown) => fail(error, "Não foi possível atualizar o cronômetro.");
   // Manutenção e montagem: só um corre por vez (começar um para o outro), então os dois são relidos juntos.
@@ -322,6 +327,13 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
               )}
 
               {running && <PtRejection client={client} stageId={maintenance.id} />}
+
+              {needsGlass && (
+                <p className={styles.glassNotice} role="status">
+                  <strong>Vidro e outra manutenção.</strong> O Vidro e o Aro já foram pedidos ao estoque (são do técnico de vidro e não travam a
+                  finalização). Faça a manutenção e finalize: o aparelho vai para o vidro sem precisar do checklist.
+                </p>
+              )}
 
               {maintenance.status === "aguardando_pecas" && (
                 <p className={stage1Styles.hint} role="status">

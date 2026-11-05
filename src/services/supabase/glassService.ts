@@ -107,3 +107,17 @@ export const glassTimerApi: TimerApi = {
   fetch: async (client, id) => toTimerTotals(await call(client, "glass_timer_totals", { p_job_id: id })),
   set: (client, id, kind) => call<null>(client, "glass_timer_set", { p_job_id: id, p_kind: kind }),
 };
+
+/** Peças do vidro já alocadas (entregues pelo estoque; o aro dispensado também conta como resolvido). */
+export const partsAllocated = (job: Pick<GlassJob, "parts">): boolean =>
+  job.parts.every((p) => p.status === "entregue" || (p.part === "Aro" && p.status === "cancelada"));
+
+/** Vidros concluídos (Concluir vidro) desde `since`, de todos os técnicos de vidro. */
+export async function countGlassDoneSince(client: AppSupabaseClient, since: Date): Promise<number> {
+  const { count, error } = await loose(client)
+    .from("repair_glass_jobs")
+    .select("id", { count: "exact", head: true })
+    .gte("glass_done_at", since.toISOString());
+  if (error) throw error;
+  return count ?? 0;
+}

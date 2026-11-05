@@ -13,6 +13,10 @@ interface OsFieldProps {
   disabled?: boolean;
   /** Chamado depois de registrar uma OS, para a tela recarregar o que depende dela. */
   onRegistered?: () => void;
+  /** Avisa a OS atual do ativo (null: sem OS; undefined: ainda carregando ou sem serial). */
+  onCurrent?: (osNumber: string | null | undefined) => void;
+  /** Mostra que a OS é obrigatória (destaca quando falta). */
+  required?: boolean;
 }
 
 const DEBOUNCE_MS = 400;
@@ -21,7 +25,7 @@ const DEBOUNCE_MS = 400;
  * Campo da OS no checklist de desmontagem: o desmontador digita a OS do ativo e registra. Cada passagem do
  * aparelho pelo laboratório tem uma OS nova (o serial pode se repetir, a OS não); a mais recente é a atual.
  */
-export function OsField({ client, serial, disabled = false, onRegistered }: OsFieldProps) {
+export function OsField({ client, serial, disabled = false, onRegistered, onCurrent, required = false }: OsFieldProps) {
   const toast = useToast();
   const key = serial.trim();
   const [orders, setOrders] = useState<ServiceOrder[] | null>(null);
@@ -55,6 +59,12 @@ export function OsField({ client, serial, disabled = false, onRegistered }: OsFi
     if (!touched) setValue(current?.osNumber ?? "");
   }, [current?.osNumber, touched]);
 
+  const currentOs = !key || orders === null ? undefined : (current?.osNumber ?? null);
+  useEffect(() => {
+    onCurrent?.(currentOs);
+  }, [currentOs, onCurrent]);
+  const missing = required && currentOs === null;
+
   const number = value.trim();
   const isNew = Boolean(number) && number.toLowerCase() !== (current?.osNumber ?? "").toLowerCase();
 
@@ -83,7 +93,7 @@ export function OsField({ client, serial, disabled = false, onRegistered }: OsFi
   return (
     <div className={styles.field}>
       <label className={styles.label}>
-        Nº da OS
+        Nº da OS{required ? " (obrigatório)" : ""}
         <span className={styles.row}>
           <input
             value={value}
@@ -108,8 +118,10 @@ export function OsField({ client, serial, disabled = false, onRegistered }: OsFi
         </span>
       </label>
       {key && orders && (
-        <span className={styles.hint}>
-          {current ? `OS atual deste ativo (${orders.length}ª OS). Para uma nova passagem, digite a nova OS e registre.` : "Sem OS: digite a OS do ativo e registre."}
+        <span className={[styles.hint, missing ? styles.missing : ""].join(" ")}>
+          {current ? `OS atual deste ativo (${orders.length}ª OS). Para uma nova passagem, digite a nova OS e registre.` : required
+              ? "Sem OS: digite a OS do ativo e clique em Registrar. Sem ela não dá para concluir."
+              : "Sem OS: digite a OS do ativo e registre."}
         </span>
       )}
     </div>

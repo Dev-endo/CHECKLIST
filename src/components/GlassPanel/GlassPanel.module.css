@@ -87,3 +87,70 @@
   gap: 10px;
   align-items: center;
 }
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 8px 0 16px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.stat {
+  cursor: pointer;
+}
+
+button.stat:hover {
+  background: var(--bg);
+}
+
+.statOn,
+button.statOn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.statWait {
+  border-left-color: var(--crit);
+}
+
+.statReady {
+  border-left-color: var(--accent);
+}
+
+.statDone {
+  border-left-color: var(--ok);
+}
+
+.statValue {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.statLabel {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+}

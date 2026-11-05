@@ -16,6 +16,7 @@ import { BoardRepairPanel } from "./components/AnalysisTechPanel/BoardRepairPane
 import { GlassPanel } from "./components/GlassPanel/GlassPanel";
 import { LegacyChecklistPanel } from "./components/LegacyChecklist/LegacyChecklistPanel";
 import { MyProduction } from "./components/MyProduction/MyProduction";
+import { DailyGoal } from "./components/DailyGoal/DailyGoal";
 import { Stage2Panel } from "./components/RepairStage2/Stage2Panel";
 import { Stage1Panel } from "./components/RepairStage1/Stage1Panel";
 import { StockAlerts } from "./components/StockAlerts/StockAlerts";
@@ -246,6 +247,8 @@ export default function App() {
             Seu acesso ainda não foi liberado. Peça ao administrador para definir o seu papel.
           </div>
         )}
+        {/* Meta do dia (liberados para quarentena e vidro) no topo do Reparo e do Checklist manutenção. */}
+        {client && (activeTab === "reparo" || activeTab === "reparo2" || activeTab === "checklist_manutencao") && <DailyGoal client={client} />}
         {activeTab === "reparo" && <Stage1Panel />}
         {activeTab === "reparo2" && (
           <>

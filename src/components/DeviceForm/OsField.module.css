@@ -28,3 +28,8 @@
   font-size: 12px;
   font-weight: 400;
 }
+
+.missing {
+  color: var(--crit);
+  font-weight: 700;
+}

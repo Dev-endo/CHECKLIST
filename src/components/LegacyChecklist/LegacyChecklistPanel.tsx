@@ -13,7 +13,7 @@ import {
   requiredTests,
   type FinishDestination,
 } from "../../domain/repairChecklist";
-import { describeRepairError } from "../../domain/repairStages";
+import { describeRepairError, GLASS_LABELS, type GlassAnswer } from "../../domain/repairStages";
 import { useRepairChecklists } from "../../hooks/useRepairChecklists";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
@@ -21,7 +21,9 @@ import {
   fetchMyLegacyFinished,
   fetchMyOpenStages,
   finishMaintenance,
+  requestGlassParts,
   startLegacyMaintenance,
+  takeLegacyChecklist,
   type LegacyChecklist,
   type OpenStage,
 } from "../../services/supabase/repairService";
@@ -29,6 +31,7 @@ import { assetsBySerial } from "../../services/supabase/stockBoardService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
 import { Checklist } from "../Checklist/Checklist";
+import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
 import { OsField } from "../DeviceForm/OsField";
 import { PtRejection } from "../PtApproval/PtRejection";
 import { FinishPanel } from "../RepairStage2/FinishPanel";
@@ -45,6 +48,7 @@ const DESTINATION_LABELS = {
   vidro: "Vidro",
   revenda: "Revenda",
   pt: "PT (aprovação pendente)",
+  bloqueado: "Bloqueado",
 } as const;
 
 const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -57,11 +61,12 @@ const startOfToday = () => {
 };
 
 /** Por que o checklist não abriu (sem OS o técnico registra ali mesmo). */
-type Problem = { kind: "no_os" } | { kind: "message"; text: string } | null;
+type Problem = { kind: "no_os" } | { kind: "confirm_os" } | { kind: "other_owner"; name: string } | { kind: "message"; text: string } | null;
 
 function problemFor(error: unknown): Problem {
   const text = (error as { message?: string })?.message ?? "";
   if (text.includes("no_os")) return { kind: "no_os" };
+  if (text.includes("legacy_other_owner")) return { kind: "other_owner", name: (error as { details?: string })?.details || "outro técnico" };
   if (text.includes("disassembly_open")) return { kind: "message", text: "Este aparelho está no Estágio 1 do Reparo: siga por lá." };
   if (text.includes("in_repair")) return { kind: "message", text: "Este aparelho está no Estágio 2 do Reparo: siga por lá." };
   if (text.includes("pt_pending")) return { kind: "message", text: "Este aparelho tem um PT aguardando a aprovação de um administrador ou supervisor." };
@@ -77,6 +82,8 @@ interface Opened {
   /** Retomado (estava começado) ou novo; no novo, o último finalizado do aparelho, se houver. */
   resumed: boolean;
   previous: LegacyChecklist | null;
+  /** Vidro e outra manutenção já marcado (Vidro e Aro pedidos). */
+  needsGlass: boolean;
 }
 
 /**
@@ -102,6 +109,8 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   const [opening, setOpening] = useState(false);
   const [tries, setTries] = useState(0);
   const [destination, setDestination] = useState<FinishDestination>("auto");
+  // "O aparelho é vidro?" (obrigatório). Só vidro e vidro e outra manutenção vão para o vidro sem checklist.
+  const [glassAnswer, setGlassAnswer] = useState<GlassAnswer | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
   // Motivo da revenda ou do PT.
   const [reason, setReason] = useState("");
@@ -111,6 +120,11 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   const [today, setToday] = useState<LegacyChecklist[] | null>(null);
   const [reloads, setReloads] = useState(0);
   const retry = useCallback(() => setTries((n) => n + 1), []);
+  // "Fazer um novo?" aceito: de quem era o checklist (para o aviso).
+  const [tookFrom, setTookFrom] = useState<{ serial: string; name: string } | null>(null);
+  // OS obrigatória: checklist novo só abre depois de o técnico confirmar a OS atual ou registrar uma nova passagem.
+  const [osConfirmed, setOsConfirmed] = useState<string | null>(null);
+  const [currentOs, setCurrentOs] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     const timer = setTimeout(() => setSerial(typed.trim()), LOOKUP_DEBOUNCE_MS);
@@ -139,6 +153,12 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     setOpening(true);
     (async () => {
       const previous = await fetchLastLegacy(client, serial).catch(() => null);
+      // Checklist em andamento é retomado direto; um novo espera a OS (confirmar a atual ou registrar outra).
+      const inProgress = previous && previous.status !== "concluida";
+      if (!inProgress && osConfirmed !== serial) {
+        if (active) setProblem({ kind: "confirm_os" });
+        return;
+      }
       const stageId = await startLegacyMaintenance(client, serial);
       const current = await fetchLastLegacy(client, serial).catch(() => null);
       if (!active) return;
@@ -149,6 +169,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         osNumber: current?.id === stageId ? current.osNumber : "—",
         resumed,
         previous: previous?.status === "concluida" ? previous : null,
+        needsGlass: current?.id === stageId ? current.needsGlass : false,
       });
     })()
       .catch((error) => active && setProblem(problemFor(error)))
@@ -156,7 +177,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     return () => {
       active = false;
     };
-  }, [client, serial, tries]);
+  }, [client, serial, tries, osConfirmed]);
 
   // Começados e não finalizados (para retomar) e os finalizados hoje (a contagem do dia).
   useEffect(() => {
@@ -174,29 +195,86 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
 
   const stageId = opened && opened.serial === serial ? opened.stageId : undefined;
   // Antes de bipar dá para marcar; se o serial não abre checklist (ex.: está no Reparo), fica travado.
-  const editable = Boolean(stageId) || !(serial && problem?.kind === "message");
+  const editable = Boolean(stageId) || !(serial && (problem?.kind === "message" || problem?.kind === "other_owner"));
+
+  // Checklist começado por outro técnico: Sim, fica com quem bipou e começa do zero; Não, continua com o dono.
+  const takeOver = async (name: string) => {
+    setBusy(true);
+    try {
+      await takeLegacyChecklist(client, serial);
+      setTookFrom({ serial, name });
+      retry();
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível abrir o checklist. Tente de novo."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const keepWithOwner = (name: string) => {
+    toast(`O checklist continua com ${name}`);
+    clear();
+  };
   const checklists = useRepairChecklists(client, stageId, editable && !busy, (error) => toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível salvar as marcações.")), true);
+
+  // Outro aparelho aberto: a resposta "é vidro?" do anterior não vale para ele.
+  const lastStage = useRef(stageId);
+  useEffect(() => {
+    if (lastStage.current && stageId && lastStage.current !== stageId) setGlassAnswer(null);
+    if (stageId) lastStage.current = stageId;
+  }, [stageId]);
+
+  const glassLocked = Boolean(stageId && opened?.needsGlass);
+  const glass: GlassAnswer | null = glassLocked ? "vidro_mais" : glassAnswer;
+  const toGlass = glass === "so_vidro" || glass === "vidro_mais";
+  const destinations = toGlass
+    ? FINISH_DESTINATIONS.filter((option) => option.id === "vidro")
+    : FINISH_DESTINATIONS.filter((option) => option.id !== "vidro");
+  const finalDestination: FinishDestination = toGlass ? "vidro" : destination === "vidro" ? "auto" : destination;
+
+  const answerGlass = async (value: GlassAnswer) => {
+    if (glassLocked) return;
+    if (value !== "vidro_mais" || !stageId) {
+      setGlassAnswer(value);
+      return;
+    }
+    if (!window.confirm("Vidro e outra manutenção: pedir Vidro e Aro ao estoque agora? Ao finalizar, o aparelho vai para o vidro sem checklist.")) return;
+    setBusy(true);
+    try {
+      await requestGlassParts(client, stageId);
+      setOpened((current) => (current && current.stageId === stageId ? { ...current, needsGlass: true } : current));
+      setGlassAnswer(value);
+      toast("Vidro e Aro pedidos ao estoque");
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível pedir o Vidro e o Aro."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Falha com o aparelho aberto: o checklist fechado não precisa ser feito (o aparelho já não vai para a quarentena).
   const openFailed = phaseFailed("aberto", checklists.results.aberto);
   const blockers = [
     ...(stageId ? [] : ["Bipe o serial do aparelho"]),
+    // PT e Bloqueado não dependem da resposta do vidro.
+    ...(glass || finalDestination === "pt" || finalDestination === "bloqueado" ? [] : ["Responda se o aparelho é vidro"]),
     ...finishBlockers({
       results: checklists.results,
       requests: [],
       returnsWaiting: 0,
-      destination,
+      destination: finalDestination,
       resaleReason: reason,
       skipPhases: openFailed ? ["fechado"] : [],
       analysisNote,
     }),
   ];
-  const outcome = expectedOutcome(checklists.results, destination);
+  const outcome = expectedOutcome(checklists.results, finalDestination);
 
   const clear = () => {
+    setOsConfirmed(null);
     setTyped("");
     setSerial("");
     setDestination("auto");
+    setGlassAnswer(null);
     setAnalysisNote("");
     setReason("");
     input.current?.focus();
@@ -213,7 +291,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         requiredOpen: requiredTests("aberto"),
         requiredClosed: openFailed ? [] : requiredTests("fechado"),
         choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
-        destination,
+        destination: finalDestination,
         resaleReason: reason,
         analysisNote,
       });
@@ -228,7 +306,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     }
   };
 
-  const counts = { quarentena: 0, analise: 0, vidro: 0, revenda: 0, pt: 0 };
+  const counts = { quarentena: 0, analise: 0, vidro: 0, revenda: 0, pt: 0, bloqueado: 0 };
   for (const item of today ?? []) if (item.outcome) counts[item.outcome] += 1;
   const breakdown = (Object.keys(counts) as (keyof typeof counts)[])
     .filter((key) => counts[key] > 0)
@@ -308,7 +386,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
           </div>
           <div>
             <dt>OS</dt>
-            <dd>{stageId && opened ? opened.osNumber : "—"}</dd>
+            <dd>{stageId && opened ? opened.osNumber : (serial && currentOs) || "—"}</dd>
           </div>
           <div>
             <dt>Técnico</dt>
@@ -321,7 +399,9 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       {stageId && <PtRejection client={client} stageId={stageId} />}
       {stageId && opened && (
         <p className={stage1Styles.hint} role="status">
-          {opened.resumed
+          {tookFrom?.serial === serial
+            ? `Checklist novo: o que ${tookFrom.name} tinha começado passou para você, em branco (as marcações dele ficam no histórico).`
+            : opened.resumed
             ? "Checklist retomado: as marcações já feitas neste aparelho estão abaixo."
             : opened.previous?.finishedAt
               ? `Checklist novo. O anterior deste aparelho foi finalizado em ${when(opened.previous.finishedAt)} (${
@@ -330,13 +410,52 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
               : "Checklist novo."}
         </p>
       )}
-      {serial && problem?.kind === "no_os" && (
-        <>
-          <p className={stage1Styles.hint}>Este aparelho não tem OS. Digite a OS e registre: o checklist abre em seguida.</p>
-          <OsField client={client} serial={serial} onRegistered={retry} />
-        </>
-      )}
       {serial && problem?.kind === "message" && <p className={stage1Styles.hint}>{problem.text}</p>}
+      {serial && !stageId && !opening && (problem?.kind === "confirm_os" || problem?.kind === "no_os" || problem?.kind === "message") && (
+        <section className={styles.osBox} aria-label="OS do aparelho">
+          <p>
+            {problem.kind === "message"
+              ? "Se o aparelho voltou ao laboratório numa nova passagem, registre a nova OS: o checklist abre nela."
+              : currentOs
+                ? `Este aparelho tem a OS ${currentOs}. Se é uma nova passagem pelo laboratório, registre a nova OS; se é a mesma, continue com ela.`
+                : "Este aparelho não tem OS. Digite a OS e registre: o checklist abre em seguida."}
+          </p>
+          <OsField
+            client={client}
+            serial={serial}
+            required
+            disabled={busy}
+            onCurrent={setCurrentOs}
+            onRegistered={() => {
+              setOsConfirmed(serial);
+              retry();
+            }}
+          />
+          {problem.kind === "confirm_os" && currentOs && (
+            <div className={stage1Styles.actions}>
+              <Button disabled={busy} onClick={() => setOsConfirmed(serial)}>
+                Continuar com a OS {currentOs}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
+      {serial && problem?.kind === "other_owner" && (
+        <section className={styles.owner} role="alertdialog" aria-label="Checklist de outro técnico">
+          <p>
+            Checklist iniciado por <strong>{problem.name}</strong>. Fazer um novo?
+          </p>
+          <p className={stage1Styles.hint}>Sim: o checklist fica com você e começa do zero. Não: continua com {problem.name}.</p>
+          <div className={stage1Styles.actions}>
+            <Button disabled={busy} onClick={() => void takeOver(problem.name)}>
+              Sim, fazer um novo
+            </Button>
+            <Button variant="ghost" disabled={busy} onClick={() => keepWithOwner(problem.name)}>
+              Não
+            </Button>
+          </div>
+        </section>
+      )}
 
       {!serial && mine.length > 0 && (
         <div className={stage1Styles.resume}>
@@ -348,6 +467,33 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
           ))}
         </div>
       )}
+
+      <section className={styles.glass} aria-label="O aparelho é vidro?">
+        <ChoiceCards
+          name="legacy-glass"
+          legend="O aparelho é vidro?"
+          value={glass}
+          onChange={(value) => void answerGlass(value)}
+          disabled={busy || glassLocked}
+          options={[
+            { id: "nao", label: GLASS_LABELS.nao, hint: "Segue o fluxo normal: testes e destino." },
+            { id: "so_vidro", label: GLASS_LABELS.so_vidro, hint: "Vai para o vidro sem checklist: finalize logo abaixo." },
+            {
+              id: "vidro_mais",
+              label: GLASS_LABELS.vidro_mais,
+              hint: stageId
+                ? "Pede Vidro e Aro agora. Faça a manutenção; ao finalizar, vai para o vidro sem checklist."
+                : "Bipe o serial primeiro: Vidro e Aro são pedidos na hora.",
+              disabled: !stageId,
+            },
+          ]}
+        />
+        {glassLocked && (
+          <p className={stage1Styles.hint} role="status">
+            Vidro e Aro já pedidos ao estoque. Faça a manutenção; ao finalizar, o aparelho vai para o vidro (checklist opcional).
+          </p>
+        )}
+      </section>
 
       {PHASES.map((phase) => (
         <section key={phase} className={stage2Styles.phase} aria-label={PHASE_LABELS[phase]}>
@@ -378,14 +524,14 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         title="Finalizar checklist"
         blockers={blockers}
         outcome={outcome}
-        destination={destination}
+        destination={finalDestination}
         resaleReason={reason}
         busy={busy}
         unsaved={Boolean(stageId) && checklists.unsaved}
         onDestination={setDestination}
         onReason={setReason}
         onFinish={() => void finish()}
-        destinations={FINISH_DESTINATIONS}
+        destinations={destinations}
         analysisNote={analysisNote}
         onAnalysisNote={setAnalysisNote}
         hideCount

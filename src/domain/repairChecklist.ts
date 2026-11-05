@@ -136,13 +136,13 @@ export function pendingTests(phase: ChecklistPhase, results: Results): string[] 
  * reprovado), vidro (sem exigir o checklist), revenda (com motivo) ou PT, perda total (com motivo; espera a
  * aprovação de um administrador ou supervisor).
  */
-export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt";
+export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado";
 
 /** Destinos que não exigem o checklist: o aparelho vai para o vidro (e volta) ou espera a aprovação do PT. */
-export const skipsChecklist = (destination: FinishDestination) => destination === "vidro" || destination === "pt";
+export const skipsChecklist = (destination: FinishDestination) => destination === "vidro" || destination === "pt" || destination === "bloqueado";
 
 /** Destinos que exigem um motivo escrito (o mesmo campo). */
-export const needsReason = (destination: FinishDestination) => destination === "revenda" || destination === "pt";
+export const needsReason = (destination: FinishDestination) => destination === "revenda" || destination === "pt" || destination === "bloqueado";
 
 /** Opções de destino ao finalizar (Reparo, Estágio 2, e Checklist manutenção). */
 export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
@@ -151,11 +151,13 @@ export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: strin
   { id: "vidro", label: "Vidro", hint: "Não precisa do checklist: pede Vidro e Aro e abre o serviço na aba Vidro; depois o aparelho volta para você." },
   { id: "revenda", label: "Revenda", hint: "Exige o motivo." },
   { id: "pt", label: "PT (perda total)", hint: "Exige o motivo e não precisa do checklist. Fica pendente até um administrador ou supervisor aprovar." },
+  { id: "bloqueado", label: "Bloqueado", hint: "Ativo travado (conta, MDM ou operadora). Exige o motivo e não precisa do checklist." },
 ];
 
 export interface FinishInput {
   results: Record<ChecklistPhase, Results>;
-  requests: readonly { status: RequestStatus; purpose: RequestPurpose; testDestiny: TestDestiny | null }[];
+  /** `glass`: pedido do vidro (Vidro e Aro), que não trava a finalização. */
+  requests: readonly { status: RequestStatus; purpose: RequestPurpose; testDestiny: TestDestiny | null; glass?: boolean }[];
   returnsWaiting: number;
   destination: FinishDestination;
   resaleReason: string;
@@ -181,13 +183,14 @@ export function finishBlockers(input: FinishInput): string[] {
     const confirmations = missingPhaseConfirmations(phase, input.results[phase]);
     if (confirmations.length) blockers.push(`${PHASE_LABELS[phase]}: confirme ${confirmations.map((item) => item.title).join(", ")}`);
   }
-  const open = input.requests.filter((r) => isOpenRequest(r.status)).length;
+  const open = input.requests.filter((r) => isOpenRequest(r.status) && !r.glass).length;
   if (open) blockers.push(`${open} solicitação(ões) de peça ainda em aberto: aguarde o estoque ou cancele`);
   const noDestiny = input.requests.filter((r) => r.purpose === "teste" && r.status === "entregue" && !r.testDestiny).length;
   if (noDestiny) blockers.push(`${noDestiny} peça(s) de teste entregue(s) sem destino: utilize ou devolva`);
   if (input.returnsWaiting) blockers.push(`${input.returnsWaiting} devolução(ões) aguardando o estoque confirmar o recebimento`);
   if (input.destination === "revenda" && input.resaleReason.trim().length < 5) blockers.push("Revenda exige o motivo");
   if (input.destination === "pt" && input.resaleReason.trim().length < 5) blockers.push("PT exige o motivo");
+  if (input.destination === "bloqueado" && input.resaleReason.trim().length < 5) blockers.push("Bloqueado exige o motivo");
   if (expectedOutcome(input.results, input.destination) === "analise" && (input.analysisNote ?? "").trim().length < ANALYSIS_NOTE_MIN) {
     blockers.push("Escreva o motivo do envio para a Análise técnica");
   }
@@ -198,7 +201,8 @@ export function finishBlockers(input: FinishInput): string[] {
 export function expectedOutcome(
   results: Record<ChecklistPhase, Results>,
   destination: FinishDestination,
-): "quarentena" | "analise" | "revenda" | "vidro" | "pt" {
+): "quarentena" | "analise" | "revenda" | "vidro" | "pt" | "bloqueado" {
+  if (destination === "bloqueado") return "bloqueado";
   if (destination === "pt") return "pt";
   if (destination === "revenda") return "revenda";
   if (destination === "vidro") return "vidro";
@@ -222,6 +226,7 @@ export const OUTCOME_LABELS = {
   analise: "Fila de Análise",
   revenda: "Revenda",
   pt: "PT (aprovação pendente)",
+  bloqueado: "Bloqueado",
 } as const;
 
 // Testes reprovados (o que a manutenção gravou na fila da Análise) ----------------------------------------------

@@ -49,7 +49,9 @@ export interface RepairStage {
   /** Só na avaliação técnica concluída: para onde o aparelho foi. */
   destination: Stage1Destination | null;
   /** Só na manutenção concluída: para onde o aparelho foi. */
-  outcome: "quarentena" | "analise" | "revenda" | "vidro" | "pt" | null;
+  outcome: "quarentena" | "analise" | "revenda" | "vidro" | "pt" | "bloqueado" | null;
+  /** Vidro e outra manutenção: Vidro e Aro já pedidos; ao finalizar, o aparelho vai para o vidro. */
+  needsGlass: boolean;
 }
 
 interface StageRow {
@@ -64,9 +66,10 @@ interface StageRow {
   finished_at: string | null;
   destination: RepairStage["destination"];
   outcome: RepairStage["outcome"];
+  needs_glass: boolean | null;
 }
 
-const STAGE_COLUMNS = "id, os_id, serial, stage, status, technician_id, round, started_at, finished_at, destination, outcome";
+const STAGE_COLUMNS = "id, os_id, serial, stage, status, technician_id, round, started_at, finished_at, destination, outcome, needs_glass";
 
 const toStage = (row: StageRow): RepairStage => ({
   id: row.id,
@@ -80,6 +83,7 @@ const toStage = (row: StageRow): RepairStage => ({
   finishedAt: row.finished_at,
   destination: row.destination,
   outcome: row.outcome,
+  needsGlass: Boolean(row.needs_glass),
 });
 
 /** A etapa de uma OS na rodada informada (ou na mais recente), ou null se ainda não foi iniciada. */
@@ -129,14 +133,20 @@ export async function fetchMyOpenStages(
 export const startLegacyMaintenance = (client: AppSupabaseClient, serial: string) =>
   call<string>(client, "start_legacy_maintenance", { p_serial: serial });
 
+/** Checklist manutenção começado por outro técnico: passa para quem bipou, em branco ("Fazer um novo?" → Sim). */
+export const takeLegacyChecklist = (client: AppSupabaseClient, serial: string) =>
+  call<string>(client, "take_legacy_checklist", { p_serial: serial });
+
 export interface LegacyChecklist {
   id: string;
   serial: string;
   status: RepairStageStatus;
-  outcome: "quarentena" | "analise" | "vidro" | "revenda" | "pt" | null;
+  outcome: "quarentena" | "analise" | "vidro" | "revenda" | "pt" | "bloqueado" | null;
   startedAt: string;
   finishedAt: string | null;
   osNumber: string;
+  needsGlass: boolean;
+  technicianId: string;
 }
 
 interface LegacyRow {
@@ -147,9 +157,11 @@ interface LegacyRow {
   started_at: string;
   finished_at: string | null;
   service_orders: { os_number: string } | null;
+  needs_glass: boolean | null;
+  technician_id: string;
 }
 
-const LEGACY_COLUMNS = "id, serial, status, outcome, started_at, finished_at, service_orders(os_number)";
+const LEGACY_COLUMNS = "id, serial, status, outcome, started_at, finished_at, needs_glass, technician_id, service_orders(os_number)";
 const toLegacy = (row: LegacyRow): LegacyChecklist => ({
   id: row.id,
   serial: row.serial,
@@ -158,6 +170,8 @@ const toLegacy = (row: LegacyRow): LegacyChecklist => ({
   startedAt: row.started_at,
   finishedAt: row.finished_at,
   osNumber: row.service_orders?.os_number ?? "—",
+  needsGlass: Boolean(row.needs_glass),
+  technicianId: row.technician_id,
 });
 
 /** O checklist mais recente do serial na aba Checklist manutenção (de qualquer técnico), ou null. */
@@ -203,12 +217,16 @@ export const finishDisassembly = (client: AppSupabaseClient, stageId: string) =>
  * Conclui a avaliação técnica e manda o aparelho para o destino escolhido. Devolve o id do Estágio 2 quando há
  * (manutenção ou aguardando peças); vidro e análise técnica encerram o Estágio 1 e devolvem null.
  */
-export const finishEvaluation = (client: AppSupabaseClient, stageId: string, destination: Stage1Destination, note = "") =>
+export const finishEvaluation = (client: AppSupabaseClient, stageId: string, destination: Stage1Destination, note = "", glass = false) =>
   call<string | null>(client, "finish_evaluation", {
     p_stage_id: stageId,
     p_destination: destination,
     p_note: destination === "analise" ? note.trim() : null,
+    p_glass: glass,
   });
+
+/** Manutenção em andamento: "vidro e outra manutenção" pede Vidro e Aro agora; ao finalizar, vai para o vidro. */
+export const requestGlassParts = (client: AppSupabaseClient, stageId: string) => call<null>(client, "request_glass_parts", { p_stage_id: stageId });
 
 // Cronômetro ------------------------------------------------------------------------------------------------
 
@@ -272,6 +290,8 @@ export interface StockRequest {
   createdAt: string;
   cancelReason: string | null;
   testDestiny: TestDestiny | null;
+  /** Peça do vidro (Vidro e Aro): do técnico de vidro; não trava a manutenção nem conta para quem finaliza. */
+  glass: boolean;
 }
 
 export interface RequestRow {
@@ -288,10 +308,11 @@ export interface RequestRow {
   created_at: string;
   cancel_reason: string | null;
   test_destiny: TestDestiny | null;
+  glass: boolean | null;
 }
 
 export const REQUEST_COLUMNS =
-  "id, part, purpose, qty, qty_delivered, status, origin_stage, replaces_request_id, replace_failure, replace_reason, created_at, cancel_reason, test_destiny";
+  "id, part, purpose, qty, qty_delivered, status, origin_stage, replaces_request_id, replace_failure, replace_reason, created_at, cancel_reason, test_destiny, glass";
 
 export const toRequest = (row: RequestRow): StockRequest => ({
   id: row.id,
@@ -307,6 +328,7 @@ export const toRequest = (row: RequestRow): StockRequest => ({
   createdAt: row.created_at,
   cancelReason: row.cancel_reason,
   testDestiny: row.test_destiny,
+  glass: Boolean(row.glass),
 });
 
 /** Todas as solicitações da OS (as de todas as fases), da mais antiga para a mais nova. */
@@ -344,23 +366,24 @@ export const finishMaintenance = (
     requiredOpen: string[];
     requiredClosed: string[];
     choice: string[];
-    destination: "auto" | "vidro" | "revenda" | "analise" | "pt";
+    destination: "auto" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado";
     resaleReason: string;
     /** Motivo do envio para a Análise técnica (obrigatório quando o aparelho vai para lá). */
     analysisNote?: string;
   },
 ) =>
-  call<"quarentena" | "analise" | "revenda" | "vidro" | "pt">(client, "finish_maintenance", {
+  call<"quarentena" | "analise" | "revenda" | "vidro" | "pt" | "bloqueado">(client, "finish_maintenance", {
     p_stage_id: input.stageId,
     p_required_open: input.requiredOpen,
     p_required_closed: input.requiredClosed,
     p_resale: input.destination === "revenda",
-    p_resale_reason: input.destination === "revenda" || input.destination === "pt" ? input.resaleReason.trim() : null,
+    p_resale_reason: ["revenda", "pt", "bloqueado"].includes(input.destination) ? input.resaleReason.trim() : null,
     p_choice: input.choice,
     p_glass: input.destination === "vidro",
     p_analysis: input.destination === "analise",
     p_analysis_note: input.analysisNote?.trim() || null,
     p_pt: input.destination === "pt",
+    p_blocked: input.destination === "bloqueado",
   });
 
 /** Manutenções que contam para quem finaliza a etapa (a placa que ele reparou e cada peça usada de vez). */

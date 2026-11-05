@@ -4,7 +4,16 @@ import { canManageUsers } from "../../domain/roles";
 import { useRepairTimer } from "../../hooks/useRepairTimer";
 import { describeRepairError, STATUS_LABELS } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import { completeGlass, fetchGlassJobs, finishGlass, glassTimerApi, startGlass, type GlassJob } from "../../services/supabase/glassService";
+import {
+  completeGlass,
+  countGlassDoneSince,
+  fetchGlassJobs,
+  finishGlass,
+  glassTimerApi,
+  partsAllocated,
+  startGlass,
+  type GlassJob,
+} from "../../services/supabase/glassService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
 import { RepairTimer } from "../RepairStage1/RepairTimer";
@@ -13,6 +22,15 @@ import styles from "./GlassPanel.module.css";
 
 const POLL_MS = 10_000;
 const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+/** Filtro pelos quadros do topo. */
+type Filter = "alocacao" | "processo" | null;
+
+const startOfToday = () => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
 
 const ORIGIN_LABELS = { avaliacao: "Estágio 1: só vidro", manutencao: "Estágio 2: manutenção", analise: "Análise técnica: reparo em placa" } as const;
 const STATE_LABELS = { aguardando: "Aguardando", em_andamento: "Em andamento", vidro_concluido: "Vidro concluído", concluido: "Entregue" } as const;
@@ -37,6 +55,8 @@ function Glass({ client, userId, isAdmin }: { client: AppSupabaseClient; userId:
   const [busy, setBusy] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
   const reload = useCallback(() => setReloads((n) => n + 1), []);
+  const [doneToday, setDoneToday] = useState<number | null>(null);
+  const [filter, setFilter] = useState<Filter>(null);
 
   useEffect(() => {
     let active = true;
@@ -48,13 +68,27 @@ function Glass({ client, userId, isAdmin }: { client: AppSupabaseClient; userId:
           setFailed(false);
         })
         .catch(() => active && setFailed(true));
+    const loadDone = () =>
+      countGlassDoneSince(client, startOfToday())
+        .then((n) => active && setDoneToday(n))
+        .catch(() => undefined);
     void load();
-    const poll = setInterval(() => void load(), POLL_MS);
+    void loadDone();
+    const poll = setInterval(() => {
+      void load();
+      void loadDone();
+    }, POLL_MS);
     return () => {
       active = false;
       clearInterval(poll);
     };
   }, [client, reloads]);
+
+  // Ainda não começados: sem a peça (aguardando alocação) ou com a peça na mão (em processo).
+  const notStarted = (jobs ?? []).filter((job) => job.status === "aguardando");
+  const waitingParts = notStarted.filter((job) => !partsAllocated(job));
+  const ready = notStarted.filter((job) => partsAllocated(job));
+  const visible = filter === "alocacao" ? waitingParts : filter === "processo" ? ready : jobs;
 
   const run = async (job: GlassJob, task: () => Promise<unknown>, done: string, fallback: string) => {
     setBusy(job.id);
@@ -86,11 +120,48 @@ function Glass({ client, userId, isAdmin }: { client: AppSupabaseClient; userId:
           Não foi possível carregar os serviços de vidro agora. Tentando de novo.
         </div>
       )}
+      <div className={styles.summary}>
+        <button
+          type="button"
+          className={[styles.stat, styles.statWait, filter === "alocacao" ? styles.statOn : ""].join(" ")}
+          aria-pressed={filter === "alocacao"}
+          onClick={() => setFilter(filter === "alocacao" ? null : "alocacao")}
+        >
+          <span className={styles.statValue}>{jobs ? waitingParts.length : "…"}</span>
+          <span className={styles.statLabel}>Aguardando alocação de peça</span>
+          <span className={styles.muted}>o estoque ainda não entregou o vidro ou o aro</span>
+        </button>
+        <button
+          type="button"
+          className={[styles.stat, styles.statReady, filter === "processo" ? styles.statOn : ""].join(" ")}
+          aria-pressed={filter === "processo"}
+          onClick={() => setFilter(filter === "processo" ? null : "processo")}
+        >
+          <span className={styles.statValue}>{jobs ? ready.length : "…"}</span>
+          <span className={styles.statLabel}>Em processo</span>
+          <span className={styles.muted}>peça já alocada, aguardando começar o vidro</span>
+        </button>
+        <div className={[styles.stat, styles.statDone].join(" ")}>
+          <span className={styles.statValue}>{doneToday ?? "…"}</span>
+          <span className={styles.statLabel}>Finalizados hoje</span>
+          <span className={styles.muted}>vidros concluídos no dia</span>
+        </div>
+      </div>
+      {filter && (
+        <p className={styles.muted}>
+          Mostrando só: {filter === "alocacao" ? "aguardando alocação de peça" : "em processo"}.{" "}
+          <button type="button" className={styles.linkButton} onClick={() => setFilter(null)}>
+            Ver todos
+          </button>
+        </p>
+      )}
+
       {jobs === null && !failed && <p className={styles.muted}>Carregando…</p>}
       {jobs?.length === 0 && <p className={styles.muted}>Nenhum aparelho esperando vidro.</p>}
+      {filter && jobs && jobs.length > 0 && visible?.length === 0 && <p className={styles.muted}>Nenhum aparelho nesta situação agora.</p>}
 
       <ul className={styles.list}>
-        {jobs?.map((job) => {
+        {visible?.map((job) => {
           const waitingGlass = job.parts.some((p) => p.part === "Vidro" && p.status !== "entregue");
           const loading = busy === job.id;
           const canAct = job.status === "aguardando" || job.startedById === userId || isAdmin;

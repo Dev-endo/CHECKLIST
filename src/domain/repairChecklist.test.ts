@@ -105,6 +105,15 @@ describe("finishBlockers", () => {
     expect(blockers.join("|")).toMatch(/2 devolução/);
   });
 
+  it("does not wait for the glass parts (Vidro e Aro are for the glass technician)", () => {
+    const glass = [
+      { status: "pendente" as const, purpose: "definitiva" as const, testDestiny: null, glass: true },
+      { status: "em_separacao" as const, purpose: "definitiva" as const, testDestiny: null, glass: true },
+    ];
+    expect(finishBlockers(ready({ requests: glass }))).toEqual([]);
+    expect(finishBlockers(ready({ destination: "vidro", results: { aberto: {}, fechado: {} }, requests: glass }))).toEqual([]);
+  });
+
   it("requires a reason for resale", () => {
     expect(finishBlockers(ready({ destination: "revenda", resaleReason: "x" }))).toEqual(["Revenda exige o motivo"]);
     expect(finishBlockers(ready({ destination: "revenda", resaleReason: "cliente pediu" }))).toEqual([]);
@@ -180,6 +189,12 @@ describe("PT e vidro", () => {
     expect(finishBlockers({ ...blank(), destination: "vidro" })).toEqual([]);
     expect(finishBlockers({ ...blank(), destination: "pt", resaleReason: "Placa queimada" })).toEqual([]);
     expect(finishBlockers({ ...blank(), destination: "auto" }).length).toBeGreaterThan(0);
+  });
+
+  it("Bloqueado: reason required, no checklist", () => {
+    expect(finishBlockers({ ...blank(), destination: "bloqueado" })).toEqual(["Bloqueado exige o motivo"]);
+    expect(finishBlockers({ ...blank(), destination: "bloqueado", resaleReason: "Conta iCloud" })).toEqual([]);
+    expect(expectedOutcome(blank().results, "bloqueado")).toBe("bloqueado");
   });
 
   it("requires the reason for PT and sends it to approval", () => {

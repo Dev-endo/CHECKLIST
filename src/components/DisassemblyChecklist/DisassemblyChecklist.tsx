@@ -58,6 +58,8 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
 
   const [concluding, setConcluding] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // OS atual do serial (obrigatória para concluir). undefined: ainda carregando.
+  const [currentOs, setCurrentOs] = useState<string | null | undefined>(undefined);
   // missing: o serial não está na planilha de ativos (segue permitido, só avisa).
   const [assetState, setAssetState] = useState<"idle" | "found" | "missing">("idle");
 
@@ -136,6 +138,10 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
       toast("Retome ou reinicie o checklist pendente deste serial");
       return;
     }
+    if (client && !currentOs) {
+      toast(currentOs === undefined ? "Aguarde: conferindo a OS do ativo" : "Registre a OS do ativo para concluir");
+      return;
+    }
     const unconfirmed = missingConfirmations(draft.r, kind);
     if (unconfirmed.length) {
       toast(`Confirme para concluir: ${unconfirmed.map((item) => item.title).join(", ")}`);
@@ -197,7 +203,7 @@ export function DisassemblyChecklist({ kind }: DisassemblyChecklistProps) {
           disabled={!editable}
           lockedFields={[...(user ? ["tec" as const] : []), ...(draft.ativo ? ["modelo" as const] : [])]}
           unitId={draft.ativo ? splitAssetId(draft.ativo).code || draft.ativo : undefined}
-          extra={client && <OsField client={client} serial={draft.serial} disabled={!editable} />}
+          extra={client && <OsField client={client} serial={draft.serial} disabled={!editable} required onCurrent={setCurrentOs} />}
         />
         {editable && client && assetState === "missing" && (
           <p className={appStyles.hint}>Serial não encontrado na lista de ativos. Preencha o modelo manualmente.</p>
