@@ -83,7 +83,7 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
     return () => {
       active = false;
     };
-  }, [client, userId, mineReloads]);
+  }, [client, userId, mineReloads, jobs?.length]);
 
   const { disassembly, maintenance } = stages;
   const job = jobs?.find((item) => item.serial.trim().toLowerCase() === serial.toLowerCase()) ?? null;
@@ -136,7 +136,8 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
   };
 
   // Manutenção do próprio técnico: checklist aberto, montagem e checklist fechado (tela do Estágio 2).
-  if (serial && order && maintenance && maintenanceMine) {
+  // Com um serviço de vidro ainda aberto, aparece o cartão do vidro (a manutenção anterior só fica finalizada).
+  if (serial && order && maintenance && maintenanceMine && (!job || maintenance.status !== "concluida")) {
     return (
       <section className={styles.direct} aria-label="Checklist e montagem do vidro">
         <h2 className={stage1Styles.heading}>Vidro · checklist e montagem</h2>
@@ -201,18 +202,20 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
           {!hasProcess && <OsField client={client} serial={serial} onRegistered={reloadAll} />}
           {!order && <p className={stage1Styles.hint}>Registre a OS para continuar.</p>}
 
-          {order && maintenance && !maintenanceMine && (
+          {order && maintenance && !maintenanceMine && !job && (
             <p className={stage1Styles.hint} role="status">
               Este aparelho está na manutenção com <strong>{ownerName ?? "outro técnico"}</strong>
               {maintenance.status === "concluida" ? " (já finalizada)" : ""}.
             </p>
           )}
 
-          {order && !maintenance && job && (
+          {order && job && (
             <>
               {renderJob(job)}
               <p className={stage1Styles.hint}>
-                Conclua o vidro e siga para o checklist: ele abre aqui mesmo, com o checklist aberto, a montagem e o checklist fechado.
+                {job.origin === "vidro"
+                  ? "Conclua o vidro e siga para o checklist: ele abre aqui mesmo, com o checklist aberto, a montagem e o checklist fechado."
+                  : "Conclua o vidro. Depois, “Fazer o checklist aqui” traz o checklist aberto (se não foi feito), a montagem e o checklist fechado; ou entregue ao responsável."}
               </p>
             </>
           )}

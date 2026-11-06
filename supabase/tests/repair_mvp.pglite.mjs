@@ -1,4 +1,4 @@
-// Testa as migrations 44-90 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-91 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-90 aplicadas (2x)");
+console.log("migrations 44-91 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -1474,6 +1474,36 @@ ok("aparelho que já está no Reparo não entra no fluxo do vidro", r.err === "o
 await as("vid", `select public.start_glass_flow('GV3', false)`);
 r = await as("vid", `select public.start_glass_flow('GV3', false)`);
 ok("serviço de vidro aberto não duplica", r.err === "glass_open", JSON.stringify(r));
+
+// ---- Vidro: aparelho que veio do Reparo fica com o técnico de vidro (checklist fechado no vidro) (migration 91)
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('GK1','OS-GK1','${U.tec}')`);
+const sk1 = await one("tec", `select public.start_disassembly('GK1')`);
+const ek1 = await one("tec", `select public.finish_disassembly('${sk1}')`);
+const mk1 = await one("tec", `select public.finish_evaluation('${ek1}')`);
+await as("tec", `select public.save_repair_checklist('${mk1}', 'aberto', '{"t1":"ok"}'::jsonb)`);
+r = await as("tec", `select public.finish_maintenance('${mk1}', array['t1'], array['t3'], false, null, '{}', true, p_analysis_note => 'Motivo de teste')`);
+ok("GK1 vai para o vidro depois da manutenção", r.rows?.[0] && Object.values(r.rows[0])[0] === "vidro", JSON.stringify(r));
+const jk1 = (await db.query(`select id from public.repair_glass_jobs where serial='GK1'`)).rows[0].id;
+await as("vid", `select public.start_glass('${jk1}')`);
+const gk1 = (await db.query(`select id from public.stock_requests where serial='GK1'`)).rows;
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'gk1')`, [JSON.stringify(gk1.map((x) => ({ id: x.id })))]);
+await as("vid", `select public.complete_glass('${jk1}')`);
+r = await as("tec", `select public.finish_glass_keep('${jk1}')`);
+ok("só vidro/admin assume o checklist depois do vidro", r.err?.includes("sem permissão"), JSON.stringify(r));
+r = await as("vid", `select public.finish_glass_keep('${jk1}')`);
+ok("técnico de vidro assume o checklist", !r.err, JSON.stringify(r));
+q = (await db.query(`select status, outcome, technician_id, handover_note from public.repair_stages where id='${mk1}'`)).rows[0];
+ok("a manutenção reabre com o técnico de vidro", q.status === "em_andamento" && q.outcome === null && q.technician_id === U.vid && q.handover_note === null, JSON.stringify(q));
+q = (await db.query(`select results from public.repair_checklist_results where stage_id='${mk1}' and phase='aberto'`)).rows[0];
+ok("as marcações do checklist aberto ficam", q && q.results?.t1 === "ok", JSON.stringify(q));
+r = await as("vid", `select public.save_repair_checklist('${mk1}', 'fechado', '{"t1":"ok"}'::jsonb)`);
+ok("o técnico de vidro faz o checklist fechado", !r.err, JSON.stringify(r));
+r = await as("tec", `select public.save_repair_checklist('${mk1}', 'fechado', '{"t1":"ok"}'::jsonb)`);
+ok("quem desmontou não mexe mais depois que o vidro assumiu", r.err?.includes("sem permissão"), JSON.stringify(r));
+r = await as("vid", `select public.hand_over_maintenance('${mk1}', '${U.tec}', 'Falhou o teste de tela')`);
+ok("do vidro, dá para voltar para a manutenção escolhendo o técnico", !r.err, JSON.stringify(r));
+q = (await db.query(`select technician_id from public.repair_stages where id='${mk1}'`)).rows[0];
+ok("o técnico escolhido recebe a manutenção", q.technician_id === U.tec, JSON.stringify(q));
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);

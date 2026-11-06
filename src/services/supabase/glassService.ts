@@ -103,6 +103,12 @@ export const completeGlass = (client: AppSupabaseClient, jobId: string) => call<
 export const finishGlass = (client: AppSupabaseClient, jobId: string, display = false) =>
   call<string>(client, "finish_glass", { p_job_id: jobId, p_display: display });
 
+/**
+ * Depois do vidro, o aparelho fica com o técnico de vidro: checklist aberto (se faltar), montagem e checklist fechado,
+ * com todos os destinos (inclusive Manutenção, escolhendo o técnico). Exige a migration 91.
+ */
+export const finishGlassKeep = (client: AppSupabaseClient, jobId: string) => call<string>(client, "finish_glass_keep", { p_job_id: jobId });
+
 /** Cronômetro do vidro: liga ao começar, pausa e retoma, para ao concluir. */
 export const glassTimerApi: TimerApi = {
   fetch: async (client, id) => toTimerTotals(await call(client, "glass_timer_totals", { p_job_id: id })),

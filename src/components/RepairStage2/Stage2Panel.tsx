@@ -4,6 +4,7 @@ import {
   choiceTests,
   expectedOutcome,
   finishBlockers,
+  pendingTests,
   GLASS_FINISH_DESTINATIONS,
   skippedPhases,
   OUTCOME_LABELS,
@@ -211,7 +212,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
   const running = maintenance?.status === "em_andamento";
   const finished = maintenance?.status === "concluida";
   // Vidro e outra manutenção (marcado no Estágio 1): Vidro e Aro já pedidos; o destino Vidro já vem escolhido.
-  const needsGlass = Boolean(running && maintenance?.needsGlass);
+  const needsGlass = Boolean(running && maintenance?.needsGlass && !glass);
   useEffect(() => {
     if (needsGlass) setDestination("vidro");
   }, [maintenanceId, needsGlass]);
@@ -389,6 +390,13 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 <p className={stage1Styles.hint} role="status">
                   Aguardando peças: este aparelho abre sozinho para manutenção quando o estoque resolver todos os pedidos de peça da OS. Dá para
                   cancelar um pedido que não precisa mais.
+                </p>
+              )}
+
+              {glass && running && checklists.loaded && pendingTests("aberto", checklists.phases.aberto.results).length > 0 && (
+                <p className={styles.glassNotice} role="status">
+                  <strong>O checklist aberto não foi feito (ou está incompleto).</strong> Faça-o completo aqui, depois a montagem e o checklist
+                  fechado.
                 </p>
               )}
 

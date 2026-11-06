@@ -9,6 +9,7 @@ import {
   countGlassDoneSince,
   fetchGlassJobs,
   finishGlass,
+  finishGlassKeep,
   glassTimerApi,
   partsAllocated,
   startGlass,
@@ -171,6 +172,22 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
               >
                 {direct ? "Seguir para o checklist" : "Entregar ao responsável"}
               </Button>
+              {!direct && (
+                <Button
+                  variant="ghost"
+                  disabled={loading}
+                  onClick={() =>
+                    void run(
+                      job,
+                      () => finishGlassKeep(client, job.id),
+                      "Siga para o checklist: bipe o serial em “Receber aparelho no vidro”",
+                      "Não foi possível seguir para o checklist.",
+                    )
+                  }
+                >
+                  Fazer o checklist aqui
+                </Button>
+              )}
               <Button
                 variant="danger"
                 disabled={loading}
