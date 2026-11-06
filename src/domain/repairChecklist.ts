@@ -136,10 +136,11 @@ export function pendingTests(phase: ChecklistPhase, results: Results): string[] 
  * reprovado), vidro (sem exigir o checklist), revenda (com motivo) ou PT, perda total (com motivo; espera a
  * aprovação de um administrador ou supervisor).
  */
-export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado";
+export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado" | "manutencao";
 
 /** Destinos que não exigem o checklist: o aparelho vai para o vidro (e volta) ou espera a aprovação do PT. */
-export const skipsChecklist = (destination: FinishDestination) => destination === "vidro" || destination === "pt" || destination === "bloqueado";
+export const skipsChecklist = (destination: FinishDestination) =>
+  destination === "vidro" || destination === "pt" || destination === "bloqueado" || destination === "manutencao";
 
 /**
  * Fases do checklist que não precisam ser feitas para o destino. Na Análise técnica não precisa dos testes com o
@@ -149,7 +150,8 @@ export const skippedPhases = (destination: FinishDestination): readonly Checklis
   skipsChecklist(destination) ? PHASES : destination === "analise" ? ["fechado"] : [];
 
 /** Destinos que exigem um motivo escrito (o mesmo campo). */
-export const needsReason = (destination: FinishDestination) => destination === "revenda" || destination === "pt" || destination === "bloqueado";
+export const needsReason = (destination: FinishDestination) =>
+  destination === "revenda" || destination === "pt" || destination === "bloqueado" || destination === "manutencao";
 
 /** Opções de destino ao finalizar (Reparo, Estágio 2, e Checklist manutenção). */
 export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
@@ -159,6 +161,15 @@ export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: strin
   { id: "revenda", label: "Revenda", hint: "Exige o motivo." },
   { id: "pt", label: "PT (perda total)", hint: "Exige o motivo e não precisa do checklist. Fica pendente até um administrador ou supervisor aprovar." },
   { id: "bloqueado", label: "Bloqueado", hint: "Ativo travado (conta, MDM ou operadora). Exige o motivo e não precisa do checklist." },
+];
+
+/**
+ * Aba Vidro: os mesmos destinos do Reparo mais "Manutenção", em que o técnico de vidro escolhe para qual técnico
+ * de manutenção o aparelho vai (com o motivo).
+ */
+export const GLASS_FINISH_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
+  ...FINISH_DESTINATIONS,
+  { id: "manutencao", label: "Manutenção", hint: "Direciona o aparelho para um técnico de manutenção que você escolhe. Exige o motivo e não precisa do checklist." },
 ];
 
 export interface FinishInput {
@@ -172,6 +183,8 @@ export interface FinishInput {
   skipPhases?: readonly ChecklistPhase[];
   /** Motivo do envio para a Análise técnica: obrigatório quando o aparelho vai para lá. */
   analysisNote?: string;
+  /** Destino Manutenção: o técnico escolhido (obrigatório nesse destino). */
+  technicianId?: string;
 }
 
 /** Tamanho mínimo da justificativa de envio para a Análise técnica (o banco confere o mesmo). */
@@ -198,6 +211,8 @@ export function finishBlockers(input: FinishInput): string[] {
   if (input.destination === "revenda" && input.resaleReason.trim().length < 5) blockers.push("Revenda exige o motivo");
   if (input.destination === "pt" && input.resaleReason.trim().length < 5) blockers.push("PT exige o motivo");
   if (input.destination === "bloqueado" && input.resaleReason.trim().length < 5) blockers.push("Bloqueado exige o motivo");
+  if (input.destination === "manutencao" && !input.technicianId) blockers.push("Escolha o técnico de manutenção");
+  if (input.destination === "manutencao" && input.resaleReason.trim().length < 5) blockers.push("Manutenção exige o motivo");
   if (expectedOutcome(input.results, input.destination) === "analise" && (input.analysisNote ?? "").trim().length < ANALYSIS_NOTE_MIN) {
     blockers.push("Escreva o motivo do envio para a Análise técnica");
   }
@@ -208,7 +223,8 @@ export function finishBlockers(input: FinishInput): string[] {
 export function expectedOutcome(
   results: Record<ChecklistPhase, Results>,
   destination: FinishDestination,
-): "quarentena" | "analise" | "revenda" | "vidro" | "pt" | "bloqueado" {
+): "quarentena" | "analise" | "revenda" | "vidro" | "pt" | "bloqueado" | "manutencao" {
+  if (destination === "manutencao") return "manutencao";
   if (destination === "bloqueado") return "bloqueado";
   if (destination === "pt") return "pt";
   if (destination === "revenda") return "revenda";
@@ -234,6 +250,7 @@ export const OUTCOME_LABELS = {
   revenda: "Revenda",
   pt: "PT (aprovação pendente)",
   bloqueado: "Bloqueado",
+  manutencao: "Manutenção (outro técnico)",
 } as const;
 
 // Testes reprovados (o que a manutenção gravou na fila da Análise) ----------------------------------------------

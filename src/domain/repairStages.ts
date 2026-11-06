@@ -77,6 +77,10 @@ export function describeRepairError(error: { code?: string; message?: string } |
   if (text.includes("blocked_reason_required")) return "Bloqueado exige o motivo (pelo menos 5 letras).";
   if (text.includes("goal_note_required")) return "Escreva a justificativa da meta (pelo menos 5 letras).";
   if (text.includes("replace_failure_required")) return "Escolha o tipo de falha: Falha técnica ou Falha de teste.";
+  if (text.includes("os_in_use")) return "Este aparelho já tem etapas nesta OS. Se ele voltou ao laboratório, registre uma OS nova; se está no Reparo, siga por lá.";
+  if (text.includes("glass_open")) return "Este aparelho já tem um serviço de vidro aberto.";
+  if (text.includes("handover_note_required")) return "Escreva o motivo de direcionar o aparelho para a manutenção (pelo menos 5 letras).";
+  if (text.includes("handover_target_invalid")) return "Escolha um técnico de manutenção (outra pessoa, não você).";
   if (text.includes("return_reason_required")) return "Explique por que está devolvendo a peça (pelo menos 5 letras).";
   if (text.includes("replace_reason_required")) return "Explique por que está substituindo a peça.";
   if (error?.code === "42501" || text.includes("sem permissão")) return "Seu perfil não pode fazer isso.";

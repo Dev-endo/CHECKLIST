@@ -50,6 +50,7 @@ const DESTINATION_LABELS = {
   revenda: "Revenda",
   pt: "PT (aprovação pendente)",
   bloqueado: "Bloqueado",
+  manutencao: "Manutenção (outro técnico)",
 } as const;
 
 const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -282,7 +283,8 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   };
 
   const finish = async () => {
-    if (!stageId || busy) return;
+    // O destino Manutenção (outro técnico) é só da aba Vidro; aqui nunca é oferecido.
+    if (!stageId || busy || finalDestination === "manutencao") return;
     if (!window.confirm(`Finalizar o checklist de ${serial}? O aparelho vai para: ${DESTINATION_LABELS[outcome]}. Depois disso não dá para alterar.`)) return;
     setBusy(true);
     try {

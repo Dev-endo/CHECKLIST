@@ -16,6 +16,7 @@ import {
 } from "../../services/supabase/glassService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
+import { GlassDirect } from "./GlassDirect";
 import { RepairTimer } from "../RepairStage1/RepairTimer";
 import { useToast } from "../Toast/ToastProvider";
 import styles from "./GlassPanel.module.css";
@@ -32,7 +33,12 @@ const startOfToday = () => {
   return date;
 };
 
-const ORIGIN_LABELS = { avaliacao: "Estágio 1: só vidro", manutencao: "Estágio 2: manutenção", analise: "Análise técnica: reparo em placa" } as const;
+const ORIGIN_LABELS = {
+  avaliacao: "Estágio 1: só vidro",
+  manutencao: "Estágio 2: manutenção",
+  analise: "Análise técnica: reparo em placa",
+  vidro: "Direto no vidro",
+} as const;
 const STATE_LABELS = { aguardando: "Aguardando", em_andamento: "Em andamento", vidro_concluido: "Vidro concluído", concluido: "Entregue" } as const;
 
 /** Cronômetro do vidro em andamento. */
@@ -45,10 +51,10 @@ function GlassTimer({ client, id, canAct, onError }: { client: AppSupabaseClient
 export function GlassPanel() {
   const { user, client } = useAuth();
   if (!client || !user) return <p className={appStyles.banner}>Entre com a sua conta para usar o Vidro.</p>;
-  return <Glass client={client} userId={user.id} isAdmin={canManageUsers(user.roles)} />;
+  return <Glass client={client} userId={user.id} isAdmin={canManageUsers(user.roles)} technician={user.name || user.email} />;
 }
 
-function Glass({ client, userId, isAdmin }: { client: AppSupabaseClient; userId: string; isAdmin: boolean }) {
+function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseClient; userId: string; isAdmin: boolean; technician: string }) {
   const toast = useToast();
   const [jobs, setJobs] = useState<GlassJob[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -108,12 +114,92 @@ function Glass({ client, userId, isAdmin }: { client: AppSupabaseClient; userId:
     }
   };
 
+  // O cartão do serviço de vidro (a lista e o fluxo "receber aparelho" usam o mesmo).
+  const renderJob = (job: GlassJob) => {
+    const waitingGlass = job.parts.some((p) => p.part === "Vidro" && p.status !== "entregue");
+    const loading = busy === job.id;
+    const canAct = job.status === "aguardando" || job.startedById === userId || isAdmin;
+    const direct = job.origin === "vidro";
+    return (
+      <div className={[styles.card, styles[`s_${job.status}`]].join(" ")}>
+        <div className={styles.head}>
+          <strong className={styles.serial}>{job.serial}</strong>
+          <span>{job.model ?? "Modelo não encontrado"}</span>
+          {job.unit && <span className={styles.muted}>{job.unit}</span>}
+          <span className={styles.os}>OS {job.osNumber}</span>
+          <span className={styles.state}>{STATE_LABELS[job.status]}</span>
+        </div>
+        <p className={styles.who}>
+          {direct ? "Recebido direto no vidro por" : "Desmontado por"} <strong>{job.responsible}</strong> · {ORIGIN_LABELS[job.origin]} · pedido em {when(job.createdAt)}
+        </p>
+        <ul className={styles.parts}>
+          {job.parts.map((p) => (
+            <li key={p.part} className={[styles.part, styles[`p_${p.status}`]].join(" ")}>
+              {p.part}: {p.status === "cancelada" && p.part === "Aro" ? "dispensado" : STATUS_LABELS[p.status]}
+            </li>
+          ))}
+        </ul>
+        {job.status === "em_andamento" && (
+          <GlassTimer client={client} id={job.id} canAct={canAct} onError={(error) => toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível atualizar o cronômetro."))} />
+        )}
+        <div className={styles.actions}>
+          {job.status === "aguardando" && (
+            <Button disabled={loading} onClick={() => void run(job, () => startGlass(client, job.id), "Vidro iniciado", "Não foi possível iniciar o vidro.")}>
+              Começar vidro
+            </Button>
+          )}
+          {job.status === "em_andamento" && (
+            <Button
+              disabled={loading || waitingGlass || !canAct}
+              onClick={() => void run(job, () => completeGlass(client, job.id), "Vidro concluído", "Não foi possível concluir o vidro.")}
+            >
+              Concluir vidro
+            </Button>
+          )}
+          {job.status === "vidro_concluido" && (
+            <>
+              <Button
+                disabled={loading}
+                onClick={() =>
+                  void run(
+                    job,
+                    () => finishGlass(client, job.id),
+                    direct ? "Vidro entregue: siga para o checklist aberto" : `Entregue a ${job.responsible}`,
+                    direct ? "Não foi possível seguir para o checklist." : "Não foi possível entregar o aparelho.",
+                  )
+                }
+              >
+                {direct ? "Seguir para o checklist" : "Entregar ao responsável"}
+              </Button>
+              <Button
+                variant="danger"
+                disabled={loading}
+                onClick={() => {
+                  if (!window.confirm(`O display morreu no processo? Um display será pedido ao estoque e o aparelho volta para ${job.responsible}.`)) return;
+                  void run(job, () => finishGlass(client, job.id, true), `Display pedido ao estoque; aparelho devolvido a ${job.responsible}`, "Não foi possível pedir o display.");
+                }}
+              >
+                Solicitar display
+              </Button>
+            </>
+          )}
+          {job.status === "em_andamento" && !canAct && <span className={styles.muted}>Só quem começou o vidro (ou o admin) conclui.</span>}
+          {waitingGlass && <span className={styles.muted}>Aguardando o estoque entregar o vidro.</span>}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <header>
         <h1 className={appStyles.title}>Vidro</h1>
-        <p className={appStyles.subtitle}>Aparelhos enviados para vidro. Ao terminar, entregue ao responsável: o aparelho volta para ele.</p>
+        <p className={appStyles.subtitle}>
+          Bipe o serial para receber um aparelho direto no vidro, ou atenda os enviados pelo Reparo. Ao terminar um enviado, entregue ao responsável: o aparelho volta para ele.
+        </p>
       </header>
+
+      <GlassDirect client={client} userId={userId} isAdmin={isAdmin} technician={technician} jobs={jobs} renderJob={renderJob} reloadJobs={reload} />
 
       {failed && (
         <div className={appStyles.banner} role="alert">
@@ -161,74 +247,9 @@ function Glass({ client, userId, isAdmin }: { client: AppSupabaseClient; userId:
       {filter && jobs && jobs.length > 0 && visible?.length === 0 && <p className={styles.muted}>Nenhum aparelho nesta situação agora.</p>}
 
       <ul className={styles.list}>
-        {visible?.map((job) => {
-          const waitingGlass = job.parts.some((p) => p.part === "Vidro" && p.status !== "entregue");
-          const loading = busy === job.id;
-          const canAct = job.status === "aguardando" || job.startedById === userId || isAdmin;
-          return (
-            <li key={job.id} className={[styles.card, styles[`s_${job.status}`]].join(" ")}>
-              <div className={styles.head}>
-                <strong className={styles.serial}>{job.serial}</strong>
-                <span>{job.model ?? "Modelo não encontrado"}</span>
-                {job.unit && <span className={styles.muted}>{job.unit}</span>}
-                <span className={styles.os}>OS {job.osNumber}</span>
-                <span className={styles.state}>{STATE_LABELS[job.status]}</span>
-              </div>
-              <p className={styles.who}>
-                Desmontado por <strong>{job.responsible}</strong> · {ORIGIN_LABELS[job.origin]} · pedido em {when(job.createdAt)}
-              </p>
-              <ul className={styles.parts}>
-                {job.parts.map((p) => (
-                  <li key={p.part} className={[styles.part, styles[`p_${p.status}`]].join(" ")}>
-                    {p.part}: {p.status === "cancelada" && p.part === "Aro" ? "dispensado" : STATUS_LABELS[p.status]}
-                  </li>
-                ))}
-              </ul>
-              {job.status === "em_andamento" && (
-                <GlassTimer client={client} id={job.id} canAct={canAct} onError={(error) => toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível atualizar o cronômetro."))} />
-              )}
-              <div className={styles.actions}>
-                {job.status === "aguardando" && (
-                  <Button disabled={loading} onClick={() => void run(job, () => startGlass(client, job.id), "Vidro iniciado", "Não foi possível iniciar o vidro.")}>
-                    Começar vidro
-                  </Button>
-                )}
-                {job.status === "em_andamento" && (
-                  <Button
-                    disabled={loading || waitingGlass || !canAct}
-                    onClick={() => void run(job, () => completeGlass(client, job.id), "Vidro concluído", "Não foi possível concluir o vidro.")}
-                  >
-                    Concluir vidro
-                  </Button>
-                )}
-                {job.status === "vidro_concluido" && (
-                  <>
-                    <Button
-                      disabled={loading}
-                      onClick={() =>
-                        void run(job, () => finishGlass(client, job.id), `Entregue a ${job.responsible}`, "Não foi possível entregar o aparelho.")
-                      }
-                    >
-                      Entregar ao responsável
-                    </Button>
-                    <Button
-                      variant="danger"
-                      disabled={loading}
-                      onClick={() => {
-                        if (!window.confirm(`O display morreu no processo? Um display será pedido ao estoque e o aparelho volta para ${job.responsible}.`)) return;
-                        void run(job, () => finishGlass(client, job.id, true), `Display pedido ao estoque; aparelho devolvido a ${job.responsible}`, "Não foi possível pedir o display.");
-                      }}
-                    >
-                      Solicitar display
-                    </Button>
-                  </>
-                )}
-                {job.status === "em_andamento" && !canAct && <span className={styles.muted}>Só quem começou o vidro (ou o admin) conclui.</span>}
-                {waitingGlass && <span className={styles.muted}>Aguardando o estoque entregar o vidro.</span>}
-              </div>
-            </li>
-          );
-        })}
+        {visible?.map((job) => (
+          <li key={job.id}>{renderJob(job)}</li>
+        ))}
       </ul>
     </>
   );

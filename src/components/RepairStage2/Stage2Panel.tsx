@@ -4,6 +4,7 @@ import {
   choiceTests,
   expectedOutcome,
   finishBlockers,
+  GLASS_FINISH_DESTINATIONS,
   skippedPhases,
   OUTCOME_LABELS,
   PHASE_KIND,
@@ -21,10 +22,15 @@ import { useRepairTimer } from "../../hooks/useRepairTimer";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
   assemblyTimerApi,
+  fetchHandover,
   fetchMaintenanceItems,
   fetchMyOpenStages,
   finishMaintenance,
+  handOverMaintenance,
+  listMaintenanceTechnicians,
   maintenanceTimerApi,
+  type Handover,
+  type MaintenanceTechnician,
   type OpenStage,
 } from "../../services/supabase/repairService";
 import { assetsBySerial } from "../../services/supabase/stockBoardService";
@@ -70,9 +76,14 @@ interface Stage2PanelProps {
   legacy?: boolean;
   /** Sem o título da tela (quem usa já mostra o seu). */
   hideHeader?: boolean;
+  /**
+   * Aba Vidro: depois do vidro, só checklist aberto, montagem e checklist fechado (sem cronômetro de manutenção nem
+   * pedido de peça). Finaliza com todos os destinos do Reparo mais Manutenção (escolhe o técnico).
+   */
+  glass?: boolean;
 }
 
-export function Stage2Panel({ title, subtitle, assemblyOnly = false, initialSerial, onBack, legacy = false, hideHeader = false }: Stage2PanelProps = {}) {
+export function Stage2Panel({ title, subtitle, assemblyOnly = false, initialSerial, onBack, legacy = false, hideHeader = false, glass = false }: Stage2PanelProps = {}) {
   const { user, client } = useAuth();
   if (!client || !user) {
     return <p className={appStyles.banner}>Entre com a sua conta para usar o Reparo.</p>;
@@ -89,6 +100,7 @@ export function Stage2Panel({ title, subtitle, assemblyOnly = false, initialSeri
       onBack={onBack}
       legacy={legacy}
       hideHeader={hideHeader}
+      glass={glass}
     />
   );
 }
@@ -104,9 +116,10 @@ interface Stage2Props {
   onBack?: () => void;
   legacy: boolean;
   hideHeader: boolean;
+  glass: boolean;
 }
 
-function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, initialSerial, onBack, legacy, hideHeader }: Stage2Props) {
+function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, initialSerial, onBack, legacy, hideHeader, glass }: Stage2Props) {
   const toast = useToast();
   // Aparelho escolhido na lista (sem bipar): o que já passou pelo Estágio 1 e espera a manutenção.
   const [serial, setSerial] = useState(initialSerial ?? "");
@@ -116,6 +129,11 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
   const [destination, setDestination] = useState<FinishDestination>("auto");
   const [resaleReason, setResaleReason] = useState("");
   const [analysisNote, setAnalysisNote] = useState("");
+  // Destino Manutenção (aba Vidro): o técnico que recebe o aparelho.
+  const [technicianId, setTechnicianId] = useState("");
+  const [technicians, setTechnicians] = useState<MaintenanceTechnician[]>([]);
+  // Manutenção que outro técnico direcionou para você (aviso com o motivo).
+  const [handover, setHandover] = useState<Handover | null>(null);
 
   const { asset, order, stages, requests, returns, reload: reloadDevice } = useRepairDevice(client, serial, () =>
     toast("Não foi possível carregar o aparelho. Tente de novo."),
@@ -171,6 +189,25 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
       active = false;
     };
   }, [client, maintenanceId, partsKey]);
+  useEffect(() => {
+    if (!glass) return;
+    let active = true;
+    listMaintenanceTechnicians(client)
+      .then((found) => active && setTechnicians(found))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, glass]);
+  useEffect(() => {
+    setHandover(null);
+    if (!maintenanceId) return;
+    let active = true;
+    fetchHandover(client, maintenanceId).then((found) => active && setHandover(found));
+    return () => {
+      active = false;
+    };
+  }, [client, maintenanceId, maintenance?.technicianId]);
   const running = maintenance?.status === "em_andamento";
   const finished = maintenance?.status === "concluida";
   // Vidro e outra manutenção (marcado no Estágio 1): Vidro e Aro já pedidos; o destino Vidro já vem escolhido.
@@ -201,6 +238,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
     destination,
     resaleReason,
     analysisNote,
+    technicianId,
   });
   const outcome = expectedOutcome(checklists.results, destination);
 
@@ -211,6 +249,17 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
     setBusy(true);
     try {
       await checklists.flush();
+      if (destination === "manutencao") {
+        // Direcionar: a etapa passa para o técnico escolhido (ele segue de onde parou).
+        await handOverMaintenance(client, maintenance.id, technicianId, resaleReason);
+        const who = technicians.find((item) => item.id === technicianId)?.name ?? "o técnico";
+        setResaleReason("");
+        setTechnicianId("");
+        setDestination("auto");
+        toast(`Aparelho direcionado para ${who}`);
+        reload();
+        return;
+      }
       const result = await finishMaintenance(client, {
         stageId: maintenance.id,
         requiredOpen: requiredTests("aberto"),
@@ -343,14 +392,20 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 </p>
               )}
 
-              {!assemblyOnly && !legacy && (
+              {handover && (
+                <p className={styles.glassNotice} role="status">
+                  <strong>Direcionado por {handover.from}.</strong> {handover.note}
+                </p>
+              )}
+
+              {!assemblyOnly && !legacy && !glass && (
                 <>
                   <h2 className={stage1Styles.heading}>Histórico da desmontagem</h2>
                   <StageHistory client={client} disassembly={disassembly} evaluation={evaluation} />
                 </>
               )}
 
-              {!legacy && (
+              {!legacy && !glass && (
                 <>
               <h2 className={stage1Styles.heading}>{assemblyOnly ? "Troca de peça" : "Manutenção"}</h2>
               <RepairTimer
@@ -367,6 +422,13 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
               <h2 className={stage1Styles.heading}>Solicitações de peça da OS {order.osNumber}</h2>
               <RequestList client={client} requests={requests} returns={returns} disabled={busy} onChanged={afterRequestChange} />
 
+                </>
+              )}
+
+              {glass && (
+                <>
+                  <h2 className={stage1Styles.heading}>Solicitações de peça da OS {order.osNumber}</h2>
+                  <RequestList client={client} requests={requests} returns={returns} disabled={busy} onChanged={afterRequestChange} />
                 </>
               )}
 
@@ -429,6 +491,11 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                   title={assemblyOnly ? "Finalizar checklist e montagem" : undefined}
                   onlyAuto={assemblyOnly}
                   maintenanceItems={maintenanceItems}
+                  destinations={glass ? GLASS_FINISH_DESTINATIONS : undefined}
+                  hideCount={glass}
+                  technicians={technicians}
+                  technicianId={technicianId}
+                  onTechnician={glass ? setTechnicianId : undefined}
                 />
               )}
             </div>

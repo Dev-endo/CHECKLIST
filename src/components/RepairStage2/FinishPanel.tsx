@@ -34,6 +34,10 @@ interface FinishPanelProps {
   /** Motivo do envio para a Análise técnica (o campo aparece quando o destino é a análise). */
   analysisNote?: string;
   onAnalysisNote?: (value: string) => void;
+  /** Destino Manutenção (aba Vidro): técnicos que podem receber o aparelho e o escolhido. */
+  technicians?: readonly { id: string; name: string }[];
+  technicianId?: string;
+  onTechnician?: (id: string) => void;
 }
 
 /** Fim da manutenção: o que ainda falta e o destino (quarentena, análise técnica, vidro, revenda ou PT). */
@@ -54,6 +58,9 @@ export function FinishPanel({
   hideCount = false,
   analysisNote = "",
   onAnalysisNote,
+  technicians = [],
+  technicianId = "",
+  onTechnician,
 }: FinishPanelProps) {
   const blocked = blockers.length > 0;
   const summary = summarizeMaintenance(maintenanceItems);
@@ -119,12 +126,31 @@ export function FinishPanel({
       {!onlyAuto && destination === "analise" && (
         <p className={styles.muted}>Para a Análise técnica não precisa dos testes com o aparelho fechado (se fez algum, ele fica salvo).</p>
       )}
+      {!onlyAuto && destination === "manutencao" && onTechnician && (
+        <label className={styles.reason}>
+          Para qual técnico de manutenção vai o aparelho? (obrigatório)
+          <select value={technicianId} disabled={busy} onChange={(e) => onTechnician(e.target.value)}>
+            <option value="">{technicians.length ? "Escolha o técnico…" : "Nenhum técnico de manutenção encontrado"}</option>
+            {technicians.map((technician) => (
+              <option key={technician.id} value={technician.id}>
+                {technician.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {!onlyAuto && skipsChecklist(destination) && (
         <p className={styles.muted}>Não precisa do checklist para este destino (se fez algum teste, ele fica salvo).</p>
       )}
       {!onlyAuto && needsReason(destination) && (
         <label className={styles.reason}>
-          {destination === "pt" ? "Motivo do PT (obrigatório)" : destination === "bloqueado" ? "Motivo do bloqueio (obrigatório)" : "Motivo da revenda (obrigatório)"}
+          {destination === "pt"
+            ? "Motivo do PT (obrigatório)"
+            : destination === "bloqueado"
+              ? "Motivo do bloqueio (obrigatório)"
+              : destination === "manutencao"
+                ? "Motivo do envio para a manutenção (obrigatório)"
+                : "Motivo da revenda (obrigatório)"}
           <textarea
             value={resaleReason}
             rows={3}
@@ -135,7 +161,9 @@ export function FinishPanel({
                 ? "Por que o aparelho é perda total?"
                 : destination === "bloqueado"
                   ? "Qual o bloqueio? (conta, MDM, operadora…)"
-                  : "Por que o aparelho vai para a revenda?"
+                  : destination === "manutencao"
+                    ? "O que o técnico de manutenção precisa resolver? (ex.: teste que falhou)"
+                    : "Por que o aparelho vai para a revenda?"
             }
             onChange={(e) => onReason(e.target.value)}
           />

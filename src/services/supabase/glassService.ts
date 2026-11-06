@@ -16,7 +16,8 @@ export interface GlassJob {
   osNumber: string;
   model: string | null;
   unit: string | null;
-  origin: "avaliacao" | "manutencao" | "analise";
+  /** vidro: o aparelho chegou direto no vidro (o técnico de vidro é o responsável). */
+  origin: "avaliacao" | "manutencao" | "analise" | "vidro";
   /** vidro_concluido: o vidro terminou; falta entregar ao responsável (com ou sem pedido de display). */
   status: "aguardando" | "em_andamento" | "vidro_concluido" | "concluido";
   /** Quem desmontou o aparelho (o aparelho volta para ele). */

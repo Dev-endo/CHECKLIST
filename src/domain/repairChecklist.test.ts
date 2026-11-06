@@ -3,7 +3,9 @@ import {
   BATTERY_KEY,
   describeFailedTest,
   expectedOutcome,
+  FINISH_DESTINATIONS,
   finishBlockers,
+  GLASS_FINISH_DESTINATIONS,
   skippedPhases,
   fromSaved,
   parseFailedTests,
@@ -203,6 +205,21 @@ describe("Análise técnica não exige o checklist fechado", () => {
   it("keeps requiring the closed tests for the other destinations", () => {
     const blockers = finishBlockers(ready({ destination: "auto", results: { aberto: { ...allOk("aberto"), "confirm:imei": "ok" }, fechado: {} } }));
     expect(blockers.join("|")).toMatch(/fechado: faltam/);
+  });
+});
+
+describe("destino Manutenção (aba Vidro)", () => {
+  const blank = () => ready({ results: { aberto: {}, fechado: {} }, destination: "manutencao" });
+
+  it("offers every Reparo destination plus Manutenção", () => {
+    expect(GLASS_FINISH_DESTINATIONS.map((d) => d.id)).toEqual([...FINISH_DESTINATIONS.map((d) => d.id), "manutencao"]);
+  });
+
+  it("does not need the checklist, but needs the technician and the reason", () => {
+    expect(finishBlockers(blank())).toEqual(["Escolha o técnico de manutenção", "Manutenção exige o motivo"]);
+    expect(finishBlockers({ ...blank(), technicianId: "t1" })).toEqual(["Manutenção exige o motivo"]);
+    expect(finishBlockers({ ...blank(), technicianId: "t1", resaleReason: "Display falhou" })).toEqual([]);
+    expect(expectedOutcome(blank().results, "manutencao")).toBe("manutencao");
   });
 });
 

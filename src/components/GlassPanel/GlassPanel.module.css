@@ -154,3 +154,10 @@ button.statOn:hover {
   font: inherit;
   text-decoration: underline;
 }
+
+/* Receber aparelho direto no vidro. */
+.direct {
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}

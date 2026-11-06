@@ -391,3 +391,63 @@ export const fetchMaintenanceItems = (client: AppSupabaseClient, stageId: string
   call<MaintenanceItem[] | null>(client, "repair_maintenance_items", { p_stage_id: stageId }).then(
     (items) => items ?? [],
   );
+
+// Vidro direto: o técnico de vidro recebe o aparelho, faz o vidro e segue para o checklist (migration 90) ---------
+
+/**
+ * Começa o fluxo do vidro. Com desmontagem devolve o id da desmontagem (que já pede Vidro e Aro); sem desmontagem
+ * devolve o id do serviço de vidro, já aberto.
+ */
+export const startGlassFlow = (client: AppSupabaseClient, serial: string, disassemble: boolean) =>
+  call<string>(client, "start_glass_flow", { p_serial: serial, p_disassemble: disassemble });
+
+/** Conclui a desmontagem do fluxo do vidro e abre o serviço de vidro (sem avaliação técnica). */
+export const finishGlassFlowDisassembly = (client: AppSupabaseClient, stageId: string) =>
+  call<string>(client, "finish_glass_flow_disassembly", { p_stage_id: stageId });
+
+export interface MaintenanceTechnician {
+  id: string;
+  name: string;
+}
+
+/** Técnicos de manutenção que podem receber um aparelho direcionado pelo destino Manutenção. */
+export const listMaintenanceTechnicians = (client: AppSupabaseClient) =>
+  call<MaintenanceTechnician[] | null>(client, "list_maintenance_technicians").then((found) => found ?? []);
+
+/** Destino Manutenção: passa a etapa em andamento para o técnico escolhido, com o motivo. */
+export const handOverMaintenance = (client: AppSupabaseClient, stageId: string, technicianId: string, note: string) =>
+  call<null>(client, "hand_over_maintenance", { p_stage_id: stageId, p_technician: technicianId, p_note: note.trim() });
+
+export interface Handover {
+  from: string;
+  note: string;
+  at: string;
+}
+
+/**
+ * Quem direcionou esta manutenção para o técnico (e o motivo), ou null. Sem a migration 90 a coluna não existe:
+ * a tela segue sem o aviso.
+ */
+export async function fetchHandover(client: AppSupabaseClient, stageId: string): Promise<Handover | null> {
+  try {
+    const found = await rows<{ handover_note: string | null; handover_at: string | null; profiles: { name: string | null; email: string } | null }>(
+      loose(client).from("repair_stages").select("handover_note, handover_at, profiles!handover_from(name, email)").eq("id", stageId).limit(1),
+    );
+    const row = found[0];
+    if (!row?.handover_note || !row.handover_at) return null;
+    return { from: row.profiles ? row.profiles.name?.trim() || row.profiles.email : "—", note: row.handover_note, at: row.handover_at };
+  } catch {
+    return null;
+  }
+}
+
+/** Nome de uma pessoa (técnico de manutenção, por exemplo); null se não achar. */
+export async function fetchPersonName(client: AppSupabaseClient, id: string): Promise<string | null> {
+  try {
+    const found = await rows<{ name: string | null; email: string }>(loose(client).from("profiles").select("name, email").eq("id", id).limit(1));
+    const row = found[0];
+    return row ? row.name?.trim() || row.email : null;
+  } catch {
+    return null;
+  }
+}
