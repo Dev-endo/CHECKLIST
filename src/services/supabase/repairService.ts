@@ -451,3 +451,19 @@ export async function fetchPersonName(client: AppSupabaseClient, id: string): Pr
     return null;
   }
 }
+
+// Limpeza: manutenção que não pede peça e conta como 1 (migration 92) ---------------------------------------------------
+
+/** Liga ou desliga a limpeza da manutenção. Não liga se já há pedido de peça na etapa. */
+export const setMaintenanceCleaning = (client: AppSupabaseClient, stageId: string, cleaning: boolean) =>
+  call<null>(client, "set_maintenance_cleaning", { p_stage_id: stageId, p_cleaning: cleaning });
+
+/** Se a etapa está marcada como limpeza. Sem a migration 92 a coluna não existe: segue como não. */
+export async function fetchCleaning(client: AppSupabaseClient, stageId: string): Promise<boolean> {
+  try {
+    const found = await rows<{ cleaning: boolean | null }>(loose(client).from("repair_stages").select("cleaning").eq("id", stageId).limit(1));
+    return Boolean(found[0]?.cleaning);
+  } catch {
+    return false;
+  }
+}

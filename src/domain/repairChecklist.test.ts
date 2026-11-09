@@ -162,6 +162,7 @@ describe("summarizeMaintenance", () => {
       ]),
     ).toEqual({ count: 4, lines: ["Reparo em placa: Troca do CI de áudio", "Bateria", "Display (2)"] });
     expect(summarizeMaintenance([])).toEqual({ count: 0, lines: [] });
+    expect(summarizeMaintenance([{ tipo: "limpeza", qtd: 1 }])).toEqual({ count: 1, lines: ["Limpeza"] });
   });
 });
 

@@ -289,7 +289,7 @@ export function describeFailedTest(entry: FailedTestEntry): string {
 
 /** O que o banco devolve: a placa reparada por quem finaliza e cada peça usada de vez. */
 export interface MaintenanceItem {
-  tipo: "placa" | "peca";
+  tipo: "placa" | "peca" | "limpeza";
   peca?: string;
   qtd?: number;
   descricao?: string | null;
@@ -298,10 +298,11 @@ export interface MaintenanceItem {
 /** Total de manutenções (placa = 1; cada peça = 1 por unidade) e as linhas para mostrar. */
 export function summarizeMaintenance(items: readonly MaintenanceItem[]): { count: number; lines: string[] } {
   const lines = items.map((item) => {
+    if (item.tipo === "limpeza") return "Limpeza";
     if (item.tipo === "placa") return item.descricao ? `Reparo em placa: ${item.descricao}` : "Reparo em placa";
     const qty = item.qtd ?? 1;
     return qty > 1 ? `${item.peca ?? "Peça"} (${qty})` : (item.peca ?? "Peça");
   });
-  const count = items.reduce((total, item) => total + (item.tipo === "placa" ? 1 : Math.max(0, item.qtd ?? 1)), 0);
+  const count = items.reduce((total, item) => total + (item.tipo === "placa" || item.tipo === "limpeza" ? 1 : Math.max(0, item.qtd ?? 1)), 0);
   return { count, lines };
 }

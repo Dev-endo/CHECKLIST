@@ -43,6 +43,7 @@ import { RequestList } from "../RepairParts/RequestList";
 import { RepairTimer } from "../RepairStage1/RepairTimer";
 import { useToast } from "../Toast/ToastProvider";
 import { PtRejection } from "../PtApproval/PtRejection";
+import { CleaningToggle } from "./CleaningToggle";
 import { FinishPanel } from "./FinishPanel";
 import { StageHistory } from "./StageHistory";
 import stage1Styles from "../RepairStage1/RepairStage1.module.css";
@@ -425,6 +426,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 onToggle={() => void timer.toggle().then(refreshAssembly)} onFinish={() => void timer.finish().then(refreshAssembly)}
               />
 
+              {running && <CleaningToggle client={client} stageId={maintenance.id} />}
               {running && <PartRequestForm client={client} serial={serial} onSent={afterRequestChange} />}
 
               <h2 className={stage1Styles.heading}>Solicitações de peça da OS {order.osNumber}</h2>

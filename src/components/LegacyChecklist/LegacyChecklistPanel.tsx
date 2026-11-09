@@ -35,6 +35,7 @@ import { Checklist } from "../Checklist/Checklist";
 import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
 import { OsField } from "../DeviceForm/OsField";
 import { PtRejection } from "../PtApproval/PtRejection";
+import { CleaningToggle } from "../RepairStage2/CleaningToggle";
 import { FinishPanel } from "../RepairStage2/FinishPanel";
 import { useToast } from "../Toast/ToastProvider";
 import stage1Styles from "../RepairStage1/RepairStage1.module.css";
@@ -522,6 +523,8 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
           )}
         </section>
       ))}
+
+      {stageId && editable && <CleaningToggle client={client} stageId={stageId} disabled={busy} />}
 
       <FinishPanel
         title="Finalizar checklist"
