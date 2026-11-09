@@ -20,7 +20,7 @@ export async function fetchMyGoal(client: AppSupabaseClient): Promise<DailyGoal>
     liberados: Number(data?.liberados ?? 0),
     quarentena: Number(data?.quarentena ?? 0),
     vidro: Number(data?.vidro ?? 0),
-    meta: Number(data?.meta ?? 6),
+    meta: Number(data?.meta ?? 10),
     justificativa: data?.justificativa ?? null,
     manutencao: data?.manutencao ? toMaintenanceTotals(data.manutencao) : null,
   };

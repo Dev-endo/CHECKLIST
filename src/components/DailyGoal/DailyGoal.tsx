@@ -11,7 +11,7 @@ const NOTE_MIN = 5;
 
 /**
  * Topo do Reparo e do Checklist manutenção: aparelhos que o técnico liberou hoje para a quarentena e para o vidro,
- * contra a meta (6). Abaixo da meta, ele escreve a justificativa ali mesmo; batida, aparece "Meta concluída".
+ * contra a meta (10). Abaixo da meta, ele escreve a justificativa ali mesmo; batida, aparece "Meta concluída".
  */
 export function DailyGoal({ client }: { client: AppSupabaseClient }) {
   const toast = useToast();
