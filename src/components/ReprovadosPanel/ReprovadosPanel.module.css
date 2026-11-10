@@ -1,0 +1,27 @@
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+.table th {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.table small {
+  display: block;
+  opacity: 0.7;
+}

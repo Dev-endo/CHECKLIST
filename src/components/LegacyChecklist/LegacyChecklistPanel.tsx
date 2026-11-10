@@ -21,6 +21,7 @@ import {
   fetchLastLegacy,
   fetchMyLegacyFinished,
   fetchMyOpenStages,
+  declareMaintenanceItems,
   finishMaintenance,
   requestGlassParts,
   startLegacyMaintenance,
@@ -35,8 +36,8 @@ import { Checklist } from "../Checklist/Checklist";
 import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
 import { OsField } from "../DeviceForm/OsField";
 import { PtRejection } from "../PtApproval/PtRejection";
-import { CleaningToggle } from "../RepairStage2/CleaningToggle";
 import { FinishPanel } from "../RepairStage2/FinishPanel";
+import { DoneMaintenanceDialog, type DoneItem } from "./DoneMaintenanceDialog";
 import { useToast } from "../Toast/ToastProvider";
 import stage1Styles from "../RepairStage1/RepairStage1.module.css";
 import stage2Styles from "../RepairStage2/RepairStage2.module.css";
@@ -118,6 +119,8 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   // Motivo da revenda ou do PT.
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  // Balão das manutenções feitas, aberto ao finalizar.
+  const [asking, setAsking] = useState(false);
   const [lastDone, setLastDone] = useState<{ serial: string; outcome: keyof typeof DESTINATION_LABELS } | null>(null);
   const [mine, setMine] = useState<OpenStage[]>([]);
   const [today, setToday] = useState<LegacyChecklist[] | null>(null);
@@ -291,13 +294,19 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     input.current?.focus();
   };
 
-  const finish = async () => {
+  // Finalizar abre o balão das manutenções feitas; ele confirma e chama o finish.
+  const askFinish = () => {
     // O destino Manutenção (outro técnico) é só da aba Vidro; aqui nunca é oferecido.
     if (!stageId || busy || finalDestination === "manutencao") return;
-    if (!window.confirm(`Finalizar o checklist de ${serial}? O aparelho vai para: ${DESTINATION_LABELS[outcome]}. Depois disso não dá para alterar.`)) return;
+    setAsking(true);
+  };
+
+  const finish = async (done: DoneItem[]) => {
+    if (!stageId || busy || finalDestination === "manutencao") return;
     setBusy(true);
     try {
       await checklists.flush();
+      await declareMaintenanceItems(client, stageId, done);
       const result = await finishMaintenance(client, {
         stageId,
         requiredOpen: requiredTests("aberto"),
@@ -307,11 +316,13 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         resaleReason: reason,
         analysisNote,
       });
+      setAsking(false);
       setLastDone({ serial, outcome: result });
       setReloads((n) => n + 1);
       clear();
       window.scrollTo(0, 0);
     } catch (error) {
+      setAsking(false);
       toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível finalizar o checklist."));
     } finally {
       setBusy(false);
@@ -532,8 +543,6 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         </section>
       ))}
 
-      {stageId && editable && <CleaningToggle client={client} stageId={stageId} disabled={busy} />}
-
       <FinishPanel
         title="Finalizar checklist"
         blockers={blockers}
@@ -544,11 +553,20 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         unsaved={Boolean(stageId) && checklists.unsaved}
         onDestination={setDestination}
         onReason={setReason}
-        onFinish={() => void finish()}
+        onFinish={askFinish}
         destinations={destinations}
         analysisNote={analysisNote}
         onAnalysisNote={setAnalysisNote}
         hideCount
+      />
+
+      <DoneMaintenanceDialog
+        open={asking}
+        busy={busy}
+        serial={serial}
+        destination={DESTINATION_LABELS[outcome]}
+        onCancel={() => setAsking(false)}
+        onConfirm={(done) => void finish(done)}
       />
     </>
   );

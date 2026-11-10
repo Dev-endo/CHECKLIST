@@ -15,11 +15,11 @@ import {
 
 describe("accessibleTabs", () => {
   it("gives each function its tab, plus the Quarentena everyone shares", () => {
-    expect(accessibleTabs("tecnico")).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena"]);
-    expect(accessibleTabs("estoquista")).toEqual(["quarentena", "solicitacoes", "os"]);
-    expect(accessibleTabs("analista")).toEqual(["quarentena", "analise_tecnica", "reparo_placa", "analise_montagem"]);
-    expect(accessibleTabs("tecnico_vidro")).toEqual(["quarentena", "vidro"]);
-    expect(accessibleTabs("supervisor")).toEqual(["quarentena", "dashboard", "aprovacao_pt"]);
+    expect(accessibleTabs("tecnico")).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena", "reprovados"]);
+    expect(accessibleTabs("estoquista")).toEqual(["quarentena", "reprovados", "solicitacoes", "os"]);
+    expect(accessibleTabs("analista")).toEqual(["quarentena", "reprovados", "analise_tecnica", "reparo_placa", "analise_montagem"]);
+    expect(accessibleTabs("tecnico_vidro")).toEqual(["quarentena", "reprovados", "vidro"]);
+    expect(accessibleTabs("supervisor")).toEqual(["quarentena", "reprovados", "dashboard", "aprovacao_pt"]);
     expect(canRegisterOs("estoquista")).toBe(false);
     expect(canRegisterOs("tecnico")).toBe(true);
   });
@@ -29,7 +29,7 @@ describe("accessibleTabs", () => {
       "reparo",
       "reparo2",
       "checklist_manutencao",
-      "quarentena",
+      "quarentena", "reprovados",
       "analise_tecnica",
       "reparo_placa",
       "analise_montagem",
@@ -46,8 +46,8 @@ describe("accessibleTabs", () => {
     for (const tab of ["checklist", "desmontagem", "desmontagem_tecnica", "montagem", "registros", "estoque", "emprestimos"] as const) {
       expect(accessibleTabs("admin")).not.toContain(tab);
     }
-    expect(accessibleTabs("desmontador")).toEqual(["quarentena"]);
-    expect(accessibleTabs("montador")).toEqual(["quarentena"]);
+    expect(accessibleTabs("desmontador")).toEqual(["quarentena", "reprovados"]);
+    expect(accessibleTabs("montador")).toEqual(["quarentena", "reprovados"]);
   });
 
   it("lets the supervisor only see the results", () => {
@@ -59,8 +59,8 @@ describe("accessibleTabs", () => {
   });
 
   it("adds up the tabs of every function a person has", () => {
-    expect(accessibleTabs(["tecnico", "tecnico_vidro"])).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena", "vidro"]);
-    expect(accessibleTabs(["estoquista", "supervisor"])).toEqual(["quarentena", "solicitacoes", "os", "dashboard", "aprovacao_pt"]);
+    expect(accessibleTabs(["tecnico", "tecnico_vidro"])).toEqual(["reparo", "reparo2", "checklist_manutencao", "quarentena", "reprovados", "vidro"]);
+    expect(accessibleTabs(["estoquista", "supervisor"])).toEqual(["quarentena", "reprovados", "solicitacoes", "os", "dashboard", "aprovacao_pt"]);
   });
 
   it("gives nothing to who has no function yet", () => {

@@ -14,6 +14,8 @@ const GROUPS: { id: string; label: string; tabs: readonly TabId[] }[] = [
   { id: "checklist_manutencao", label: "Checklist manutenção", tabs: ["checklist_manutencao"] },
   // Uma aba só para a quarentena, aberta para todos (aguardando, registrar e seriais de hoje).
   { id: "quarentena", label: "Quarentena", tabs: ["quarentena"] },
+  // Bipa vários seriais e mostra quem fez a desmontagem, o checklist, a manutenção e a montagem de cada um.
+  { id: "reprovados", label: "Reprovados", tabs: ["reprovados"] },
   { id: "analise_tecnica", label: "Análise técnica", tabs: ["analise_tecnica", "reparo_placa", "analise_montagem"] },
   { id: "vidro", label: "Vidro", tabs: ["vidro"] },
   // A consulta de OS fica em Estoque.
@@ -42,6 +44,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   desmontagem_tecnica: "Desmontagem técnica",
   montagem: "Montagem",
   quarentena: "Quarentena",
+  reprovados: "Reprovados",
   registros: "Análise (antiga)",
   dashboard: "Análise",
   aprovacao_pt: "Aprovação PT",

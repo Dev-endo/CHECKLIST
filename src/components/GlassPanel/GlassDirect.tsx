@@ -44,7 +44,7 @@ interface GlassDirectProps {
 
 /**
  * Aparelho que chega direto no vidro: bipa o serial, responde se faz a desmontagem, faz o vidro e segue para o
- * checklist aberto, a montagem e o checklist fechado (a mesma tela do Estágio 2 do Reparo).
+ * checklist de display (o único do vidro), com os destinos do Reparo mais Manutenção.
  */
 export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJob, reloadJobs }: GlassDirectProps) {
   const toast = useToast();
@@ -135,12 +135,12 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
     }
   };
 
-  // Manutenção do próprio técnico: checklist aberto, montagem e checklist fechado (tela do Estágio 2).
+  // Manutenção do próprio técnico: só o checklist de display e o destino (tela do Estágio 2 em modo vidro).
   // Com um serviço de vidro ainda aberto, aparece o cartão do vidro (a manutenção anterior só fica finalizada).
   if (serial && order && maintenance && maintenanceMine && (!job || maintenance.status !== "concluida")) {
     return (
-      <section className={styles.direct} aria-label="Checklist e montagem do vidro">
-        <h2 className={stage1Styles.heading}>Vidro · checklist e montagem</h2>
+      <section className={styles.direct} aria-label="Checklist de display do vidro">
+        <h2 className={stage1Styles.heading}>Vidro · checklist de display</h2>
         <Stage2Panel key={maintenance.id} initialSerial={serial} onBack={clear} hideHeader glass />
       </section>
     );
@@ -172,7 +172,7 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
           Em andamento:
           {mine.map((item) => (
             <Button key={item.id} variant="small" onClick={() => resume(item)}>
-              {item.serial} · OS {item.osNumber} · {item.stage === "manutencao" ? "checklist e montagem" : "desmontagem"}
+              {item.serial} · OS {item.osNumber} · {item.stage === "manutencao" ? "checklist de display" : "desmontagem"}
             </Button>
           ))}
         </div>
@@ -214,8 +214,8 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
               {renderJob(job)}
               <p className={stage1Styles.hint}>
                 {job.origin === "vidro"
-                  ? "Conclua o vidro e siga para o checklist: ele abre aqui mesmo, com o checklist aberto, a montagem e o checklist fechado."
-                  : "Conclua o vidro. Depois, “Fazer o checklist aqui” traz o checklist aberto (se não foi feito), a montagem e o checklist fechado; ou entregue ao responsável."}
+                  ? "Conclua o vidro e siga para o checklist de display, que abre aqui mesmo."
+                  : "Conclua o vidro e responda o checklist de display: tudo certo, entregue a quem desmontou; display com falha (ou solicitado), escolha quem faz."}
               </p>
             </>
           )}

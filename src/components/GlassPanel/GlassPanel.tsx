@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { canManageUsers } from "../../domain/roles";
-import { useRepairTimer } from "../../hooks/useRepairTimer";
 import { describeRepairError, STATUS_LABELS } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
-  completeGlass,
   countGlassDoneSince,
   fetchGlassJobs,
-  finishGlass,
-  finishGlassKeep,
-  glassTimerApi,
   partsAllocated,
-  startGlass,
   type GlassJob,
 } from "../../services/supabase/glassService";
 import appStyles from "../../App.module.css";
-import { Button } from "../Button/Button";
 import { GlassDirect } from "./GlassDirect";
-import { RepairTimer } from "../RepairStage1/RepairTimer";
+import { GlassJobActions } from "./GlassJobActions";
 import { useToast } from "../Toast/ToastProvider";
 import styles from "./GlassPanel.module.css";
 
@@ -43,10 +36,6 @@ const ORIGIN_LABELS = {
 const STATE_LABELS = { aguardando: "Aguardando", em_andamento: "Em andamento", vidro_concluido: "Vidro concluído", concluido: "Entregue" } as const;
 
 /** Cronômetro do vidro em andamento. */
-function GlassTimer({ client, id, canAct, onError }: { client: AppSupabaseClient; id: string; canAct: boolean; onError: (error: unknown) => void }) {
-  const timer = useRepairTimer(client, id, onError, glassTimerApi);
-  return <RepairTimer title="Vidro" hideWait totals={timer.totals} action={timer.action} busy={timer.busy} disabled={!canAct} onToggle={() => void timer.toggle()} onFinish={() => void timer.finish()} />;
-}
 
 /** Aba Vidro: o técnico de vidro vê quem desmontou cada aparelho, o vidro e o aro do estoque, e entrega ao responsável. */
 export function GlassPanel() {
@@ -104,12 +93,7 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
       toast(done);
       reload();
     } catch (error) {
-      const text = (error as { message?: string })?.message ?? "";
-      toast(
-        text.includes("glass_pending")
-          ? "O estoque ainda não entregou o vidro (o aro pode ser dispensado)."
-          : describeRepairError(error as { code?: string; message?: string }, fallback),
-      );
+      toast(describeRepairError(error as { code?: string; message?: string }, fallback));
     } finally {
       setBusy(null);
     }
@@ -117,9 +101,7 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
 
   // O cartão do serviço de vidro (a lista e o fluxo "receber aparelho" usam o mesmo).
   const renderJob = (job: GlassJob) => {
-    const waitingGlass = job.parts.some((p) => p.part === "Vidro" && p.status !== "entregue");
     const loading = busy === job.id;
-    const canAct = job.status === "aguardando" || job.startedById === userId || isAdmin;
     const direct = job.origin === "vidro";
     return (
       <div className={[styles.card, styles[`s_${job.status}`]].join(" ")}>
@@ -140,69 +122,7 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
             </li>
           ))}
         </ul>
-        {job.status === "em_andamento" && (
-          <GlassTimer client={client} id={job.id} canAct={canAct} onError={(error) => toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível atualizar o cronômetro."))} />
-        )}
-        <div className={styles.actions}>
-          {job.status === "aguardando" && (
-            <Button disabled={loading} onClick={() => void run(job, () => startGlass(client, job.id), "Vidro iniciado", "Não foi possível iniciar o vidro.")}>
-              Começar vidro
-            </Button>
-          )}
-          {job.status === "em_andamento" && (
-            <Button
-              disabled={loading || waitingGlass || !canAct}
-              onClick={() => void run(job, () => completeGlass(client, job.id), "Vidro concluído", "Não foi possível concluir o vidro.")}
-            >
-              Concluir vidro
-            </Button>
-          )}
-          {job.status === "vidro_concluido" && (
-            <>
-              <Button
-                disabled={loading}
-                onClick={() =>
-                  void run(
-                    job,
-                    () => finishGlass(client, job.id),
-                    direct ? "Vidro entregue: siga para o checklist aberto" : `Entregue a ${job.responsible}`,
-                    direct ? "Não foi possível seguir para o checklist." : "Não foi possível entregar o aparelho.",
-                  )
-                }
-              >
-                {direct ? "Seguir para o checklist" : "Entregar ao responsável"}
-              </Button>
-              {!direct && (
-                <Button
-                  variant="ghost"
-                  disabled={loading}
-                  onClick={() =>
-                    void run(
-                      job,
-                      () => finishGlassKeep(client, job.id),
-                      "Siga para o checklist: bipe o serial em “Receber aparelho no vidro”",
-                      "Não foi possível seguir para o checklist.",
-                    )
-                  }
-                >
-                  Fazer o checklist aqui
-                </Button>
-              )}
-              <Button
-                variant="danger"
-                disabled={loading}
-                onClick={() => {
-                  if (!window.confirm(`O display morreu no processo? Um display será pedido ao estoque e o aparelho volta para ${job.responsible}.`)) return;
-                  void run(job, () => finishGlass(client, job.id, true), `Display pedido ao estoque; aparelho devolvido a ${job.responsible}`, "Não foi possível pedir o display.");
-                }}
-              >
-                Solicitar display
-              </Button>
-            </>
-          )}
-          {job.status === "em_andamento" && !canAct && <span className={styles.muted}>Só quem começou o vidro (ou o admin) conclui.</span>}
-          {waitingGlass && <span className={styles.muted}>Aguardando o estoque entregar o vidro.</span>}
-        </div>
+        <GlassJobActions client={client} job={job} loading={loading} direct={direct} run={run} />
       </div>
     );
   };
@@ -212,7 +132,7 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
       <header>
         <h1 className={appStyles.title}>Vidro</h1>
         <p className={appStyles.subtitle}>
-          Bipe o serial para receber um aparelho direto no vidro, ou atenda os enviados pelo Reparo. Ao terminar um enviado, entregue ao responsável: o aparelho volta para ele.
+          Bipe o serial para receber um aparelho direto no vidro, ou atenda os enviados pelo Reparo. Conclua o vidro e responda o checklist de display. Tudo certo, o aparelho volta para quem desmontou; display com falha (ou solicitado), você escolhe quem faz.
         </p>
       </header>
 
@@ -242,7 +162,7 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
         >
           <span className={styles.statValue}>{jobs ? ready.length : "…"}</span>
           <span className={styles.statLabel}>Em processo</span>
-          <span className={styles.muted}>peça já alocada, aguardando começar o vidro</span>
+          <span className={styles.muted}>peça já alocada, aguardando concluir o vidro</span>
         </button>
         <div className={[styles.stat, styles.statDone].join(" ")}>
           <span className={styles.statValue}>{doneToday ?? "…"}</span>

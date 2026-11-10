@@ -5,6 +5,7 @@ import {
   expectedOutcome,
   FINISH_DESTINATIONS,
   finishBlockers,
+  GLASS_DISPLAY_TEST,
   GLASS_FINISH_DESTINATIONS,
   skippedPhases,
   fromSaved,
@@ -81,6 +82,19 @@ describe("repair checklist", () => {
     const back = toggleBlockResult(failed, block, "ok");
     expect(back["tela-branca"]).toBeUndefined();
     expect(back[block.id]).toBe("ok");
+  });
+});
+
+describe("finishBlockers: só o checklist de display (aba Vidro)", () => {
+  it("exige só o teste de display, sem o resto do checklist", () => {
+    const base = ready({ results: { aberto: {}, fechado: {} }, onlyTests: [GLASS_DISPLAY_TEST] });
+    expect(finishBlockers(base)).toEqual(["Checklist de display: responda o teste"]);
+    expect(finishBlockers({ ...base, results: { aberto: { [GLASS_DISPLAY_TEST]: "ok" }, fechado: {} } })).toEqual([]);
+  });
+
+  it("falha no display leva à Análise, tudo certo à quarentena", () => {
+    expect(expectedOutcome({ aberto: { [GLASS_DISPLAY_TEST]: "fail" }, fechado: {} }, "auto", [GLASS_DISPLAY_TEST])).toBe("analise");
+    expect(expectedOutcome({ aberto: { [GLASS_DISPLAY_TEST]: "ok" }, fechado: {} }, "auto", [GLASS_DISPLAY_TEST])).toBe("quarentena");
   });
 });
 
@@ -163,6 +177,7 @@ describe("summarizeMaintenance", () => {
     ).toEqual({ count: 4, lines: ["Reparo em placa: Troca do CI de áudio", "Bateria", "Display (2)"] });
     expect(summarizeMaintenance([])).toEqual({ count: 0, lines: [] });
     expect(summarizeMaintenance([{ tipo: "limpeza", qtd: 1 }])).toEqual({ count: 1, lines: ["Limpeza"] });
+    expect(summarizeMaintenance([{ tipo: "feita", peca: "Bateria", qtd: 2 }, { tipo: "feita", peca: "Tampa", qtd: 1 }])).toEqual({ count: 3, lines: ["Bateria (2)", "Tampa"] });
   });
 });
 

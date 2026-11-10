@@ -63,6 +63,7 @@ export type TabId =
   | "desmontagem_tecnica"
   | "montagem"
   | "quarentena"
+  | "reprovados"
   | "solicitacoes"
   | "estoque"
   | "emprestimos"
@@ -161,7 +162,7 @@ export function accessibleTabs(role: Roles): TabId[] {
   // Técnico: Reparo. Técnico de placa: Análise técnica. Técnico de vidro: Vidro. Estoquista: Estoque.
   // Supervisor: Análise. Todos: Quarentena. Admin: tudo.
   if (canDoRepair(role)) tabs.push("reparo", "reparo2", "checklist_manutencao");
-  if (canUseQuarantine(role)) tabs.push("quarentena");
+  if (canUseQuarantine(role)) tabs.push("quarentena", "reprovados");
   if (canDoAnalysis(role)) tabs.push("analise_tecnica", "reparo_placa", "analise_montagem");
   if (canDoGlass(role)) tabs.push("vidro");
   if (canManageStock(role)) tabs.push("solicitacoes");

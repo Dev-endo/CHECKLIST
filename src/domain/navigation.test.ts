@@ -11,6 +11,7 @@ describe("navGroups", () => {
       ["Reparo", ["reparo", "reparo2"]],
       ["Checklist manutenção", ["checklist_manutencao"]],
       ["Quarentena", ["quarentena"]],
+      ["Reprovados", ["reprovados"]],
       ["Análise técnica", ["analise_tecnica", "reparo_placa", "analise_montagem"]],
       ["Vidro", ["vidro"]],
       ["Estoque", ["solicitacoes", "os"]],
@@ -25,21 +26,26 @@ describe("navGroups", () => {
       ["Reparo", ["reparo", "reparo2"]],
       ["Checklist manutenção", ["checklist_manutencao"]],
       ["Quarentena", ["quarentena"]],
+      ["Reprovados", ["reprovados"]],
     ]);
     expect(summary("estoquista")).toEqual([
       ["Quarentena", ["quarentena"]],
+      ["Reprovados", ["reprovados"]],
       ["Estoque", ["solicitacoes", "os"]],
     ]);
     expect(summary("analista")).toEqual([
       ["Quarentena", ["quarentena"]],
+      ["Reprovados", ["reprovados"]],
       ["Análise técnica", ["analise_tecnica", "reparo_placa", "analise_montagem"]],
     ]);
     expect(summary("tecnico_vidro")).toEqual([
       ["Quarentena", ["quarentena"]],
+      ["Reprovados", ["reprovados"]],
       ["Vidro", ["vidro"]],
     ]);
     expect(summary("supervisor")).toEqual([
       ["Quarentena", ["quarentena"]],
+      ["Reprovados", ["reprovados"]],
       ["Análise", ["dashboard"]],
       ["Aprovação PT", ["aprovacao_pt"]],
     ]);

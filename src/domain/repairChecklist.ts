@@ -185,6 +185,8 @@ export interface FinishInput {
   analysisNote?: string;
   /** Destino Manutenção: o técnico escolhido (obrigatório nesse destino). */
   technicianId?: string;
+  /** Aba Vidro: só estes testes (do checklist aberto) são exigidos; o resto do checklist não entra. */
+  onlyTests?: readonly string[];
 }
 
 /** Tamanho mínimo da justificativa de envio para a Análise técnica (o banco confere o mesmo). */
@@ -196,7 +198,11 @@ export const ANALYSIS_NOTE_MIN = 5;
  */
 export function finishBlockers(input: FinishInput): string[] {
   const blockers: string[] = [];
-  for (const phase of PHASES) {
+  if (input.onlyTests) {
+    const missing = input.onlyTests.filter((id) => !input.results.aberto[id]).length;
+    if (missing) blockers.push("Checklist de display: responda o teste");
+  }
+  for (const phase of input.onlyTests ? [] : PHASES) {
     if (skippedPhases(input.destination).includes(phase) || input.skipPhases?.includes(phase)) continue;
     const missing = pendingTests(phase, input.results[phase]).length;
     if (missing) blockers.push(`${PHASE_LABELS[phase]}: faltam ${missing} teste(s) obrigatório(s)`);
@@ -223,6 +229,7 @@ export function finishBlockers(input: FinishInput): string[] {
 export function expectedOutcome(
   results: Record<ChecklistPhase, Results>,
   destination: FinishDestination,
+  onlyTests?: readonly string[],
 ): "quarentena" | "analise" | "revenda" | "vidro" | "pt" | "bloqueado" | "manutencao" {
   if (destination === "manutencao") return "manutencao";
   if (destination === "bloqueado") return "bloqueado";
@@ -230,6 +237,7 @@ export function expectedOutcome(
   if (destination === "revenda") return "revenda";
   if (destination === "vidro") return "vidro";
   if (destination === "analise") return "analise";
+  if (onlyTests) return onlyTests.some((id) => results.aberto[id] === "fail") ? "analise" : "quarentena";
   const failed = PHASES.some((phase) => {
     const choice = new Set(choiceTests(phase));
     return requiredTests(phase).some((id) => results[phase][id] === "fail" && !choice.has(id));
@@ -242,6 +250,9 @@ export function phaseFailed(phase: ChecklistPhase, results: Results): boolean {
   const choice = new Set(choiceTests(phase));
   return requiredTests(phase).some((id) => results[id] === "fail" && !choice.has(id));
 }
+
+/** Aba Vidro: o único checklist é o de display (o bloco "Tela e touch" do checklist de manutenção). */
+export const GLASS_DISPLAY_TEST = "tela-e-touch";
 
 export const OUTCOME_LABELS = {
   quarentena: "Quarentena",
@@ -289,7 +300,7 @@ export function describeFailedTest(entry: FailedTestEntry): string {
 
 /** O que o banco devolve: a placa reparada por quem finaliza e cada peça usada de vez. */
 export interface MaintenanceItem {
-  tipo: "placa" | "peca" | "limpeza";
+  tipo: "placa" | "peca" | "limpeza" | "feita";
   peca?: string;
   qtd?: number;
   descricao?: string | null;

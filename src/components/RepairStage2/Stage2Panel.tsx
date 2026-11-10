@@ -4,7 +4,7 @@ import {
   choiceTests,
   expectedOutcome,
   finishBlockers,
-  pendingTests,
+  GLASS_DISPLAY_TEST,
   GLASS_FINISH_DESTINATIONS,
   skippedPhases,
   OUTCOME_LABELS,
@@ -241,8 +241,9 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
     resaleReason,
     analysisNote,
     technicianId,
+    onlyTests: glass ? [GLASS_DISPLAY_TEST] : undefined,
   });
-  const outcome = expectedOutcome(checklists.results, destination);
+  const outcome = expectedOutcome(checklists.results, destination, glass ? [GLASS_DISPLAY_TEST] : undefined);
 
   const finish = async () => {
     if (!maintenance || busy) return;
@@ -264,9 +265,9 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
       }
       const result = await finishMaintenance(client, {
         stageId: maintenance.id,
-        requiredOpen: requiredTests("aberto"),
-        requiredClosed: skippedPhases(destination).includes("fechado") ? [] : requiredTests("fechado"),
-        choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
+        requiredOpen: glass ? [GLASS_DISPLAY_TEST] : requiredTests("aberto"),
+        requiredClosed: glass || skippedPhases(destination).includes("fechado") ? [] : requiredTests("fechado"),
+        choice: glass ? [] : [...choiceTests("aberto"), ...choiceTests("fechado")],
         destination,
         resaleReason,
         analysisNote,
@@ -394,13 +395,6 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 </p>
               )}
 
-              {glass && running && checklists.loaded && pendingTests("aberto", checklists.phases.aberto.results).length > 0 && (
-                <p className={styles.glassNotice} role="status">
-                  <strong>O checklist aberto não foi feito (ou está incompleto).</strong> Faça-o completo aqui, depois a montagem e o checklist
-                  fechado.
-                </p>
-              )}
-
               {handover && (
                 <p className={styles.glassNotice} role="status">
                   <strong>Direcionado por {handover.from}.</strong> {handover.note}
@@ -442,16 +436,16 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                 </>
               )}
 
-              {PHASES.map((phase) => (
+              {(glass ? (["aberto"] as const) : PHASES).map((phase) => (
                 <Fragment key={phase}>
                 <section className={styles.phase} aria-label={PHASE_LABELS[phase]}>
-                  <h2 className={stage1Styles.heading}>{PHASE_LABELS[phase]}</h2>
+                  <h2 className={stage1Styles.heading}>{glass ? "Checklist de display" : PHASE_LABELS[phase]}</h2>
                   {!checklists.loaded ? (
                     <p className={styles.muted}>Carregando…</p>
                   ) : (
                     <Checklist
                       kind={PHASE_KIND[phase]}
-                      blocks={phaseCatalog(phase)}
+                      blocks={glass ? phaseCatalog(phase).filter((block) => block.id === GLASS_DISPLAY_TEST) : phaseCatalog(phase)}
                       results={checklists.phases[phase].results}
                       onToggle={(sectionId, result) => checklists.toggleResult(phase, sectionId, result)}
                       onToggleItem={(sectionId, itemId) => checklists.toggleItem(phase, sectionId, itemId)}
@@ -463,7 +457,7 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
                   )}
                 </section>
                 {/* Montagem: depois dos testes com o aparelho aberto. */}
-                  {phase === "aberto" && !legacy && (
+                  {phase === "aberto" && !legacy && !glass && (
                     <div className={styles.phase}>
                     <h2 className={stage1Styles.heading}>Montagem</h2>
                     <RepairTimer

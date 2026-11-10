@@ -467,3 +467,68 @@ export async function fetchCleaning(client: AppSupabaseClient, stageId: string):
     return false;
   }
 }
+
+// Aba Reprovados: quem teve a mão em cada aparelho (migration 94) -------------------------------------------------------
+
+export interface ReprovadoRow {
+  serial: string;
+  osNumber: string | null;
+  outcome: string | null;
+  finishedAt: string | null;
+  responsavel: string | null;
+  desmontagem: string | null;
+  checklist: string | null;
+  manutencao: string | null;
+  placa: string | null;
+  montagem: string | null;
+  quarentena: string | null;
+  quarentenaPor: string | null;
+  quarentenaEm: string | null;
+  /** Manutenções contadas (texto) e o total. */
+  feitas: string | null;
+  feitasQtd: number | null;
+}
+
+interface ReprovadoDb {
+  serial: string;
+  os_number: string | null;
+  outcome: string | null;
+  finished_at: string | null;
+  responsavel: string | null;
+  desmontagem: string | null;
+  checklist: string | null;
+  manutencao: string | null;
+  placa: string | null;
+  montagem: string | null;
+  quarentena: string | null;
+  quarentena_por: string | null;
+  quarentena_em: string | null;
+  feitas: string | null;
+  feitas_qtd: number | null;
+}
+
+/** Por serial: o técnico responsável e quem fez a desmontagem, o checklist, a manutenção e a montagem (OS mais recente). */
+export async function fetchReprovados(client: AppSupabaseClient, serials: readonly string[]): Promise<ReprovadoRow[]> {
+  const found = await call<ReprovadoDb[] | null>(client, "reprovados_lookup", { p_serials: [...serials] });
+  return (found ?? []).map((row) => ({
+    serial: row.serial,
+    osNumber: row.os_number,
+    outcome: row.outcome,
+    finishedAt: row.finished_at,
+    responsavel: row.responsavel,
+    desmontagem: row.desmontagem,
+    checklist: row.checklist,
+    manutencao: row.manutencao,
+    placa: row.placa,
+    montagem: row.montagem,
+    quarentena: row.quarentena,
+    quarentenaPor: row.quarentena_por,
+    quarentenaEm: row.quarentena_em,
+    feitas: row.feitas,
+    feitasQtd: row.feitas_qtd,
+  }));
+}
+
+/** Manutenções que o técnico informa ao finalizar o checklist (migration 95): trocam a lista da etapa; vazia = nenhuma. */
+export const declareMaintenanceItems = (client: AppSupabaseClient, stageId: string, items: readonly { nome: string; qtd: number }[]) =>
+  call<null>(client, "declare_maintenance_items", { p_stage_id: stageId, p_items: [...items] });

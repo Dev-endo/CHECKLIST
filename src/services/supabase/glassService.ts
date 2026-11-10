@@ -109,6 +109,29 @@ export const finishGlass = (client: AppSupabaseClient, jobId: string, display = 
  */
 export const finishGlassKeep = (client: AppSupabaseClient, jobId: string) => call<string>(client, "finish_glass_keep", { p_job_id: jobId });
 
+/**
+ * Display (reprovado no teste ou solicitado antes dele): fecha o vidro e envia o aparelho ao técnico escolhido, que o
+ * encontra no Estágio 2 com o aviso. Não pede nada ao estoque (migration 97).
+ */
+export const glassSendDisplay = (client: AppSupabaseClient, jobId: string, technicianId: string) =>
+  call<string>(client, "glass_send_display", { p_job_id: jobId, p_technician: technicianId });
+
+/** Grava o checklist de display do serviço de vidro (migration 96). */
+export const saveGlassDisplay = (client: AppSupabaseClient, jobId: string, results: Record<string, unknown>) =>
+  call<null>(client, "save_glass_display", { p_job_id: jobId, p_results: results });
+
+/** O que já foi marcado no checklist de display; sem a migration 96 a coluna não existe e volta em branco. */
+export async function fetchGlassDisplay(client: AppSupabaseClient, jobId: string): Promise<Record<string, "ok" | "fail" | "">> {
+  try {
+    const found = await rows<{ display_results: Record<string, "ok" | "fail" | ""> | null }>(
+      loose(client).from("repair_glass_jobs").select("display_results").eq("id", jobId).limit(1),
+    );
+    return found[0]?.display_results ?? {};
+  } catch {
+    return {};
+  }
+}
+
 /** Cronômetro do vidro: liga ao começar, pausa e retoma, para ao concluir. */
 export const glassTimerApi: TimerApi = {
   fetch: async (client, id) => toTimerTotals(await call(client, "glass_timer_totals", { p_job_id: id })),
