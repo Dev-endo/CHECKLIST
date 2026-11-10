@@ -109,6 +109,9 @@ export const finishGlass = (client: AppSupabaseClient, jobId: string, display = 
  */
 export const finishGlassKeep = (client: AppSupabaseClient, jobId: string) => call<string>(client, "finish_glass_keep", { p_job_id: jobId });
 
+/** Aparelho que chegou direto no vidro, display OK: fecha o serviço (nada mais a fazer na aba). Exige a migration 98. */
+export const finishGlassDirect = (client: AppSupabaseClient, jobId: string) => call<null>(client, "finish_glass_direct", { p_job_id: jobId });
+
 /**
  * Display (reprovado no teste ou solicitado antes dele): fecha o vidro e envia o aparelho ao técnico escolhido, que o
  * encontra no Estágio 2 com o aviso. Não pede nada ao estoque (migration 97).

@@ -1,33 +1,28 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { MISSING_PARTS_CATALOG, missingPartsPending } from "../../domain/repairChecklist";
 import { describeRepairError } from "../../domain/repairStages";
 import { useRepairChecklists } from "../../hooks/useRepairChecklists";
 import { useRepairDevice } from "../../hooks/useRepairDevice";
 import { useRepairTimer } from "../../hooks/useRepairTimer";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import type { GlassJob } from "../../services/supabase/glassService";
+import { completeGlass, type GlassJob } from "../../services/supabase/glassService";
 import {
   fetchMyOpenStages,
   fetchPersonName,
   finishGlassFlowDisassembly,
-  setTimer,
   startGlassFlow,
   type OpenStage,
   type RepairStage,
 } from "../../services/supabase/repairService";
 import { Button } from "../Button/Button";
-import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
 import { Checklist } from "../Checklist/Checklist";
 import { OsField } from "../DeviceForm/OsField";
 import { RepairTimer } from "../RepairStage1/RepairTimer";
-import { Stage2Panel } from "../RepairStage2/Stage2Panel";
 import { useToast } from "../Toast/ToastProvider";
 import stage1Styles from "../RepairStage1/RepairStage1.module.css";
 import styles from "./GlassPanel.module.css";
 
 const LOOKUP_DEBOUNCE_MS = 400;
-
-type Disassemble = "sim" | "nao";
 
 interface GlassDirectProps {
   client: AppSupabaseClient;
@@ -43,14 +38,13 @@ interface GlassDirectProps {
 }
 
 /**
- * Aparelho que chega direto no vidro: bipa o serial, responde se faz a desmontagem, faz o vidro e segue para o
- * checklist de display (o único do vidro), com os destinos do Reparo mais Manutenção.
+ * Aparelho que chega direto no vidro: bipa o serial, conclui o vidro (sem desmontagem nem estoque) e segue para o
+ * checklist de display (o único do vidro): OK finaliza; falha ou display solicitado vai para o técnico escolhido.
  */
 export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJob, reloadJobs }: GlassDirectProps) {
   const toast = useToast();
   const [typed, setTyped] = useState("");
   const [serial, setSerial] = useState("");
-  const [disassemble, setDisassemble] = useState<Disassemble | null>(null);
   const [busy, setBusy] = useState(false);
   const [mine, setMine] = useState<OpenStage[]>([]);
   const [mineReloads, setMineReloads] = useState(0);
@@ -69,7 +63,6 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
   useEffect(() => {
     const timer = setTimeout(() => {
       setSerial(typed.trim());
-      setDisassemble(null);
     }, LOOKUP_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [typed]);
@@ -77,7 +70,7 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
   // O que está em andamento com este técnico: dá para retomar depois de recarregar a página.
   useEffect(() => {
     let active = true;
-    fetchMyOpenStages(client, userId, ["desmontagem", "manutencao"])
+    fetchMyOpenStages(client, userId, ["desmontagem"])
       .then((found) => active && setMine(found))
       .catch(() => undefined);
     return () => {
@@ -94,11 +87,10 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
     if (serial) reloadDevice();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobStatus, serial]);
-  const maintenanceMine = Boolean(maintenance && (maintenance.technicianId === userId || isAdmin));
   const disassemblyMine = Boolean(disassembly && disassembly.status === "em_andamento" && (disassembly.technicianId === userId || isAdmin));
 
-  // De quem é a manutenção, quando não é deste técnico (ex.: foi direcionada para outro técnico).
-  const otherOwnerId = maintenance && !maintenanceMine ? maintenance.technicianId : null;
+  // De quem é a manutenção (o vidro não faz manutenção: o aparelho segue com o responsável ou com quem recebeu o display).
+  const otherOwnerId = maintenance ? maintenance.technicianId : null;
   useEffect(() => {
     setOwnerName(null);
     if (!otherOwnerId) return;
@@ -112,21 +104,26 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
   const clear = () => {
     setTyped("");
     setSerial("");
-    setDisassemble(null);
     reloadAll();
   };
 
+  // Vidro finalizado (entregue ao responsável ou display enviado): o aparelho sai da tela, sem abrir mais nenhuma escolha.
+  const lastJob = useRef<GlassJob | null>(null);
+  useEffect(() => {
+    const previous = lastJob.current;
+    lastJob.current = job;
+    if (previous && !job && previous.serial === serial) clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job]);
+
   const start = async () => {
-    if (!disassemble || !serial) return;
+    if (!serial) return;
     setBusy(true);
     try {
-      const id = await startGlassFlow(client, serial, disassemble === "sim");
-      if (disassemble === "sim") {
-        await setTimer(client, id, "produtivo");
-        toast("Desmontagem iniciada: Vidro e Aro já foram pedidos ao estoque");
-      } else {
-        toast("Serviço de vidro aberto: Vidro e Aro pedidos ao estoque");
-      }
+      // O vidro não desmonta nem usa o estoque: abre o serviço e já conclui; falta o checklist de display.
+      const jobId = await startGlassFlow(client, serial, false);
+      await completeGlass(client, jobId);
+      toast("Vidro concluído: responda o checklist de display");
       reloadAll();
     } catch (error) {
       toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível começar o fluxo do vidro."));
@@ -134,17 +131,6 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
       setBusy(false);
     }
   };
-
-  // Manutenção do próprio técnico: só o checklist de display e o destino (tela do Estágio 2 em modo vidro).
-  // Com um serviço de vidro ainda aberto, aparece o cartão do vidro (a manutenção anterior só fica finalizada).
-  if (serial && order && maintenance && maintenanceMine && (!job || maintenance.status !== "concluida")) {
-    return (
-      <section className={styles.direct} aria-label="Checklist de display do vidro">
-        <h2 className={stage1Styles.heading}>Vidro · checklist de display</h2>
-        <Stage2Panel key={maintenance.id} initialSerial={serial} onBack={clear} hideHeader glass />
-      </section>
-    );
-  }
 
   const resume = (item: OpenStage) => {
     setTyped(item.serial);
@@ -172,7 +158,7 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
           Em andamento:
           {mine.map((item) => (
             <Button key={item.id} variant="small" onClick={() => resume(item)}>
-              {item.serial} · OS {item.osNumber} · {item.stage === "manutencao" ? "checklist de display" : "desmontagem"}
+              {item.serial} · OS {item.osNumber} · desmontagem
             </Button>
           ))}
         </div>
@@ -202,7 +188,7 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
           {!hasProcess && <OsField client={client} serial={serial} onRegistered={reloadAll} />}
           {!order && <p className={stage1Styles.hint}>Registre a OS para continuar.</p>}
 
-          {order && maintenance && !maintenanceMine && !job && (
+          {order && maintenance && !job && (
             <p className={stage1Styles.hint} role="status">
               Este aparelho está na manutenção com <strong>{ownerName ?? "outro técnico"}</strong>
               {maintenance.status === "concluida" ? " (já finalizada)" : ""}.
@@ -214,7 +200,7 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
               {renderJob(job)}
               <p className={stage1Styles.hint}>
                 {job.origin === "vidro"
-                  ? "Conclua o vidro e siga para o checklist de display, que abre aqui mesmo."
+                  ? "Conclua o vidro e responda o checklist de display: tudo certo, finalize; display com falha (ou solicitado), escolha quem faz."
                   : "Conclua o vidro e responda o checklist de display: tudo certo, entregue a quem desmontou; display com falha (ou solicitado), escolha quem faz."}
               </p>
             </>
@@ -232,26 +218,11 @@ export function GlassDirect({ client, userId, isAdmin, technician, jobs, renderJ
 
           {order && !hasProcess && (
             <div className={stage1Styles.destinations}>
-              <ChoiceCards
-                name="glass-disassemble"
-                legend="Realizar desmontagem?"
-                value={disassemble}
-                onChange={setDisassemble}
-                disabled={busy}
-                options={[
-                  {
-                    id: "sim",
-                    label: "Sim",
-                    hint: "Mesmo processo de desmontagem do Reparo (cronômetro e perguntas). Vidro e Aro já são pedidos ao estoque.",
-                  },
-                  { id: "nao", label: "Não", hint: "Pula a desmontagem e vai direto para o reparo do vidro (pede Vidro e Aro)." },
-                ]}
-              />
               <div className={stage1Styles.actions}>
-                <Button disabled={busy || !disassemble} onClick={() => void start()}>
-                  {disassemble === "nao" ? "Ir para o vidro" : "Iniciar"}
+                <Button disabled={busy} onClick={() => void start()}>
+                  Concluir vidro
                 </Button>
-                {!disassemble && <span className={stage1Styles.hint}>Responda se vai desmontar o aparelho.</span>}
+                <span className={stage1Styles.hint}>Depois do vidro vem o checklist de display.</span>
               </div>
             </div>
           )}

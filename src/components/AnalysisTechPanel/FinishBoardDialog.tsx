@@ -13,7 +13,7 @@ interface FinishBoardDialogProps {
 
 const DESTINATIONS: { id: BoardDestination; label: string; hint: string }[] = [
   { id: "quarentena", label: "Checklist e montagem → Quarentena", hint: "Não há mais nenhum reparo: os checklists e a montagem abrem aqui em seguida; tudo aprovado, o aparelho vai para a quarentena." },
-  { id: "vidro", label: "Vidro", hint: "Entra no mesmo processo de vidro: pede Vidro e Aro ao estoque e abre o serviço na aba Vidro; depois volta a quem mandou para a análise." },
+  { id: "vidro", label: "Vidro", hint: "Entra no mesmo processo de vidro: abre o serviço na aba Vidro; depois volta a quem mandou para a análise." },
   { id: "estagio2", label: "Estágio 2", hint: "Ainda há outro reparo: o aparelho vai ao Estágio 2 de quem mandou para a análise." },
 ];
 

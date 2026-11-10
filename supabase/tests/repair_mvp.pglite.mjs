@@ -1,4 +1,4 @@
-// Testa as migrations 44-97 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
+// Testa as migrations 44-99 (Reparo/Estoque) num Postgres em WASM, sem tocar no Supabase.
 // Uso: npm i --no-save @electric-sql/pglite && node supabase/tests/repair_mvp.pglite.mjs
 // As tabelas antigas (profiles, service_orders...) são recriadas de forma mínima aqui; dados só existem em memória.
 import { PGlite } from "@electric-sql/pglite";
@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist", "92_cleaning_maintenance", "93_daily_goal_10", "94_reprovados_lookup", "95_declared_maintenance", "96_glass_simple", "97_glass_send_display"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist", "92_cleaning_maintenance", "93_daily_goal_10", "94_reprovados_lookup", "95_declared_maintenance", "96_glass_simple", "97_glass_send_display", "98_glass_direct_finish", "99_glass_no_stock"]) {
     const n = f.split("_")[0];
     const name = `202610080000${n}_${f.slice(3)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -52,7 +52,7 @@ async function applyAll() {
 }
 await applyAll();
 await applyAll(); // idempotente
-console.log("migrations 44-97 aplicadas (2x)");
+console.log("migrations 44-99 aplicadas (2x)");
 
 const V = {
   vid: "00000000-0000-0000-0000-000000000005",
@@ -382,7 +382,7 @@ r = await as("tec2", `select public.finish_evaluation('${e10}', 'vidro')`);
 ok("outro técnico não encaminha para vidro", r.err?.includes("sem permissão"));
 await as("tec", `select public.finish_evaluation('${e10}', 'vidro')`);
 q = (await db.query(`select part, status, origin_stage from public.stock_requests where os_id=(select id from public.service_orders where serial='SER10') order by part`)).rows;
-ok("vidro pede Vidro e Aro ao estoque", q.length === 2 && q[0].part === "Aro" && q[1].part === "Vidro" && q.every((x) => x.status === "pendente" && x.origin_stage === "avaliacao"), JSON.stringify(q));
+ok("vidro não pede nada ao estoque", q.length === 0, JSON.stringify(q));
 const job = (await db.query(`select id, responsible_id, status from public.repair_glass_jobs where serial='SER10'`)).rows[0];
 ok("serviço de vidro aponta o responsável pela desmontagem", job.responsible_id === U.tec && job.status === "aguardando");
 r = await as("tec", `select public.start_glass('${job.id}')`);
@@ -403,11 +403,6 @@ ok("pausar o vidro", gt.open_kind === "pausa", JSON.stringify(gt));
 await as("vid", `select public.glass_timer_set('${job.id}', 'produtivo')`);
 r = await as("vid", `select public.finish_glass('${job.id}')`);
 ok("não entrega sem concluir o vidro", r.err?.includes("pedido já fechado"), JSON.stringify(r));
-const glass = (await db.query(`select id, part from public.stock_requests where os_id=(select id from public.service_orders where serial='SER10')`)).rows;
-const vId = glass.find((x) => x.part === "Vidro").id;
-const aId = glass.find((x) => x.part === "Aro").id;
-await as("est", `select public.deliver_stock_requests($1::jsonb, 'g1')`, [JSON.stringify([{ id: vId }])]);
-await as("est", `select public.cancel_stock_request('${aId}','Aro dispensado pelo estoque')`);
 r = await as("vid", `select public.complete_glass('${job.id}')`);
 ok("com o vidro entregue, conclui o vidro", !r.err, JSON.stringify(r));
 gt = await one("vid", `select public.glass_timer_totals('${job.id}')`);
@@ -684,14 +679,11 @@ await as("ana", `select public.finish_board_repair('${b41}', 'Reballing do chip 
 q = (await db.query(`select origin, responsible_id, status from public.repair_glass_jobs where serial='SER41'`)).rows[0];
 ok("reparo em placa -> vidro abre o mesmo processo de vidro", q && q.origin === "analise" && q.responsible_id === U.tec && q.status === "aguardando", JSON.stringify(q));
 q = (await db.query(`select part from public.stock_requests where os_id=(select id from public.service_orders where serial='SER41') order by part`)).rows;
-ok("e pede Vidro e Aro ao estoque", q.length === 2 && q[0].part === "Aro" && q[1].part === "Vidro", JSON.stringify(q));
+ok("e não pede nada ao estoque", q.length === 0, JSON.stringify(q));
 r = await as("tec", `select serial from public.quarantine_pending() where serial = 'SER41'`);
 ok("indo para o vidro, não espera a quarentena", r.rows.length === 0);
 const job41 = (await db.query(`select id from public.repair_glass_jobs where serial='SER41'`)).rows[0].id;
 await as("vid", `select public.start_glass('${job41}')`);
-const g41 = (await db.query(`select id, part from public.stock_requests where os_id=(select id from public.service_orders where serial='SER41')`)).rows;
-await as("est", `select public.deliver_stock_requests($1::jsonb, 'g41')`, [JSON.stringify([{ id: g41.find((x) => x.part === "Vidro").id }])]);
-await as("est", `select public.cancel_stock_request('${g41.find((x) => x.part === "Aro").id}','Aro dispensado pelo estoque')`);
 await as("vid", `select public.complete_glass('${job41}')`);
 r = await as("vid", `select public.finish_glass('${job41}')`);
 q = r.rows?.[0] && (await db.query(`select status, technician_id from public.repair_stages where id='${Object.values(r.rows[0])[0]}'`)).rows[0];
@@ -863,15 +855,13 @@ ok("manutenção finaliza com destino vidro, sem exigir o checklist", r.rows?.[0
 q = (await db.query(`select origin, responsible_id, status from public.repair_glass_jobs where serial='SER80'`)).rows[0];
 ok("abre o mesmo serviço de vidro, devolvendo a quem fez a manutenção", q && q.origin === "manutencao" && q.responsible_id === U.tec && q.status === "aguardando", JSON.stringify(q));
 q = (await db.query(`select part from public.stock_requests where os_id=(select id from public.service_orders where serial='SER80') order by part`)).rows;
-ok("pede Vidro e Aro ao estoque", q.length === 2 && q[0].part === "Aro" && q[1].part === "Vidro", JSON.stringify(q));
+ok("não pede nada ao estoque", q.length === 0, JSON.stringify(q));
 r = await as("tec", `select serial from public.quarantine_pending() where serial = 'SER80'`);
 ok("indo para o vidro, ainda não espera a quarentena", r.rows.length === 0);
 q = (await db.query(`select count(*)::int c from public.repair_analysis_queue where serial='SER80'`)).rows[0].c;
 ok("vidro não entra na fila de Análise", q === 0);
 const job80 = (await db.query(`select id from public.repair_glass_jobs where serial='SER80'`)).rows[0].id;
 await as("vid", `select public.start_glass('${job80}')`);
-const g80 = (await db.query(`select id, part from public.stock_requests where os_id=(select id from public.service_orders where serial='SER80')`)).rows;
-await as("est", `select public.deliver_stock_requests($1::jsonb, 'g80')`, [JSON.stringify(g80.map((x) => ({ id: x.id })))]);
 await as("vid", `select public.complete_glass('${job80}')`);
 await as("vid", `select public.finish_glass('${job80}')`);
 q = (await db.query(`select status, outcome from public.repair_stages where id='${m80}'`)).rows[0];
@@ -885,8 +875,6 @@ const e90 = await one("tec", `select public.finish_disassembly('${await one("tec
 await as("tec", `select public.finish_evaluation('${e90}', 'vidro')`);
 const job90 = (await db.query(`select id from public.repair_glass_jobs where serial='SER90'`)).rows[0].id;
 await as("vid", `select public.start_glass('${job90}')`);
-const g90 = (await db.query(`select id from public.stock_requests where os_id=(select id from public.service_orders where serial='SER90')`)).rows;
-await as("est", `select public.deliver_stock_requests($1::jsonb, 'g90')`, [JSON.stringify(g90.map((x) => ({ id: x.id })))]);
 await as("vid", `select public.complete_glass('${job90}')`);
 r = await as("vid", `select public.finish_glass('${job90}', true)`);
 const m90 = r.rows?.[0] && Object.values(r.rows[0])[0];
@@ -1216,28 +1204,27 @@ const mG = await one("tec", `select public.finish_evaluation('${eG}', 'manutenca
 q = (await db.query(`select needs_glass from public.repair_stages where id = '${mG}'`)).rows[0];
 ok("vidro e outra manutenção: Estágio 2 marcado", q?.needs_glass === true, JSON.stringify(q));
 q = (await db.query(`select part, glass, stage_id::text, status from public.stock_requests where serial_key = 'serg1' order by part`)).rows;
-ok("Vidro e Aro pedidos já no Estágio 1, presos ao Estágio 2", q.length === 2 && q.every(x => x.glass && x.stage_id === mG && x.status === "pendente"), JSON.stringify(q));
+ok("vidro e outra manutenção não pede nada ao estoque", q.length === 0, JSON.stringify(q));
 const glassDef = await one("tec", `select public.create_stock_request('SERG1', 'Bateria', 'definitiva', 1)`);
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'g82a')`, [JSON.stringify([{ id: glassDef }])]);
 q = (await db.query(`select public.repair_finish_blockers(os_id) b from public.repair_stages where id = '${mG}'`)).rows[0];
 ok("pedido de vidro em aberto não trava a finalização", Array.isArray(q.b) && q.b.length === 0, JSON.stringify(q));
 r = await as("tec", `select public.finish_maintenance('${mG}', array['t1'], array['t3'], p_glass => true)`);
-ok("finaliza para o vidro sem checklist, com Vidro e Aro ainda pendentes", !r.err && r.rows[0].finish_maintenance === "vidro", JSON.stringify(r));
+ok("finaliza para o vidro sem checklist", !r.err && r.rows[0].finish_maintenance === "vidro", JSON.stringify(r));
 q = (await db.query(`select (select count(*)::int from public.stock_requests where serial_key = 'serg1' and glass) n,
   (select count(*)::int from public.repair_glass_jobs where serial_key = 'serg1') jobs,
   (select needs_glass from public.repair_stages where id = '${mG}') flag,
   (select maintenance_count from public.repair_stages where id = '${mG}') cnt`)).rows[0];
-ok("não pede Vidro e Aro de novo; abre o serviço de vidro", q.n === 2 && q.jobs === 1 && q.flag === false, JSON.stringify(q));
+ok("abre o serviço de vidro sem pedido ao estoque", q.n === 0 && q.jobs === 1 && q.flag === false, JSON.stringify(q));
 ok("só a peça do técnico conta como manutenção (vidro não)", q.cnt === 1, JSON.stringify(q));
-await as("est", `select public.deliver_stock_requests((select jsonb_agg(jsonb_build_object('id', id)) from public.stock_requests where serial_key = 'serg1' and glass), 'g82b')`);
 q = (await db.query(`select public.repair_maintenance_items('${mG}') i`)).rows[0];
-ok("peças do vidro entregues continuam fora das manutenções", JSON.stringify(q.i).includes("Bateria") && !JSON.stringify(q.i).includes("Vidro"), JSON.stringify(q));
+ok("só a peça do técnico entra nas manutenções", JSON.stringify(q.i).includes("Bateria") && !JSON.stringify(q.i).includes("Vidro"), JSON.stringify(q));
 
 // Só vidro: como antes (vai direto, pede as peças marcadas como vidro).
 const eG2 = await evalOf("SERG2", "OS-G2");
 await as("tec", `select public.finish_evaluation('${eG2}', 'vidro')`);
 q = (await db.query(`select count(*)::int n, bool_and(glass) g from public.stock_requests where serial_key = 'serg2'`)).rows[0];
-ok("só vidro: pede Vidro e Aro (marcados como vidro)", q.n === 2 && q.g === true, JSON.stringify(q));
+ok("só vidro: não pede nada ao estoque", q.n === 0, JSON.stringify(q));
 
 // Aguardando peças não espera o vidro.
 const eG3 = await evalOf("SERG3", "OS-G3");
@@ -1253,13 +1240,13 @@ const lg = await one("tec", `select public.start_legacy_maintenance('ANTIGOG')`)
 r = await as("tec2", `select public.request_glass_parts('${lg}')`);
 ok("outro técnico não pede o vidro do checklist alheio", !!r.err, JSON.stringify(r));
 r = await as("tec", `select public.request_glass_parts('${lg}')`);
-ok("checklist manutenção: pede Vidro e Aro", !r.err, JSON.stringify(r));
+ok("checklist manutenção: marca vidro e outra manutenção", !r.err, JSON.stringify(r));
 await as("tec", `select public.request_glass_parts('${lg}')`);
 q = (await db.query(`select count(*)::int n from public.stock_requests where serial_key = 'antigog' and glass`)).rows[0];
-ok("pedir de novo não duplica", q.n === 2, JSON.stringify(q));
+ok("marcar de novo não pede nada ao estoque", q.n === 0, JSON.stringify(q));
 r = await as("tec", `select public.finish_maintenance('${lg}', array['t1'], array['t3'], p_glass => true)`);
 q = (await db.query(`select count(*)::int n from public.stock_requests where serial_key = 'antigog' and glass`)).rows[0];
-ok("checklist manutenção vai para o vidro sem pedir de novo", !r.err && q.n === 2, JSON.stringify([r, q]));
+ok("checklist manutenção vai para o vidro sem pedir ao estoque", !r.err && q.n === 0, JSON.stringify([r, q]));
 
 // ---- Meta diária (migration 82)
 q = await one("tec", `select public.repair_my_goal()`);
@@ -1398,7 +1385,7 @@ ok("técnico de vidro começa com desmontagem", typeof gv1 === "string", JSON.st
 q = (await db.query(`select stage, flow, technician_id, needs_glass, status from public.repair_stages where id='${gv1}'`)).rows[0];
 ok("a desmontagem é do técnico de vidro, no fluxo do vidro", q.stage === "desmontagem" && q.flow === "vidro" && q.technician_id === U.vid && q.needs_glass && q.status === "em_andamento", JSON.stringify(q));
 q = (await db.query(`select part, glass, origin_stage, status from public.stock_requests where serial='GV1' order by part`)).rows;
-ok("pede Vidro e Aro ao estoque já ao começar", q.length === 2 && q[0].part === "Aro" && q[1].part === "Vidro" && q.every((x) => x.glass && x.status === "pendente"), JSON.stringify(q));
+ok("começar não pede nada ao estoque", q.length === 0, JSON.stringify(q));
 ok("repetir devolve a mesma desmontagem", (await one("vid", `select public.start_glass_flow('GV1', true)`)) === gv1);
 r = await as("vid", `select public.repair_timer_set('${gv1}','produtivo')`);
 ok("técnico de vidro liga o cronômetro da própria desmontagem", !r.err, JSON.stringify(r));
@@ -1408,7 +1395,7 @@ const gj1 = await one("vid", `select public.finish_glass_flow_disassembly('${gv1
 ok("concluir a desmontagem abre o serviço de vidro", typeof gj1 === "string", JSON.stringify(gj1));
 q = (await db.query(`select origin, responsible_id, stage_id, status from public.repair_glass_jobs where id='${gj1}'`)).rows[0];
 ok("o serviço é do técnico de vidro, origem vidro", q.origin === "vidro" && q.responsible_id === U.vid && q.stage_id === gv1 && q.status === "aguardando", JSON.stringify(q));
-ok("Vidro e Aro não são pedidos de novo", (await db.query(`select count(*)::int c from public.stock_requests where serial='GV1'`)).rows[0].c === 2);
+ok("o serviço de vidro não pede nada ao estoque", (await db.query(`select count(*)::int c from public.stock_requests where serial='GV1'`)).rows[0].c === 0);
 ok("o fluxo do vidro não abre avaliação técnica", (await db.query(`select count(*)::int c from public.repair_stages where serial='GV1' and stage='avaliacao'`)).rows[0].c === 0);
 ok("a desmontagem fica concluída", (await db.query(`select status from public.repair_stages where id='${gv1}'`)).rows[0].status === "concluida");
 r = await as("vid", `select public.start_glass_flow('GV1', false)`);
@@ -1456,7 +1443,7 @@ const gj2 = await one("vid", `select public.start_glass_flow('GV2', false)`);
 q = (await db.query(`select origin, responsible_id, stage_id, status from public.repair_glass_jobs where id='${gj2}'`)).rows[0];
 ok("sem desmontagem abre o serviço de vidro direto", q.origin === "vidro" && q.responsible_id === U.vid && q.stage_id === null && q.status === "aguardando", JSON.stringify(q));
 q = (await db.query(`select part, glass, stage_id from public.stock_requests where serial='GV2' order by part`)).rows;
-ok("sem desmontagem também pede Vidro e Aro", q.length === 2 && q.every((x) => x.glass && x.stage_id === null), JSON.stringify(q));
+ok("sem desmontagem também não pede nada ao estoque", q.length === 0, JSON.stringify(q));
 ok("sem desmontagem não cria etapa", (await db.query(`select count(*)::int c from public.repair_stages where serial='GV2'`)).rows[0].c === 0);
 const g2Ids = (await db.query(`select id from public.stock_requests where serial='GV2'`)).rows.map((x) => ({ id: x.id }));
 await as("est", `select public.deliver_stock_requests($1::jsonb, 'gv2')`, [JSON.stringify(g2Ids)]);
@@ -1584,7 +1571,7 @@ const sgs1 = await one("tec", `select public.start_disassembly('GS1')`);
 const egs1 = await one("tec", `select public.finish_disassembly('${sgs1}')`);
 await as("tec", `select public.finish_evaluation('${egs1}', 'vidro')`);
 const jgs1 = (await db.query(`select id, status from public.repair_glass_jobs where serial='GS1'`)).rows[0];
-ok("o vidro do Reparo nasce aguardando, com Vidro e Aro pendentes no estoque", jgs1.status === "aguardando" && (await db.query(`select count(*)::int c from public.stock_requests where serial='GS1' and status = 'pendente'`)).rows[0].c === 2);
+ok("o vidro do Reparo nasce aguardando, sem nada no estoque", jgs1.status === "aguardando" && (await db.query(`select count(*)::int c from public.stock_requests where serial='GS1'`)).rows[0].c === 0);
 r = await as("tec", `select public.complete_glass('${jgs1.id}')`);
 ok("técnico comum não conclui o vidro", r.err?.includes("sem permissão"), JSON.stringify(r));
 r = await as("vid", `select public.finish_glass('${jgs1.id}')`);
@@ -1602,7 +1589,7 @@ ok("técnico de vidro grava o checklist de display", !r.err, JSON.stringify(r));
 q = (await db.query(`select display_results from public.repair_glass_jobs where id='${jgs1.id}'`)).rows[0];
 ok("o checklist de display fica no serviço", q.display_results["tela-e-touch"] === "fail", JSON.stringify(q));
 r = await as("vid", `select public.finish_glass('${jgs1.id}', true)`);
-ok("entrega ao responsável mesmo com Vidro e Aro pendentes no estoque", !r.err, JSON.stringify(r));
+ok("entrega ao responsável", !r.err, JSON.stringify(r));
 ok("nada é pedido ao estoque na entrega", (await db.query(`select count(*)::int c from public.stock_requests where serial='GS1' and part='Display'`)).rows[0].c === 0);
 q = (await db.query(`select status, technician_id from public.repair_stages where os_id=(select id from public.service_orders where serial='GS1') and stage='manutencao'`)).rows[0];
 ok("o aparelho volta ao Estágio 2 do responsável, sem travar", q.status === "em_andamento" && q.technician_id === U.tec, JSON.stringify(q));
@@ -1652,6 +1639,23 @@ q = (await db.query(`select status, technician_id, handover_note from public.rep
 ok("dá para solicitar display antes do teste, escolhendo até quem desmontou", q.status === "em_andamento" && q.technician_id === U.tec && q.handover_note.includes("solicitado"), JSON.stringify(q));
 q = (await db.query(`select status, glass_done_by from public.repair_glass_jobs where id='${jgx2}'`)).rows[0];
 ok("o vidro é concluído junto, por quem solicitou", q.status === "concluido" && q.glass_done_by === U.vid, JSON.stringify(q));
+
+// ---- Vidro direto no modelo novo: só finaliza o vidro (migration 98)
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('GF1','OS-GF1','${U.vid}'),('GF2','OS-GF2','${U.tec}')`);
+const jgf1 = await one("vid", `select public.start_glass_flow('GF1', false)`);
+r = await as("vid", `select public.finish_glass_direct('${jgf1}')`);
+ok("não finaliza o vidro direto antes de concluir o vidro", r.err?.includes("pedido já fechado"), JSON.stringify(r));
+await as("vid", `select public.complete_glass('${jgf1}')`);
+r = await as("tec", `select public.finish_glass_direct('${jgf1}')`);
+ok("técnico comum não finaliza o vidro direto", r.err?.includes("sem permissão"), JSON.stringify(r));
+r = await as("vid", `select public.finish_glass_direct('${jgf1}')`);
+ok("técnico de vidro finaliza o vidro direto", !r.err, JSON.stringify(r));
+q = (await db.query(`select status, finished_by from public.repair_glass_jobs where id='${jgf1}'`)).rows[0];
+ok("o serviço fecha sem abrir manutenção", q.status === "concluido" && q.finished_by === U.vid && (await db.query(`select count(*)::int c from public.repair_stages where serial='GF1' and stage='manutencao'`)).rows[0].c === 0, JSON.stringify(q));
+const jgf2 = await glassJobFor("GF2");
+await as("vid", `select public.complete_glass('${jgf2}')`);
+r = await as("vid", `select public.finish_glass_direct('${jgf2}')`);
+ok("serviço vindo do Reparo não usa a finalização direta", r.err?.includes("pedido já fechado"), JSON.stringify(r));
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);

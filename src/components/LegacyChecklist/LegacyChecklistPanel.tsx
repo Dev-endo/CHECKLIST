@@ -251,15 +251,15 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       setGlassAnswer(value);
       return;
     }
-    if (!window.confirm("Vidro e outra manutenção: pedir Vidro e Aro ao estoque agora? Ao finalizar, o aparelho vai para o vidro sem checklist.")) return;
+    if (!window.confirm("Vidro e outra manutenção: ao finalizar, o aparelho vai para o vidro sem checklist. Confirmar?")) return;
     setBusy(true);
     try {
       await requestGlassParts(client, stageId);
       setOpened((current) => (current && current.stageId === stageId ? { ...current, needsGlass: true } : current));
       setGlassAnswer(value);
-      toast("Vidro e Aro pedidos ao estoque");
+      toast("Marcado: vidro e outra manutenção");
     } catch (error) {
-      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível pedir o Vidro e o Aro."));
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível marcar o vidro."));
     } finally {
       setBusy(false);
     }
@@ -505,15 +505,15 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
               id: "vidro_mais",
               label: GLASS_LABELS.vidro_mais,
               hint: stageId
-                ? "Pede Vidro e Aro agora. Faça a manutenção; ao finalizar, vai para o vidro sem checklist."
-                : "Bipe o serial primeiro: Vidro e Aro são pedidos na hora.",
+                ? "Faça a manutenção; ao finalizar, vai para o vidro sem checklist."
+                : "Bipe o serial primeiro.",
               disabled: !stageId,
             },
           ]}
         />
         {glassLocked && (
           <p className={stage1Styles.hint} role="status">
-            Vidro e Aro já pedidos ao estoque. Faça a manutenção; ao finalizar, o aparelho vai para o vidro (checklist opcional).
+            Vidro e outra manutenção marcado. Faça a manutenção; ao finalizar, o aparelho vai para o vidro (checklist opcional).
           </p>
         )}
       </section>

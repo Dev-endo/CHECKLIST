@@ -184,7 +184,7 @@ function Stage1({ client, userId, technician }: Stage1Props) {
     const label = STAGE1_DESTINATIONS.find((d) => d.id === chosen)?.label ?? chosen;
     const withGlass = glass === "vidro_mais";
     const confirmed = withGlass
-      ? window.confirm(`Vidro e outra manutenção: pedir Vidro e Aro ao estoque e enviar o aparelho para: ${label}? Ao finalizar o Estágio 2, ele vai para o vidro.`)
+      ? window.confirm(`Vidro e outra manutenção: enviar o aparelho para: ${label}? Ao finalizar o Estágio 2, ele vai para o vidro.`)
       : chosen === "manutencao"
         ? confirmOpenRequests("o Estágio 2")
         : window.confirm(`Enviar o aparelho para: ${label}? Isso encerra o Estágio 1.`);
@@ -192,7 +192,7 @@ function Stage1({ client, userId, technician }: Stage1Props) {
     setBusy(true);
     try {
       await finishEvaluation(client, evaluation.id, chosen, analysisNote, withGlass);
-      toast(withGlass ? `Avaliação técnica concluída: ${label} (Vidro e Aro pedidos)` : `Avaliação técnica concluída: ${label}`);
+      toast(withGlass ? `Avaliação técnica concluída: ${label} (depois vai para o vidro)` : `Avaliação técnica concluída: ${label}`);
       setDestination("manutencao");
       setGlass(null);
       setAnalysisNote("");
@@ -366,11 +366,11 @@ function Stage1({ client, userId, technician }: Stage1Props) {
                         disabled={busy}
                         options={[
                           { id: "nao", label: GLASS_LABELS.nao, hint: "Segue o fluxo normal." },
-                          { id: "so_vidro", label: GLASS_LABELS.so_vidro, hint: "Pede Vidro e Aro e vai direto para o Vidro (sem Estágio 2)." },
+                          { id: "so_vidro", label: GLASS_LABELS.so_vidro, hint: "Vai direto para o Vidro (sem Estágio 2)." },
                           {
                             id: "vidro_mais",
                             label: GLASS_LABELS.vidro_mais,
-                            hint: "Pede Vidro e Aro agora e vai para o Estágio 2. Ao finalizar a manutenção, vai para o vidro sem checklist.",
+                            hint: "Vai para o Estágio 2. Ao finalizar a manutenção, vai para o vidro sem checklist.",
                           },
                         ]}
                       />

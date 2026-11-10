@@ -157,7 +157,7 @@ export const needsReason = (destination: FinishDestination) =>
 export const FINISH_DESTINATIONS: readonly { id: FinishDestination; label: string; hint: string }[] = [
   { id: "auto", label: "Quarentena", hint: "Tudo aprovado. Com algum teste reprovado, o aparelho vai para a Análise técnica." },
   { id: "analise", label: "Análise técnica", hint: "Entra na fila da Análise técnica, mesmo sem teste reprovado. Não precisa dos testes com o aparelho fechado." },
-  { id: "vidro", label: "Vidro", hint: "Não precisa do checklist: pede Vidro e Aro e abre o serviço na aba Vidro; depois o aparelho volta para você." },
+  { id: "vidro", label: "Vidro", hint: "Não precisa do checklist: abre o serviço na aba Vidro; depois o aparelho volta para você." },
   { id: "revenda", label: "Revenda", hint: "Exige o motivo." },
   { id: "pt", label: "PT (perda total)", hint: "Exige o motivo e não precisa do checklist. Fica pendente até um administrador ou supervisor aprovar." },
   { id: "bloqueado", label: "Bloqueado", hint: "Ativo travado (conta, MDM ou operadora). Exige o motivo e não precisa do checklist." },

@@ -211,7 +211,7 @@ export type Stage1Destination = "manutencao" | "vidro" | "analise" | "aguardando
 
 export const STAGE1_DESTINATIONS: readonly { id: Stage1Destination; label: string; hint: string }[] = [
   { id: "manutencao", label: "Estágio 2 (manutenção)", hint: "O aparelho segue para a manutenção com os pedidos de peça da OS." },
-  { id: "vidro", label: "Vidro", hint: "Só quando o aparelho precisa apenas de vidro. Pede Vidro e Aro ao estoque e abre o serviço na aba Vidro." },
+  { id: "vidro", label: "Vidro", hint: "Só quando o aparelho precisa apenas de vidro. Abre o serviço na aba Vidro." },
   { id: "analise", label: "Análise técnica", hint: "O aparelho entra na fila da aba Análise técnica." },
   {
     id: "aguardando_pecas",

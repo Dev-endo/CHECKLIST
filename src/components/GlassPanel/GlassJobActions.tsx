@@ -7,6 +7,7 @@ import {
   completeGlass,
   fetchGlassDisplay,
   finishGlass,
+  finishGlassDirect,
   glassSendDisplay,
   saveGlassDisplay,
   type GlassJob,
@@ -36,7 +37,6 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
   const [results, setResults] = useState<Results>({});
   const [loaded, setLoaded] = useState(false);
   const [technicians, setTechnicians] = useState<MaintenanceTechnician[]>([]);
-  const [technicianId, setTechnicianId] = useState("");
   const dirty = useRef(false);
   const latest = useRef<Results>({});
   latest.current = results;
@@ -96,20 +96,20 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
 
   const answer = DISPLAY_BLOCK ? results[DISPLAY_BLOCK.id] : undefined;
   const failed = answer === "fail";
-  // Aparelho que chegou direto no vidro segue pelo checklist do Estágio 2 (só o display); os demais voltam ao responsável.
-  const showDisplayCheck = !direct && DISPLAY_BLOCK;
-  const technicianName = technicians.find((item) => item.id === technicianId)?.name;
+  const showDisplayCheck = DISPLAY_BLOCK;
 
-  const sendDisplay = () => {
+  // Escolher o técnico já envia o display e finaliza o vidro (com uma confirmação).
+  const sendDisplay = (technicianId: string) => {
     if (!technicianId) return;
-    if (!window.confirm(`Enviar o aparelho para ${technicianName ?? "o técnico"} trocar o display? Nada é pedido ao estoque.`)) return;
-    void run(job, flushThen(() => glassSendDisplay(client, job.id, technicianId)), `Display enviado para ${technicianName ?? "o técnico"}`, "Não foi possível enviar o display.");
+    const name = technicians.find((item) => item.id === technicianId)?.name ?? "o técnico";
+    if (!window.confirm(`Enviar o aparelho para ${name} trocar o display? O vidro é finalizado e nada é pedido ao estoque.`)) return;
+    void run(job, flushThen(() => glassSendDisplay(client, job.id, technicianId)), `Display enviado para ${name}`, "Não foi possível enviar o display.");
   };
 
   const picker = (
     <label className={styles.muted}>
-      Quem faz o display?{" "}
-      <select value={technicianId} disabled={loading} onChange={(e) => setTechnicianId(e.target.value)}>
+      {failed ? "Enviar display para:" : "Solicitar display para:"}{" "}
+      <select value="" disabled={loading} onChange={(e) => sendDisplay(e.target.value)}>
         <option value="">{technicians.length ? "Escolha o técnico…" : "Nenhum técnico encontrado"}</option>
         {technicians.map((item) => (
           <option key={item.id} value={item.id}>
@@ -143,17 +143,17 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
 
       {failed && (
         <p className={styles.muted} role="status">
-          <strong>Display reprovado:</strong> o aparelho vira display. Escolha quem vai fazer.
+          <strong>Display reprovado:</strong> o aparelho vira display. Escolha o técnico abaixo e o vidro é finalizado.
         </p>
       )}
 
       <div className={styles.actions}>
-        {direct && (
+        {direct && answer === "ok" && (
           <Button
             disabled={loading}
-            onClick={() => void run(job, () => finishGlass(client, job.id), "Vidro entregue: siga para o checklist de display", "Não foi possível seguir para o checklist.")}
+            onClick={() => void run(job, flushThen(() => finishGlassDirect(client, job.id)), "Vidro finalizado", "Não foi possível finalizar o vidro.")}
           >
-            Seguir para o checklist
+            Finalizar vidro
           </Button>
         )}
         {!direct && answer === "ok" && (
@@ -164,11 +164,8 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
             Entregar ao responsável ({job.responsible})
           </Button>
         )}
-        {!direct && !answer && <span className={styles.muted}>Responda o checklist de display para entregar ao responsável.</span>}
+        {!answer && <span className={styles.muted}>Responda o checklist de display para {direct ? "finalizar" : "entregar ao responsável"}.</span>}
         {picker}
-        <Button variant="danger" disabled={loading || !technicianId} onClick={sendDisplay}>
-          {failed ? "Enviar display" : "Solicitar display"}
-        </Button>
       </div>
     </>
   );

@@ -383,8 +383,8 @@ function Stage2({ client, userId, technician, title, subtitle, assemblyOnly, ini
 
               {needsGlass && (
                 <p className={styles.glassNotice} role="status">
-                  <strong>Vidro e outra manutenção.</strong> O Vidro e o Aro já foram pedidos ao estoque (são do técnico de vidro e não travam a
-                  finalização). Faça a manutenção e finalize: o aparelho vai para o vidro sem precisar do checklist.
+                  <strong>Vidro e outra manutenção.</strong> O vidro é feito na aba Vidro e não trava a
+                  finalização. Faça a manutenção e finalize: o aparelho vai para o vidro sem precisar do checklist.
                 </p>
               )}
 

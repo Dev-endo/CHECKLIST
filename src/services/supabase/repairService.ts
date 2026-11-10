@@ -225,7 +225,7 @@ export const finishEvaluation = (client: AppSupabaseClient, stageId: string, des
     p_glass: glass,
   });
 
-/** Manutenção em andamento: "vidro e outra manutenção" pede Vidro e Aro agora; ao finalizar, vai para o vidro. */
+/** Manutenção em andamento: "vidro e outra manutenção" marca o aparelho; ao finalizar, vai para o vidro. */
 export const requestGlassParts = (client: AppSupabaseClient, stageId: string) => call<null>(client, "request_glass_parts", { p_stage_id: stageId });
 
 // Cronômetro ------------------------------------------------------------------------------------------------
@@ -395,7 +395,7 @@ export const fetchMaintenanceItems = (client: AppSupabaseClient, stageId: string
 // Vidro direto: o técnico de vidro recebe o aparelho, faz o vidro e segue para o checklist (migration 90) ---------
 
 /**
- * Começa o fluxo do vidro. Com desmontagem devolve o id da desmontagem (que já pede Vidro e Aro); sem desmontagem
+ * Começa o fluxo do vidro. Com desmontagem devolve o id da desmontagem; sem desmontagem
  * devolve o id do serviço de vidro, já aberto.
  */
 export const startGlassFlow = (client: AppSupabaseClient, serial: string, disassemble: boolean) =>
