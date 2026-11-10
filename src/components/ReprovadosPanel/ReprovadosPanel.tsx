@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useState, type ClipboardEvent, type FormEvent } from "react";
 import { splitAssetId } from "../../domain/device";
 import { OUTCOME_LABELS } from "../../domain/repairChecklist";
 import { describeRepairError } from "../../domain/repairStages";
-import { lookupAsset } from "../../services/supabase/assetsService";
+import { assetsBySerial } from "../../services/supabase/stockBoardService";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchReprovados, type ReprovadoRow } from "../../services/supabase/repairService";
 import { Button } from "../Button/Button";
@@ -15,6 +15,12 @@ interface Entry {
   serial: string;
   unit: string | null;
 }
+
+const MAX_SERIALS = 500;
+const CHUNK = 100;
+
+/** Separa o que foi colado ou bipado: um serial por linha, ou separados por espaço, tabulação, vírgula ou ponto e vírgula. */
+const splitSerials = (text: string) => text.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean);
 
 const dash = (value: string | null) => value || "—";
 const outcomeLabel = (outcome: string | null) =>
@@ -51,17 +57,48 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ReprovadoRow[] | null>(null);
 
+  // Vários de uma vez (colados da planilha, por exemplo) ou um bipado: repetidos são ignorados.
+  const addMany = async (values: string[]) => {
+    const known = new Set(entries.map((entry) => entry.serial.toLowerCase()));
+    const fresh: string[] = [];
+    for (const value of values) {
+      const key = value.toLowerCase();
+      if (known.has(key)) continue;
+      known.add(key);
+      fresh.push(value);
+    }
+    const room = Math.max(0, MAX_SERIALS - entries.length);
+    const accepted = fresh.slice(0, room);
+    if (!accepted.length) {
+      if (values.length) toast(fresh.length ? `A lista aceita até ${MAX_SERIALS} seriais.` : "Esses seriais já estão na lista.");
+      return;
+    }
+    // Aparecem na hora; o modelo e a unidade entram em seguida.
+    setEntries((prev) => [...prev, ...accepted.filter((value) => !prev.some((entry) => entry.serial.toLowerCase() === value.toLowerCase())).map((value) => ({ serial: value, unit: null }))]);
+    const units = new Map<string, string>();
+    for (let i = 0; i < accepted.length; i += CHUNK) {
+      const found = await assetsBySerial(client, accepted.slice(i, i + CHUNK)).catch(() => null);
+      found?.forEach((asset, key) => units.set(key, asset.unit));
+    }
+    if (units.size) setEntries((prev) => prev.map((entry) => (entry.unit ? entry : { ...entry, unit: units.get(entry.serial.toLowerCase()) ?? null })));
+    const skipped = values.length - accepted.length;
+    if (values.length > 1) toast(`${accepted.length} seriais adicionados${skipped ? ` (${skipped} repetidos ou acima do limite ignorados)` : ""}`);
+  };
+
   const add = async (event: FormEvent) => {
     event.preventDefault();
-    const value = serial.trim();
-    if (!value) return;
+    const values = splitSerials(serial);
     setSerial("");
-    const key = value.toLowerCase();
-    if (entries.some((entry) => entry.serial.toLowerCase() === key)) return;
-    const unit = await lookupAsset(client, value)
-      .then((asset) => asset?.assetShortId ?? null)
-      .catch(() => null);
-    setEntries((prev) => (prev.some((entry) => entry.serial.toLowerCase() === key) ? prev : [...prev, { serial: value, unit }]));
+    if (values.length) await addMany(values);
+  };
+
+  // Colar uma lista inteira (várias linhas) adiciona todos os seriais de uma vez.
+  const paste = (event: ClipboardEvent<HTMLInputElement>) => {
+    const values = splitSerials(event.clipboardData.getData("text"));
+    if (values.length < 2) return;
+    event.preventDefault();
+    setSerial("");
+    void addMany(values);
   };
 
   const conclude = async () => {
@@ -175,7 +212,8 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
               <input
                 value={serial}
                 onChange={(e) => setSerial(e.target.value)}
-                placeholder="Bipe o serial e aperte Enter"
+                onPaste={paste}
+                placeholder="Bipe o serial e aperte Enter, ou cole vários de uma vez"
                 autoComplete="off"
                 autoFocus
                 disabled={busy}
@@ -206,7 +244,7 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
           )}
 
           <div className={quarantineStyles.footer}>
-            <span>{entries.length} bipados</span>
+            <span>{entries.length} na lista</span>
             <Button onClick={() => void conclude()} disabled={busy || !entries.length}>
               {busy ? "Buscando…" : "Concluir"}
             </Button>
