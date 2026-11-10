@@ -64,7 +64,7 @@ const startOfToday = () => {
 };
 
 /** Por que o checklist não abriu (sem OS o técnico registra ali mesmo). */
-type Problem = { kind: "no_os" } | { kind: "confirm_os" } | { kind: "other_owner"; name: string } | { kind: "message"; text: string } | null;
+type Problem = { kind: "no_os" } | { kind: "confirm_os" } | { kind: "other_owner"; name: string } | { kind: "message"; text: string; waiting?: boolean } | null;
 
 function problemFor(error: unknown): Problem {
   const text = (error as { message?: string })?.message ?? "";
@@ -73,7 +73,7 @@ function problemFor(error: unknown): Problem {
   if (text.includes("disassembly_open")) return { kind: "message", text: "Este aparelho está no Estágio 1 do Reparo: siga por lá." };
   if (text.includes("in_repair")) return { kind: "message", text: "Este aparelho está no Estágio 2 do Reparo: siga por lá." };
   if (text.includes("pt_pending")) return { kind: "message", text: "Este aparelho tem um PT aguardando a aprovação de um administrador ou supervisor." };
-  if (text.includes("in_glass")) return { kind: "message", text: "Este aparelho está no Vidro. O checklist volta para quem o enviou quando o vidro terminar." };
+  if (text.includes("in_glass")) return { kind: "message", waiting: true, text: "Este aparelho está no Vidro. O checklist volta para quem o enviou quando o vidro terminar." };
   return { kind: "message", text: describeRepairError(error as { code?: string; message?: string }, "Não foi possível abrir o checklist. Tente de novo.") };
 }
 
@@ -181,6 +181,14 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       active = false;
     };
   }, [client, serial, tries, osConfirmed]);
+
+  // No Vidro: quando o vidro termina o checklist volta sozinho; a tela tenta abrir de novo até liberar.
+  const waitingGlass = Boolean(serial && problem?.kind === "message" && problem.waiting);
+  useEffect(() => {
+    if (!waitingGlass) return;
+    const poll = setInterval(retry, 10_000);
+    return () => clearInterval(poll);
+  }, [waitingGlass, retry]);
 
   // Começados e não finalizados (para retomar) e os finalizados hoje (a contagem do dia).
   useEffect(() => {

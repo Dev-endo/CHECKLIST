@@ -1526,6 +1526,26 @@ await as("tec", `select public.finish_maintenance('${mcl2}', array[]::text[], ar
 q = (await db.query(`select maintenance_count from public.repair_stages where id='${mcl2}'`)).rows[0];
 ok("limpeza + 1 peça contam 2 manutenções", q.maintenance_count === 2, JSON.stringify(q));
 
+// ---- Checklist manutenção -> vidro -> volta: quem abriu retoma e consegue marcar
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('LV1','OS-LV1','${U.tec}')`);
+const lv1 = await one("tec", `select public.start_legacy_maintenance('LV1')`);
+r = await as("tec", `select public.finish_maintenance('${lv1}', array[]::text[], array[]::text[], false, null, '{}', true, p_analysis_note => 'Motivo de teste')`);
+ok("checklist manutenção finaliza para o vidro", r.rows?.[0] && Object.values(r.rows[0])[0] === "vidro", JSON.stringify(r));
+r = await as("tec", `select public.start_legacy_maintenance('LV1')`);
+ok("enquanto está no vidro, o checklist não abre", r.err === "in_glass", JSON.stringify(r));
+const jlv1 = (await db.query(`select id from public.repair_glass_jobs where serial='LV1'`)).rows[0].id;
+await as("vid", `select public.start_glass('${jlv1}')`);
+const glv1 = (await db.query(`select id from public.stock_requests where serial='LV1'`)).rows.map((x) => ({ id: x.id }));
+await as("est", `select public.deliver_stock_requests($1::jsonb, 'lv1')`, [JSON.stringify(glv1)]);
+await as("vid", `select public.complete_glass('${jlv1}')`);
+await as("vid", `select public.finish_glass('${jlv1}')`);
+q = (await db.query(`select status, technician_id, legacy, needs_glass from public.repair_stages where id='${lv1}'`)).rows[0];
+ok("o vidro devolve o checklist reaberto ao técnico", q.status === "em_andamento" && q.technician_id === U.tec && q.legacy === true, JSON.stringify(q));
+r = await as("tec", `select public.start_legacy_maintenance('LV1')`);
+ok("o técnico retoma o mesmo checklist", !r.err && Object.values(r.rows[0])[0] === lv1, JSON.stringify(r));
+r = await as("tec", `select public.save_repair_checklist('${lv1}', 'aberto', '{"t1":"ok"}'::jsonb)`);
+ok("e consegue marcar o checklist", !r.err, JSON.stringify(r));
+
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);
 ok("movimentações são imutáveis", r instanceof Error && /imutável/.test(r.message));
