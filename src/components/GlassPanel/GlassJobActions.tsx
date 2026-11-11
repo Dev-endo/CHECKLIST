@@ -26,10 +26,9 @@ type Run = (job: GlassJob, task: () => Promise<unknown>, done: string, fallback:
 /**
  * Ações do serviço de vidro: o técnico só faz o vidro e testa a tela.
  * 1) "Concluir vidro" (sem espera do estoque nem cronômetro);
- * 2) checklist de display: tudo certo, aparece "Entregar ao responsável" (quem desmontou); falha, o aparelho vira
- *    display e o técnico escolhe quem faz;
- * 3) "Solicitar display" pode ser usado a qualquer momento depois do vidro, também escolhendo quem faz.
- * Nada disso cria pedido no estoque.
+ * 2) checklist de display; 3) entregar ao responsável (quem desmontou) ou enviar para outro técnico.
+ * "Troca de display" é só uma marca (vem sozinha quando o teste falha, ou o técnico marca antes do teste): não depende
+ * de enviar para outro técnico e não pede nada ao estoque.
  */
 export function GlassJobActions({ client, job, loading, direct, run }: { client: AppSupabaseClient; job: GlassJob; loading: boolean; direct: boolean; run: Run }) {
   const open = job.status === "aguardando" || job.status === "em_andamento";
@@ -37,6 +36,8 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
   const [results, setResults] = useState<Results>({});
   const [loaded, setLoaded] = useState(false);
   const [technicians, setTechnicians] = useState<MaintenanceTechnician[]>([]);
+  // Troca de display pedida à mão (a falha no teste também pede, sozinha).
+  const [displayAsked, setDisplayAsked] = useState(false);
   const dirty = useRef(false);
   const latest = useRef<Results>({});
   latest.current = results;
@@ -97,19 +98,22 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
   const answer = DISPLAY_BLOCK ? results[DISPLAY_BLOCK.id] : undefined;
   const failed = answer === "fail";
   const showDisplayCheck = DISPLAY_BLOCK;
+  const wantsDisplay = failed || displayAsked;
+  // Pode finalizar com o teste respondido, ou com a troca de display já solicitada (antes do teste).
+  const canFinish = Boolean(answer) || wantsDisplay;
 
-  // Escolher o técnico já envia o display e finaliza o vidro (com uma confirmação).
-  const sendDisplay = (technicianId: string) => {
+  // Escolher o técnico envia o aparelho para ele e finaliza o vidro (com uma confirmação); é independente da troca de display.
+  const sendToTechnician = (technicianId: string) => {
     if (!technicianId) return;
     const name = technicians.find((item) => item.id === technicianId)?.name ?? "o técnico";
-    if (!window.confirm(`Enviar o aparelho para ${name} trocar o display? O vidro é finalizado e nada é pedido ao estoque.`)) return;
-    void run(job, flushThen(() => glassSendDisplay(client, job.id, technicianId)), `Display enviado para ${name}`, "Não foi possível enviar o display.");
+    if (!window.confirm(`Enviar o aparelho para ${name}? O vidro é finalizado${wantsDisplay ? " com a troca de display solicitada" : ""}.`)) return;
+    void run(job, flushThen(() => glassSendDisplay(client, job.id, technicianId, wantsDisplay)), `Aparelho enviado para ${name}`, "Não foi possível enviar o aparelho.");
   };
 
   const picker = (
     <label className={styles.muted}>
-      {failed ? "Enviar display para:" : "Solicitar display para:"}{" "}
-      <select value="" disabled={loading} onChange={(e) => sendDisplay(e.target.value)}>
+      Enviar para outro técnico:{" "}
+      <select value="" disabled={loading || !canFinish} onChange={(e) => sendToTechnician(e.target.value)}>
         <option value="">{technicians.length ? "Escolha o técnico…" : "Nenhum técnico encontrado"}</option>
         {technicians.map((item) => (
           <option key={item.id} value={item.id}>
@@ -141,30 +145,32 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
         </div>
       )}
 
-      {failed && (
-        <p className={styles.muted} role="status">
-          <strong>Display reprovado:</strong> o aparelho vira display. Escolha o técnico abaixo e o vidro é finalizado.
-        </p>
-      )}
+      <label className={styles.muted} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input type="checkbox" checked={wantsDisplay} disabled={loading || failed} onChange={(e) => setDisplayAsked(e.target.checked)} />
+        <span>
+          <strong>Solicitar troca de display</strong>
+          {failed ? " (display reprovado no teste: já solicitada)" : " (pode marcar antes do teste)"}
+        </span>
+      </label>
 
       <div className={styles.actions}>
-        {direct && answer === "ok" && (
+        {direct && canFinish && (
           <Button
             disabled={loading}
-            onClick={() => void run(job, flushThen(() => finishGlassDirect(client, job.id)), "Vidro finalizado", "Não foi possível finalizar o vidro.")}
+            onClick={() => void run(job, flushThen(() => finishGlassDirect(client, job.id, wantsDisplay)), "Vidro finalizado", "Não foi possível finalizar o vidro.")}
           >
             Finalizar vidro
           </Button>
         )}
-        {!direct && answer === "ok" && (
+        {!direct && canFinish && (
           <Button
             disabled={loading}
-            onClick={() => void run(job, flushThen(() => finishGlass(client, job.id)), `Entregue a ${job.responsible}`, "Não foi possível entregar o aparelho.")}
+            onClick={() => void run(job, flushThen(() => finishGlass(client, job.id, wantsDisplay)), `Entregue a ${job.responsible}`, "Não foi possível entregar o aparelho.")}
           >
             Entregar ao responsável ({job.responsible})
           </Button>
         )}
-        {!answer && <span className={styles.muted}>Responda o checklist de display para {direct ? "finalizar" : "entregar ao responsável"}.</span>}
+        {!canFinish && <span className={styles.muted}>Responda o checklist de display (ou solicite a troca) para {direct ? "finalizar" : "entregar ao responsável"}.</span>}
         {picker}
       </div>
     </>
