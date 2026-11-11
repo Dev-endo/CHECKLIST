@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist", "92_cleaning_maintenance", "93_daily_goal_10", "94_reprovados_lookup", "95_declared_maintenance", "96_glass_simple", "97_glass_send_display", "98_glass_direct_finish", "99_glass_no_stock", "100_glass_send_separate"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist", "92_cleaning_maintenance", "93_daily_goal_10", "94_reprovados_lookup", "95_declared_maintenance", "96_glass_simple", "97_glass_send_display", "98_glass_direct_finish", "99_glass_no_stock", "100_glass_send_separate", "101_glass_return_unlock"]) {
     const n = f.split("_")[0];
     const name = `2026100800${String(n).padStart(4, "0")}_${f.slice(f.indexOf("_") + 1)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -1671,6 +1671,21 @@ await as("vid", `select public.complete_glass('${jgy2}')`);
 const mgy2 = await one("vid", `select public.finish_glass('${jgy2}', true)`);
 q = (await db.query(`select technician_id, handover_from, handover_note from public.repair_stages where id='${mgy2}'`)).rows[0];
 ok("troca de display sem enviar a outro técnico: volta ao responsável com o aviso", q.technician_id === U.tec && q.handover_from === U.vid && q.handover_note.includes("Troca de display"), JSON.stringify(q));
+
+// ---- Vidro: ao voltar, a marca "vidro e outra manutenção" é zerada e o checklist abre (migration 101)
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('GZ1','OS-GZ1','${U.tec}')`);
+await as("tec", `select public.start_legacy_maintenance('GZ1')`);
+await db.exec(`update public.repair_stages set needs_glass = true where serial = 'GZ1' and stage = 'manutencao'`);
+await as("tec", `select public.finish_maintenance((select id from public.repair_stages where serial='GZ1' and stage='manutencao'), 'vidro')`).catch(() => null);
+const jgz = await glassJobFor("GZ1").catch(() => null);
+if (jgz) {
+  await as("vid", `select public.complete_glass('${jgz}')`);
+  await as("vid", `select public.finish_glass('${jgz}', false)`);
+  q = (await db.query(`select needs_glass, status from public.repair_stages where serial='GZ1' and stage='manutencao'`)).rows[0];
+  ok("ao voltar do vidro o checklist não fica travado (needs_glass zerado)", q.needs_glass === false && q.status === "em_andamento", JSON.stringify(q));
+  const reopen = await one("tec", `select public.start_legacy_maintenance('GZ1')`).catch((e) => "erro " + e.message);
+  ok("o técnico consegue abrir o checklist de volta", typeof reopen === "string" && !reopen.startsWith("erro"), String(reopen));
+} else ok("vidro aberto no teste GZ1", false, "sem job");
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);
