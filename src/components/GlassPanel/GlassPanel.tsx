@@ -87,7 +87,10 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
       toast(done);
       reload();
     } catch (error) {
-      toast(describeRepairError(error as { code?: string; message?: string }, fallback));
+      const err = error as { code?: string; message?: string };
+      const known = describeRepairError(err, fallback);
+      // Erro não reconhecido: mostra o motivo técnico para facilitar o diagnóstico.
+      toast(known === fallback && err?.message ? `${fallback} (${err.message})` : known);
     } finally {
       setBusy(null);
     }
