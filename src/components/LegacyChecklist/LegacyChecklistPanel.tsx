@@ -131,6 +131,13 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   // OS obrigatória: checklist novo só abre depois de o técnico confirmar a OS atual ou registrar uma nova passagem.
   const [osConfirmed, setOsConfirmed] = useState<string | null>(null);
   const [currentOs, setCurrentOs] = useState<string | null | undefined>(undefined);
+  // "Usar uma nova OS" escolhido: mostra o campo para registrar.
+  const [newOs, setNewOs] = useState(false);
+  // Outro serial: esquece a OS do anterior e a escolha de OS nova.
+  useEffect(() => {
+    setCurrentOs(undefined);
+    setNewOs(false);
+  }, [serial]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSerial(typed.trim()), LOOKUP_DEBOUNCE_MS);
@@ -434,14 +441,47 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         </p>
       )}
       {serial && problem?.kind === "message" && <p className={stage1Styles.hint}>{problem.text}</p>}
-      {serial && !stageId && !opening && (problem?.kind === "confirm_os" || problem?.kind === "no_os" || problem?.kind === "message") && (
+      {serial && !stageId && !opening && problem?.kind === "confirm_os" && (
+        <section className={styles.osBox} aria-label="OS do aparelho">
+          <p>
+            {currentOs === null
+              ? "Este aparelho não tem OS. Digite a OS e registre: o checklist abre em seguida."
+              : `Este aparelho tem a OS ${currentOs ?? "…"}. Se ele foi reprovado na quarentena, use a mesma OS; se voltou ao laboratório numa nova passagem, use uma nova.`}
+          </p>
+          {currentOs !== null && (
+            <div className={stage1Styles.actions}>
+              <Button disabled={busy} onClick={() => setOsConfirmed(serial)}>
+                Usar a mesma OS{currentOs ? ` (${currentOs})` : ""}
+              </Button>
+              <Button variant="ghost" disabled={busy} onClick={() => setNewOs(true)}>
+                Usar uma nova OS
+              </Button>
+            </div>
+          )}
+          {(currentOs === null || newOs) && (
+            <OsField
+              client={client}
+              serial={serial}
+              required
+              disabled={busy}
+              onCurrent={setCurrentOs}
+              onRegistered={() => {
+                setNewOs(false);
+                setOsConfirmed(serial);
+                retry();
+              }}
+            />
+          )}
+          {/* Carrega a OS atual mesmo com o campo escondido. */}
+          {currentOs === undefined && !newOs && <OsField client={client} serial={serial} onCurrent={setCurrentOs} disabled />}
+        </section>
+      )}
+      {serial && !stageId && !opening && (problem?.kind === "no_os" || problem?.kind === "message") && (
         <section className={styles.osBox} aria-label="OS do aparelho">
           <p>
             {problem.kind === "message"
               ? "Se o aparelho voltou ao laboratório numa nova passagem, registre a nova OS: o checklist abre nela."
-              : currentOs
-                ? `Este aparelho tem a OS ${currentOs}. Se é uma nova passagem pelo laboratório, registre a nova OS; se é a mesma, continue com ela.`
-                : "Este aparelho não tem OS. Digite a OS e registre: o checklist abre em seguida."}
+              : "Este aparelho não tem OS. Digite a OS e registre: o checklist abre em seguida."}
           </p>
           <OsField
             client={client}
@@ -454,13 +494,6 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
               retry();
             }}
           />
-          {problem.kind === "confirm_os" && currentOs && (
-            <div className={stage1Styles.actions}>
-              <Button disabled={busy} onClick={() => setOsConfirmed(serial)}>
-                Continuar com a OS {currentOs}
-              </Button>
-            </div>
-          )}
         </section>
       )}
       {serial && problem?.kind === "other_owner" && (
