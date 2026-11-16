@@ -76,7 +76,14 @@ export function OsField({ client, serial, disabled = false, onRegistered, onCurr
       const asset = await lookupAsset(client, key).catch(() => null);
       const result = await registerServiceOrder(client, { serial: key, osNumber: number, unit: asset?.assetShortId ?? null });
       if (result === "duplicate") {
-        toast("Essa OS já foi registrada. Confira o número.");
+        // Diz em qual serial a OS está registrada (o número vale uma vez só no sistema).
+        const owner = await client
+          .from("service_orders")
+          .select("serial")
+          .eq("os_key", number.toLowerCase())
+          .limit(1)
+          .then((found) => (found.data as { serial: string }[] | null)?.[0]?.serial ?? null, () => null);
+        toast(owner ? `A OS ${number} já está registrada no serial ${owner}. Confira o número ou o serial.` : "Essa OS já foi registrada. Confira o número.");
       } else {
         toast(`OS ${number} registrada`);
         setTouched(false);

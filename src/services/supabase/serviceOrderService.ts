@@ -66,6 +66,15 @@ export async function fetchAssetOrders(client: AppSupabaseClient, serial: string
   return withAssets(client, data as unknown as OrderRow[]);
 }
 
+/** O serial da OS digitada (número exato), ou null se não existe. O número de OS vale uma vez só no sistema. */
+export async function serialOfOrder(client: AppSupabaseClient, osNumber: string): Promise<string | null> {
+  const key = osNumber.trim().toLowerCase();
+  if (!key) return null;
+  const { data, error } = await client.from("service_orders").select("serial").eq("os_key", key).limit(1);
+  if (error) throw error;
+  return (data as { serial: string }[] | null)?.[0]?.serial ?? null;
+}
+
 export type RegisterOrderResult = "ok" | "duplicate";
 
 /** O desmontador registra a OS do ativo. "duplicate": esse número de OS já foi registrado. */

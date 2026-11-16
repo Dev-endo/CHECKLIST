@@ -30,6 +30,7 @@ import {
   type OpenStage,
 } from "../../services/supabase/repairService";
 import { assetsBySerial } from "../../services/supabase/stockBoardService";
+import { serialOfOrder } from "../../services/supabase/serviceOrderService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
 import { Checklist } from "../Checklist/Checklist";
@@ -139,10 +140,31 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
     setNewOs(false);
   }, [serial]);
 
+  // Digitou o serial ou o número da OS: se for uma OS registrada, troca pelo serial do aparelho dela.
   useEffect(() => {
-    const timer = setTimeout(() => setSerial(typed.trim()), LOOKUP_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [typed]);
+    let active = true;
+    const timer = setTimeout(() => {
+      const value = typed.trim();
+      if (!value) {
+        setSerial("");
+        return;
+      }
+      serialOfOrder(client, value)
+        .catch(() => null)
+        .then((found) => {
+          if (!active) return;
+          if (found && found.trim().toLowerCase() !== value.toLowerCase()) {
+            toast(`OS ${value}: aparelho ${found}`);
+            setTyped(found);
+            setSerial(found.trim());
+          } else setSerial(value);
+        });
+    }, LOOKUP_DEBOUNCE_MS);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [typed, client, toast]);
 
   // Bipou: modelo e Unit ID na hora.
   useEffect(() => {
@@ -384,7 +406,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
 
       <div className={styles.top}>
         <div className={stage1Styles.serial}>
-          <label htmlFor="legacy-serial">Serial do aparelho</label>
+          <label htmlFor="legacy-serial">Serial do aparelho ou número da OS</label>
           <div className={styles.serialRow}>
             <input
               id="legacy-serial"
@@ -393,7 +415,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
               autoFocus
               autoComplete="off"
               spellCheck={false}
-              placeholder="Bipe ou digite o serial"
+              placeholder="Bipe o serial ou digite a OS"
               disabled={busy}
               onChange={(e) => setTyped(e.target.value)}
             />
@@ -448,7 +470,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
           <p>
             {!knownOs && currentOs === null
               ? "Este aparelho não tem OS. Digite a OS e registre: o checklist abre em seguida."
-              : `Este aparelho tem a OS ${knownOs ?? "…"}. Se ele foi reprovado na quarentena, use a mesma OS; se voltou ao laboratório numa nova passagem, use uma nova.`}
+              : `Este aparelho ${knownOs ? `tem a OS ${knownOs}` : "já passou pelo laboratório"}. Se ele foi reprovado na quarentena, use a mesma OS; se voltou ao laboratório numa nova passagem, use uma nova.`}
           </p>
           {(knownOs || currentOs !== null) && (
             <div className={stage1Styles.actions}>
