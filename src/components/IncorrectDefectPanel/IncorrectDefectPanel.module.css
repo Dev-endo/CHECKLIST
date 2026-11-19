@@ -1,0 +1,98 @@
+.box {
+  border: 1px solid var(--line, #d5dde0);
+  border-radius: 10px;
+  padding: 22px;
+  margin: 14px 0;
+  display: grid;
+  gap: 14px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+}
+
+.head small,
+.help {
+  color: var(--muted, #5f6f75);
+}
+
+.help {
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 1px solid var(--line, #d5dde0);
+  border-radius: 10px;
+  background: var(--surface, transparent);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.option span {
+  flex: 1;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.option:has(input:checked) {
+  border-color: var(--accent, #0b7a82);
+  background: color-mix(in srgb, var(--accent, #0b7a82) 12%, transparent);
+  font-weight: 700;
+}
+
+.note {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sub {
+  margin: 18px 0 6px;
+}
+
+.info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+}
+
+.info dt {
+  font-size: 0.8rem;
+  color: var(--muted, #5f6f75);
+}
+
+.info dd {
+  margin: 0;
+  font-weight: 700;
+}

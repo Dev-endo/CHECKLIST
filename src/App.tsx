@@ -26,6 +26,7 @@ import { StockPanel } from "./components/StockPanel/StockPanel";
 import { ServiceOrderPanel } from "./components/ServiceOrderPanel/ServiceOrderPanel";
 import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { ReprovadosPanel } from "./components/ReprovadosPanel/ReprovadosPanel";
+import { IncorrectDefectPanel } from "./components/IncorrectDefectPanel/IncorrectDefectPanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
 import { ReviewSection } from "./components/ReviewSection/ReviewSection";
 import { DashboardPanel } from "./components/Dashboard/DashboardPanel";
@@ -273,6 +274,7 @@ export default function App() {
         {activeTab === "montagem" && <AssemblyChecklist />}
         {activeTab === "quarentena" && client && <QuarantinePanel client={client} userId={userId} showPending />}
         {activeTab === "reprovados" && client && <ReprovadosPanel client={client} />}
+        {activeTab === "defeito_incorreto" && client && <IncorrectDefectPanel client={client} />}
         {activeTab === "solicitacoes" && client && <StockRequestsPanel client={client} />}
         {activeTab === "estoque" && client && <StockPanel client={client} />}
         {activeTab === "emprestimos" && client && <LoansPanel client={client} />}

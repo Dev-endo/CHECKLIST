@@ -16,6 +16,8 @@ const GROUPS: { id: string; label: string; tabs: readonly TabId[] }[] = [
   { id: "quarentena", label: "Quarentena", tabs: ["quarentena"] },
   // Bipa vários seriais e mostra quem fez a desmontagem, o checklist, a manutenção e a montagem de cada um.
   { id: "reprovados", label: "Reprovados", tabs: ["reprovados"] },
+  // Bipa o ativo e marca a peça cujo defeito não foi identificado; aberto para todos. A Análise mostra o resumo.
+  { id: "defeito_incorreto", label: "Defeito incorreto", tabs: ["defeito_incorreto"] },
   { id: "analise_tecnica", label: "Análise técnica", tabs: ["analise_tecnica", "reparo_placa", "analise_montagem"] },
   { id: "vidro", label: "Vidro", tabs: ["vidro"] },
   // A consulta de OS fica em Estoque.
@@ -45,6 +47,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   montagem: "Montagem",
   quarentena: "Quarentena",
   reprovados: "Reprovados",
+  defeito_incorreto: "Defeito incorreto",
   registros: "Análise (antiga)",
   dashboard: "Análise",
   aprovacao_pt: "Aprovação PT",
