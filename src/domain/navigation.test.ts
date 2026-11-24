@@ -18,6 +18,7 @@ describe("navGroups", () => {
       ["Estoque", ["solicitacoes", "os"]],
       ["Análise", ["dashboard"]],
       ["Aprovação PT", ["aprovacao_pt"]],
+      ["Liberação", ["liberacao"]],
       ["Administração", ["admin"]],
     ]);
   });

@@ -26,6 +26,7 @@ import { StockPanel } from "./components/StockPanel/StockPanel";
 import { ServiceOrderPanel } from "./components/ServiceOrderPanel/ServiceOrderPanel";
 import { QuarantinePanel } from "./components/QuarantinePanel/QuarantinePanel";
 import { ReprovadosPanel } from "./components/ReprovadosPanel/ReprovadosPanel";
+import { ReleasePanel } from "./components/ReleasePanel/ReleasePanel";
 import { IncorrectDefectPanel } from "./components/IncorrectDefectPanel/IncorrectDefectPanel";
 import { MaintenanceDialog } from "./components/MaintenanceDialog/MaintenanceDialog";
 import { ReviewSection } from "./components/ReviewSection/ReviewSection";
@@ -282,6 +283,7 @@ export default function App() {
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
         {activeTab === "dashboard" && client && <DashboardPanel client={client} />}
         {activeTab === "aprovacao_pt" && client && <PtApprovalPanel client={client} />}
+        {activeTab === "liberacao" && <ReleasePanel />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 
         {activeTab === "checklist" && (

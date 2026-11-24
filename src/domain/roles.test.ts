@@ -38,6 +38,7 @@ describe("accessibleTabs", () => {
       "os",
       "dashboard",
       "aprovacao_pt",
+      "liberacao",
       "admin",
     ]);
   });

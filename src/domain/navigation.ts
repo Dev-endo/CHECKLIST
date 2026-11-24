@@ -25,6 +25,8 @@ const GROUPS: { id: string; label: string; tabs: readonly TabId[] }[] = [
   { id: "analise", label: "Análise", tabs: ["dashboard"] },
   // Pedidos de perda total esperando administrador ou supervisor.
   { id: "aprovacao_pt", label: "Aprovação PT", tabs: ["aprovacao_pt"] },
+  // Só admin: pedidos de liberação de checklist dos colaboradores.
+  { id: "liberacao", label: "Liberação", tabs: ["liberacao"] },
   { id: "admin", label: "Administração", tabs: ["admin"] },
 ];
 
@@ -51,6 +53,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   registros: "Análise (antiga)",
   dashboard: "Análise",
   aprovacao_pt: "Aprovação PT",
+  liberacao: "Liberação",
   admin: "Administração",
 };
 

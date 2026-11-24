@@ -137,6 +137,81 @@ export const startLegacyMaintenance = (client: AppSupabaseClient, serial: string
 export const takeLegacyChecklist = (client: AppSupabaseClient, serial: string) =>
   call<string>(client, "take_legacy_checklist", { p_serial: serial });
 
+/** Admin: passa o checklist em andamento para outro técnico (as marcações ficam). */
+export const adminReassignChecklist = (client: AppSupabaseClient, stageId: string, technicianId: string) =>
+  call<null>(client, "admin_reassign_checklist", { p_stage_id: stageId, p_technician: technicianId });
+
+/** Técnico: pede ao admin a liberação do checklist que está com outra pessoa. */
+export const requestChecklistRelease = (client: AppSupabaseClient, serial: string) =>
+  call<string>(client, "request_checklist_release", { p_serial: serial });
+
+export const myChecklistReleasePending = (client: AppSupabaseClient, serial: string) =>
+  call<boolean>(client, "my_checklist_release_pending", { p_serial: serial }).then((found) => Boolean(found));
+
+export interface ChecklistReleaseRequest {
+  id: string;
+  serial: string;
+  requester: string;
+  owner: string;
+  createdAt: string;
+}
+
+/** Admin: pedidos de liberação pendentes. */
+export async function listChecklistRequests(client: AppSupabaseClient): Promise<ChecklistReleaseRequest[]> {
+  const found = await call<{ id: string; serial: string; requester: string | null; owner: string | null; created_at: string }[] | null>(
+    client,
+    "list_checklist_requests",
+  );
+  return (found ?? []).map((row) => ({ id: row.id, serial: row.serial, requester: row.requester ?? "—", owner: row.owner ?? "—", createdAt: row.created_at }));
+}
+
+export interface ChecklistRequestRow {
+  id: string;
+  serial: string;
+  osNumber: string | null;
+  model: string | null;
+  requester: string;
+  owner: string;
+  status: "pendente" | "aprovado" | "recusado" | "cancelado";
+  createdAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
+/** Admin (aba Liberação): pendentes e os decididos nos últimos dias. */
+export async function listChecklistRequestsAll(client: AppSupabaseClient, days = 7): Promise<ChecklistRequestRow[]> {
+  const found = await call<
+    | {
+        id: string;
+        serial: string;
+        os_number: string | null;
+        model: string | null;
+        requester: string | null;
+        owner: string | null;
+        status: ChecklistRequestRow["status"];
+        created_at: string;
+        decided_by: string | null;
+        decided_at: string | null;
+      }[]
+    | null
+  >(client, "list_checklist_requests_all", { p_days: days });
+  return (found ?? []).map((row) => ({
+    id: row.id,
+    serial: row.serial,
+    osNumber: row.os_number,
+    model: row.model,
+    requester: row.requester ?? "—",
+    owner: row.owner ?? "—",
+    status: row.status,
+    createdAt: row.created_at,
+    decidedBy: row.decided_by,
+    decidedAt: row.decided_at,
+  }));
+}
+
+export const decideChecklistRequest = (client: AppSupabaseClient, id: string, approve: boolean) =>
+  call<null>(client, "decide_checklist_request", { p_id: id, p_approve: approve });
+
 export interface LegacyChecklist {
   id: string;
   serial: string;

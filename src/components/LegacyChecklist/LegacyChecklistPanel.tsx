@@ -17,7 +17,15 @@ import {
 import { describeRepairError, GLASS_LABELS, type GlassAnswer } from "../../domain/repairStages";
 import { useRepairChecklists } from "../../hooks/useRepairChecklists";
 import type { AppSupabaseClient } from "../../services/supabase/client";
+import { canManageUsers } from "../../domain/roles";
 import {
+  adminReassignChecklist,
+  fetchHandover,
+  fetchPersonName,
+  listMaintenanceTechnicians,
+  myChecklistReleasePending,
+  requestChecklistRelease,
+  type MaintenanceTechnician,
   fetchLastLegacy,
   fetchMyLegacyFinished,
   fetchMyOpenStages,
@@ -89,6 +97,8 @@ interface Opened {
   previous: LegacyChecklist | null;
   /** Vidro e outra manutenção já marcado (Vidro e Aro pedidos). */
   needsGlass: boolean;
+  /** Quem está com o checklist (técnico dono da manutenção). */
+  ownerId: string | null;
 }
 
 /**
@@ -100,10 +110,10 @@ interface Opened {
 export function LegacyChecklistPanel() {
   const { user, client } = useAuth();
   if (!client || !user) return <p className={appStyles.banner}>Entre com a sua conta para usar o Checklist manutenção.</p>;
-  return <Legacy client={client} userId={user.id} technician={user.name || user.email} />;
+  return <Legacy client={client} userId={user.id} technician={user.name || user.email} admin={canManageUsers(user.roles)} />;
 }
 
-function Legacy({ client, userId, technician }: { client: AppSupabaseClient; userId: string; technician: string }) {
+function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClient; userId: string; technician: string; admin: boolean }) {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState("");
@@ -134,11 +144,103 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
   const [currentOs, setCurrentOs] = useState<string | null | undefined>(undefined);
   // "Usar uma nova OS" escolhido: mostra o campo para registrar.
   const [newOs, setNewOs] = useState(false);
+  // Troca de responsável (admin) e pedido de liberação (técnico, quando o checklist está com outro).
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+  const [crew, setCrew] = useState<MaintenanceTechnician[]>([]);
+  const [requested, setRequested] = useState(false);
+  // Por que o checklist está com o outro: ele começou, ou o ativo foi direcionado a ele (e por quem).
+  const [ownerInfo, setOwnerInfo] = useState<{ directed: boolean; from: string | null } | null>(null);
   // Outro serial: esquece a OS do anterior e a escolha de OS nova.
   useEffect(() => {
     setCurrentOs(undefined);
     setNewOs(false);
   }, [serial]);
+
+  // Nome de quem está com o checklist aberto (pode não ser quem bipou, quando o admin abre o de outro).
+  const openedOwner = opened?.ownerId ?? null;
+  useEffect(() => {
+    setOwnerName(null);
+    if (!openedOwner || openedOwner === userId) return;
+    let active = true;
+    fetchPersonName(client, openedOwner)
+      .then((name) => active && setOwnerName(name))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, openedOwner, userId]);
+
+  // Admin: lista de técnicos para trocar o responsável.
+  useEffect(() => {
+    if (!admin) return;
+    listMaintenanceTechnicians(client)
+      .then(setCrew)
+      .catch(() => undefined);
+  }, [client, admin]);
+
+  // Checklist de outro técnico: já existe pedido de liberação meu para este serial?
+  const blockedBy = problem?.kind === "other_owner" ? serial : "";
+  useEffect(() => {
+    setRequested(false);
+    if (!blockedBy) return;
+    let active = true;
+    myChecklistReleasePending(client, blockedBy)
+      .then((found) => active && setRequested(found))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, blockedBy]);
+
+  useEffect(() => {
+    setOwnerInfo(null);
+    if (!blockedBy) return;
+    let active = true;
+    (async () => {
+      const last = await fetchLastLegacy(client, blockedBy).catch(() => null);
+      const handover = last && last.status !== "concluida" ? await fetchHandover(client, last.id) : null;
+      if (active) setOwnerInfo({ directed: Boolean(handover), from: handover?.from ?? null });
+    })().catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, blockedBy]);
+
+  // Pedido enviado: tenta abrir de novo até o admin liberar (o checklist passa para quem pediu).
+  useEffect(() => {
+    if (!requested || !blockedBy) return;
+    const poll = setInterval(retry, 10_000);
+    return () => clearInterval(poll);
+  }, [requested, blockedBy, retry]);
+
+  const requestRelease = async () => {
+    setBusy(true);
+    try {
+      await requestChecklistRelease(client, serial);
+      setRequested(true);
+      toast("Pedido enviado ao admin. Quando ele liberar, o checklist passa para você.");
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível pedir a liberação. Tente de novo."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reassign = async (technicianId: string) => {
+    if (!technicianId || !stageId) return;
+    const name = crew.find((item) => item.id === technicianId)?.name ?? "o técnico";
+    if (!window.confirm(`Passar o checklist de ${serial} para ${name}? As marcações feitas ficam.`)) return;
+    setBusy(true);
+    try {
+      await adminReassignChecklist(client, stageId, technicianId);
+      toast(`Checklist passado para ${name}`);
+      setOpened((current) => (current && current.stageId === stageId ? { ...current, ownerId: technicianId } : current));
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível trocar o responsável."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Digitou o serial ou o número da OS: se for uma OS registrada, troca pelo serial do aparelho dela.
   useEffect(() => {
@@ -205,6 +307,7 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
         resumed,
         previous: previous?.status === "concluida" ? previous : null,
         needsGlass: current?.id === stageId ? current.needsGlass : false,
+        ownerId: current?.id === stageId ? current.technicianId : null,
       });
     })()
       .catch((error) => active && setProblem(problemFor(error)))
@@ -442,10 +545,26 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
           </div>
           <div>
             <dt>Técnico</dt>
-            <dd>{technician}</dd>
+            <dd>{stageId && openedOwner && openedOwner !== userId ? (ownerName ?? "…") : technician}</dd>
           </div>
         </dl>
       </div>
+
+      {admin && stageId && crew.length > 0 && (
+        <label className={stage1Styles.hint}>
+          Responsável pelo checklist (admin):{" "}
+          <select value="" disabled={busy} onChange={(e) => void reassign(e.target.value)}>
+            <option value="">Trocar para…</option>
+            {crew
+              .filter((item) => item.id !== openedOwner)
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
 
       {serial && opening && <p className={stage1Styles.hint}>Abrindo o checklist…</p>}
       {stageId && <PtRejection client={client} stageId={stageId} />}
@@ -524,15 +643,32 @@ function Legacy({ client, userId, technician }: { client: AppSupabaseClient; use
       {serial && problem?.kind === "other_owner" && (
         <section className={styles.owner} role="alertdialog" aria-label="Checklist de outro técnico">
           <p>
-            Checklist iniciado por <strong>{problem.name}</strong>. Fazer um novo?
+            {ownerInfo?.directed ? (
+              <>
+                O ativo foi direcionado a <strong>{problem.name}</strong>
+                {ownerInfo.from ? ` por ${ownerInfo.from}` : ""}.
+              </>
+            ) : (
+              <>
+                <strong>{problem.name}</strong> começou o checklist deste ativo.
+              </>
+            )}{" "}
+            Solicite a liberação do checklist para fazer você.
           </p>
-          <p className={stage1Styles.hint}>Sim: o checklist fica com você e começa do zero. Não: continua com {problem.name}.</p>
           <div className={stage1Styles.actions}>
-            <Button disabled={busy} onClick={() => void takeOver(problem.name)}>
-              Sim, fazer um novo
+            <Button className={styles.green} disabled={busy || requested} onClick={() => void requestRelease()}>
+              {requested ? "Pedido enviado: aguardando o admin liberar" : "Solicitar liberação do checklist"}
+            </Button>
+          </div>
+          <p className={stage1Styles.hint}>
+            O admin libera na aba Liberação e o checklist passa para você, com as marcações já feitas. Se preferir recomeçar do zero:
+          </p>
+          <div className={stage1Styles.actions}>
+            <Button variant="ghost" disabled={busy} onClick={() => void takeOver(problem.name)}>
+              Fazer um novo, do zero
             </Button>
             <Button variant="ghost" disabled={busy} onClick={() => keepWithOwner(problem.name)}>
-              Não
+              Deixar com {problem.name}
             </Button>
           </div>
         </section>

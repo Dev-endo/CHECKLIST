@@ -114,3 +114,13 @@
   margin: 0;
   font-size: 14px;
 }
+
+button.green {
+  background: var(--ok, #2e7d4f);
+  border-color: var(--ok, #2e7d4f);
+  color: #fff;
+}
+
+button.green:disabled {
+  opacity: 0.65;
+}

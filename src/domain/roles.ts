@@ -72,6 +72,7 @@ export type TabId =
   | "registros"
   | "dashboard"
   | "aprovacao_pt"
+  | "liberacao"
   | "admin";
 
 /** Supervisor e admin enxergam os checklists de todos. */
@@ -170,6 +171,6 @@ export function accessibleTabs(role: Roles): TabId[] {
   if (canViewOs(role)) tabs.push("os");
   if (canSeeDashboard(role)) tabs.push("dashboard");
   if (canApprovePt(role)) tabs.push("aprovacao_pt");
-  if (canManageUsers(role)) tabs.push("admin");
+  if (canManageUsers(role)) tabs.push("liberacao", "admin");
   return tabs;
 }

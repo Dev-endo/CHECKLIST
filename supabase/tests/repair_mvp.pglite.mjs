@@ -44,7 +44,7 @@ await db.exec(`
 `);
 
 async function applyAll() {
-  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist", "92_cleaning_maintenance", "93_daily_goal_10", "94_reprovados_lookup", "95_declared_maintenance", "96_glass_simple", "97_glass_send_display", "98_glass_direct_finish", "99_glass_no_stock", "100_glass_send_separate", "101_glass_return_unlock", "102_incorrect_defect", "103_dashboard_reprovados", "104_reprovados_log"]) {
+  for (const f of ["44_repair_stages_timer", "45_stock_requests_v2", "46_stock_request_functions", "47_repair_flow_functions", "48_stock_requests_compat_view", "49_technical_evaluation_stage", "50_maintenance_failed_tests", "51_roles_analista_vidro", "52_stage1_destinations_glass", "53_quarantine_pending", "54_quarantine_everyone", "55_requarantine_new_round", "56_technical_analysis", "57_analysis_timer", "58_board_repair", "59_analysis_sent_by", "60_return_to_sender", "61_analysis_test_parts", "62_board_test_parts", "63_maintenance_to_glass", "64_glass_timer_display", "65_stage2_assembly_timer", "66_board_to_assembly_checklist", "67_analyst_does_swap", "68_maintenance_count", "69_timer_finish", "70_dashboard", "71_dashboard_sent_to_glass", "72_dashboard_sent_to_analysis", "73_legacy_maintenance_checklist", "74_legacy_checklist_simple", "75_my_production", "76_replacement_reason", "77_analysis_send_note", "78_pt_destination", "79_lab_reads_names", "80_part_wait_ends_on_delivery", "81_test_part_kept_notice", "82_glass_flag_goal", "83_maintenance_visibility", "84_individual_productivity", "85_blocked_destination", "86_dashboard_blocked_maintenance_list", "87_resale_out_of_analysis", "88_legacy_checklist_takeover", "89_return_reason", "90_glass_direct_flow", "91_glass_keep_checklist", "92_cleaning_maintenance", "93_daily_goal_10", "94_reprovados_lookup", "95_declared_maintenance", "96_glass_simple", "97_glass_send_display", "98_glass_direct_finish", "99_glass_no_stock", "100_glass_send_separate", "101_glass_return_unlock", "102_incorrect_defect", "103_dashboard_reprovados", "104_reprovados_log", "105_checklist_reassign", "106_checklist_requests_all"]) {
     const n = f.split("_")[0];
     const name = `2026100800${String(n).padStart(4, "0")}_${f.slice(f.indexOf("_") + 1)}.sql`;
     await db.exec(readFileSync(MIG + name, "utf8"));
@@ -1722,6 +1722,61 @@ r = await as("sem", `select public.reprovados_register(array['DRP1'])`);
 ok("quem está sem função não registra", r.err?.includes("sem permissão"), JSON.stringify(r));
 r = await as("tec", `select count(*)::int c from public.repair_dashboard_reprovados(current_date - 1, current_date + 1)`);
 ok("técnico não lê a lista da Análise (reprovados)", r.rows?.[0]?.c === 0, JSON.stringify(r));
+
+// ---- Checklist manutenção: o admin troca o responsável; o técnico pede a liberação (migration 105)
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('CHG1','OS-CHG1','${U.tec}')`);
+const chg = await one("tec", `select public.start_legacy_maintenance('CHG1')`);
+await as("tec", `select public.save_repair_checklist('${chg}', 'fechado', '{"t3":"ok"}')`);
+r = await as("tec2", `select public.start_legacy_maintenance('CHG1')`);
+ok("outro técnico fica travado (checklist de quem começou)", r.err?.includes("legacy_other_owner"), JSON.stringify(r));
+r = await as("tec", `select public.request_checklist_release('CHG1')`);
+ok("quem é o dono não pede liberação", Boolean(r.err), JSON.stringify(r));
+const chreq = await one("tec2", `select public.request_checklist_release('CHG1')`);
+ok("o técnico pede a liberação", Boolean(chreq));
+ok("pedir de novo devolve o mesmo pedido", (await one("tec2", `select public.request_checklist_release('CHG1')`)) === chreq);
+r = await as("tec2", `select public.my_checklist_release_pending('CHG1')`);
+ok("a tela sabe que o pedido está pendente", r.rows && Object.values(r.rows[0])[0] === true, JSON.stringify(r));
+r = await as("tec2", `select count(*)::int c from public.list_checklist_requests()`);
+ok("técnico não lê a lista de pedidos", r.rows?.[0]?.c === 0, JSON.stringify(r));
+r = await as("adm", `select requester, owner, serial from public.list_checklist_requests()`);
+ok("o admin vê o pedido (quem pediu e com quem está)", r.rows?.length === 1 && r.rows[0].requester === "Tec2" && r.rows[0].owner === "Tec" && r.rows[0].serial === "CHG1", JSON.stringify(r));
+r = await as("tec2", `select public.decide_checklist_request('${chreq}', true)`);
+ok("técnico não decide o pedido", r.err?.includes("sem permissão"), JSON.stringify(r));
+r = await as("adm", `select public.decide_checklist_request('${chreq}', true)`);
+ok("o admin libera", !r.err, JSON.stringify(r));
+q = (await db.query(`select technician_id from public.repair_stages where id='${chg}'`)).rows[0];
+ok("o checklist passa para quem pediu", q.technician_id === U.tec2, JSON.stringify(q));
+q = (await db.query(`select count(*)::int c from public.repair_checklist_results where stage_id='${chg}'`)).rows[0];
+ok("as marcações ficam", q.c >= 1, JSON.stringify(q));
+r = await as("tec2", `select public.start_legacy_maintenance('CHG1')`);
+ok("quem recebeu abre o checklist", !r.err, JSON.stringify(r));
+r = await as("tec", `select public.start_legacy_maintenance('CHG1')`);
+ok("o antigo dono agora é quem fica travado", r.err?.includes("legacy_other_owner"), JSON.stringify(r));
+r = await as("tec2", `select public.admin_reassign_checklist('${chg}', '${U.tec}')`);
+ok("técnico não troca o responsável", r.err?.includes("sem permissão"), JSON.stringify(r));
+r = await as("adm", `select public.admin_reassign_checklist('${chg}', '${U.est}')`);
+ok("só técnico recebe o checklist", r.err?.includes("handover_target_invalid"), JSON.stringify(r));
+r = await as("adm", `select public.admin_reassign_checklist('${chg}', '${U.tec}')`);
+ok("o admin troca o responsável direto", !r.err, JSON.stringify(r));
+q = (await db.query(`select technician_id from public.repair_stages where id='${chg}'`)).rows[0];
+ok("o responsável mudou", q.technician_id === U.tec, JSON.stringify(q));
+const chreq2 = await one("tec2", `select public.request_checklist_release('CHG1')`);
+await as("adm", `select public.decide_checklist_request('${chreq2}', false)`);
+r = await as("tec2", `select public.my_checklist_release_pending('CHG1')`);
+ok("pedido recusado não fica pendente", r.rows && Object.values(r.rows[0])[0] === false, JSON.stringify(r));
+
+// ---- Aba Liberação: todos os pedidos (migration 106)
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('CHG2','OS-CHG2','${U.tec}')`);
+const chg2 = await one("tec", `select public.start_legacy_maintenance('CHG2')`);
+const chreq3 = await one("tec2", `select public.request_checklist_release('CHG2')`);
+r = await as("adm", `select status, requester, owner, os_number from public.list_checklist_requests_all() where serial = 'CHG2'`);
+ok("a Liberação lista o pedido pendente com a OS", r.rows?.length === 1 && r.rows[0].status === "pendente" && r.rows[0].requester === "Tec2" && r.rows[0].owner === "Tec" && r.rows[0].os_number === "OS-CHG2", JSON.stringify(r));
+r = await as("adm", `select count(*)::int c from public.list_checklist_requests_all() where serial = 'CHG1'`);
+ok("e também os pedidos já decididos (histórico)", r.rows?.[0]?.c >= 2, JSON.stringify(r));
+r = await as("adm", `select status, decided_by from public.list_checklist_requests_all() where serial = 'CHG1' and status = 'aprovado'`);
+ok("o aprovado mostra quem liberou", r.rows?.[0]?.decided_by === "Adm" || Boolean(r.rows?.[0]?.decided_by), JSON.stringify(r));
+r = await as("tec2", `select count(*)::int c from public.list_checklist_requests_all()`);
+ok("só o admin lê a Liberação", r.rows?.[0]?.c === 0, JSON.stringify(r));
 
 // ---- Auditoria, imutabilidade, permissões diretas e view
 r = await db.query(`update public.stock_movements set qty = 9 where id = (select min(id) from public.stock_movements)`).catch(e => e);
