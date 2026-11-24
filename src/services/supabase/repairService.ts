@@ -508,6 +508,10 @@ interface ReprovadoDb {
 }
 
 /** Por serial: o técnico responsável e quem fez a desmontagem, o checklist, a manutenção e a montagem (OS mais recente). */
+/** Guarda a consulta da aba Reprovados (retrato dos responsáveis) para a Análise; falha em silêncio sem a migration 104. */
+export const registerReprovados = (client: AppSupabaseClient, serials: readonly string[]) =>
+  call<number>(client, "reprovados_register", { p_serials: [...serials] });
+
 export async function fetchReprovados(client: AppSupabaseClient, serials: readonly string[]): Promise<ReprovadoRow[]> {
   const found = await call<ReprovadoDb[] | null>(client, "reprovados_lookup", { p_serials: [...serials] });
   return (found ?? []).map((row) => ({

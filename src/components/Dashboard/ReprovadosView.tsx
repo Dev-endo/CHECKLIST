@@ -22,7 +22,7 @@ export function ReprovadosView({ client, from, to }: { client: AppSupabaseClient
     };
   }, [client, from, to]);
 
-  if (failed) return <p className={styles.warn}>Não foi possível carregar os reprovados. Rode a migration 103 no Supabase, se ainda não rodou.</p>;
+  if (failed) return <p className={styles.warn}>Não foi possível carregar os reprovados. Rode a migration 104 no Supabase, se ainda não rodou.</p>;
   if (rows === null) return <p className={styles.muted}>Carregando…</p>;
 
   return (
@@ -30,24 +30,24 @@ export function ReprovadosView({ client, from, to }: { client: AppSupabaseClient
       <div className={styles.cards}>
         <div className={[styles.card, styles.crit].join(" ")}>
           <span className={styles.cardValue}>{rows.length}</span>
-          <span className={styles.cardLabel}>Aparelhos reprovados na quarentena</span>
-          <span className={styles.muted}>cada serial conta uma vez</span>
+          <span className={styles.cardLabel}>Aparelhos reprovados</span>
+          <span className={styles.muted}>os consultados na aba Reprovados; cada serial conta uma vez</span>
         </div>
       </div>
       <p className={styles.muted}>
-        Os responsáveis são os da última passagem do aparelho (OS mais recente). “—” quer dizer que a etapa não tem registro.
+        Cada aparelho entra aqui quando é consultado (Concluir) na aba Reprovados, com os responsáveis daquele momento. “—” quer dizer que a etapa não tem registro.
       </p>
-      {rows.length === 0 && <p className={styles.muted}>Nenhum reprovado no período.</p>}
+      {rows.length === 0 && <p className={styles.muted}>Nenhum aparelho consultado na aba Reprovados no período.</p>}
       {rows.length > 0 && (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Reprovado em</th>
+                <th>Registrado em</th>
                 <th>Serial</th>
                 <th>OS</th>
                 <th>Modelo</th>
-                <th>Quem reprovou</th>
+                <th>Quem registrou</th>
                 <th>Técnico responsável</th>
                 <th>Checklist</th>
                 <th>Desmontagem</th>

@@ -4,7 +4,7 @@ import { OUTCOME_LABELS } from "../../domain/repairChecklist";
 import { describeRepairError } from "../../domain/repairStages";
 import { assetsBySerial } from "../../services/supabase/stockBoardService";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import { fetchReprovados, type ReprovadoRow } from "../../services/supabase/repairService";
+import { fetchReprovados, registerReprovados, type ReprovadoRow } from "../../services/supabase/repairService";
 import { Button } from "../Button/Button";
 import quarantineStyles from "../QuarantinePanel/QuarantinePanel.module.css";
 import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
@@ -109,6 +109,11 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
         client,
         entries.map((entry) => entry.serial),
       );
+      // Guarda o resultado para a Análise (a lista some depois de bipada).
+      await registerReprovados(
+        client,
+        entries.map((entry) => entry.serial),
+      ).catch(() => toast("A consulta apareceu, mas não foi guardada na Análise (falta rodar a migration 104)."));
       // Na ordem em que foram bipados; serial sem retorno aparece vazio.
       const byKey = new Map(found.map((row) => [row.serial.trim().toLowerCase(), row]));
       setResult(entries.map((entry) => byKey.get(entry.serial.trim().toLowerCase()) ?? emptyRow(entry.serial)));
