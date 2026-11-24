@@ -24,11 +24,12 @@ import {
 } from "../../services/supabase/dashboardService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
+import { ReprovadosView } from "./ReprovadosView";
 import { IncorrectDefectView } from "./IncorrectDefectView";
 import { ProductivityView } from "./ProductivityView";
 import styles from "./Dashboard.module.css";
 
-type View = "geral" | "colaboradores" | "produtividade" | "manutencoes" | "pecas" | "defeito";
+type View = "geral" | "colaboradores" | "produtividade" | "manutencoes" | "pecas" | "defeito" | "reprovados";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "geral", label: "Visão geral" },
@@ -36,6 +37,7 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "produtividade", label: "Produtividade individual" },
   { id: "manutencoes", label: "Manutenções" },
   { id: "pecas", label: "Peças" },
+  { id: "reprovados", label: "Reprovados" },
   { id: "defeito", label: "Defeito incorreto" },
 ];
 
@@ -156,7 +158,7 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
       fetchPeople(client, period).then(done(setPeople)).catch(fail);
     } else if (view === "produtividade") {
       // A aba carrega os próprios dados (por dia).
-    } else if (view === "defeito") {
+    } else if (view === "defeito" || view === "reprovados") {
       // A aba carrega os próprios dados.
     } else if (view === "manutencoes") {
       setCrew(null);
@@ -314,6 +316,8 @@ export function DashboardPanel({ client }: { client: AppSupabaseClient }) {
       )}
 
       {view === "produtividade" && <ProductivityView client={client} initialDay={to} />}
+
+      {view === "reprovados" && valid && <ReprovadosView client={client} from={from} to={to} />}
 
       {view === "defeito" && valid && <IncorrectDefectView client={client} from={from} to={to} />}
 

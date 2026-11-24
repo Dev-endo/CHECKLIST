@@ -195,6 +195,59 @@ export async function fetchPartDevices(client: AppSupabaseClient, part: string, 
   return (rows ?? []).map(toDevice);
 }
 
+/** Reprovado na quarentena: o aparelho, quando foi reprovado e quem fez cada etapa da última passagem. */
+export interface DashboardReprovado {
+  serial: string;
+  osNumber: string | null;
+  model: string | null;
+  reprovadoEm: string;
+  reprovadoPor: string | null;
+  vezes: number;
+  responsavel: string | null;
+  desmontagem: string | null;
+  checklist: string | null;
+  manutencao: string | null;
+  montagem: string | null;
+  feitas: string | null;
+  feitasQtd: number;
+}
+
+export async function fetchDashboardReprovados(client: AppSupabaseClient, period: Period): Promise<DashboardReprovado[]> {
+  const rows = await call<
+    | {
+        serial: string;
+        os_number: string | null;
+        model: string | null;
+        reprovado_em: string;
+        reprovado_por: string | null;
+        vezes: number;
+        responsavel: string | null;
+        desmontagem: string | null;
+        checklist: string | null;
+        manutencao: string | null;
+        montagem: string | null;
+        feitas: string | null;
+        feitas_qtd: number | null;
+      }[]
+    | null
+  >(client, "repair_dashboard_reprovados", range(period));
+  return (rows ?? []).map((row) => ({
+    serial: row.serial,
+    osNumber: row.os_number,
+    model: row.model,
+    reprovadoEm: row.reprovado_em,
+    reprovadoPor: row.reprovado_por,
+    vezes: Number(row.vezes),
+    responsavel: row.responsavel,
+    desmontagem: row.desmontagem,
+    checklist: row.checklist,
+    manutencao: row.manutencao,
+    montagem: row.montagem,
+    feitas: row.feitas,
+    feitasQtd: Number(row.feitas_qtd ?? 0),
+  }));
+}
+
 /** Manutenções e o caminho das peças (aparelhos finalizados no período). */
 export interface MaintenanceTotals {
   aparelhos: number;
