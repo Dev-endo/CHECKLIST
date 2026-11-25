@@ -340,8 +340,8 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
   }, [client, userId, reloads, opened?.stageId]);
 
   const stageId = opened && opened.serial === serial ? opened.stageId : undefined;
-  // Antes de bipar dá para marcar; se o serial não abre checklist (ex.: está no Reparo), fica travado.
-  const editable = Boolean(stageId) || !(serial && (problem?.kind === "message" || problem?.kind === "other_owner"));
+  // Sem trava: o técnico sempre consegue marcar o checklist (sem etapa aberta, fica como rascunho na tela).
+  const editable = true;
 
   // Checklist começado por outro técnico: Sim, fica com quem bipou e começa do zero; Não, continua com o dono.
   const takeOver = async (name: string) => {
