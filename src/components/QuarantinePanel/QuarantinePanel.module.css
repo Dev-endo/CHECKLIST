@@ -219,3 +219,35 @@
 .sent small {
   color: var(--muted);
 }
+
+/* Trava: seriais bipados que não estão na lista Aguardando. */
+.unregistered {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--crit);
+  border-left: 6px solid var(--crit);
+  border-radius: 8px;
+  background: var(--crit-soft);
+  color: var(--ink);
+}
+
+.unregisteredHead {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--crit);
+  font-size: 15px;
+}
+
+.unregistered p {
+  margin: 6px 0;
+  font-size: 13.5px;
+}
+
+.unregistered ul {
+  margin: 0;
+  padding-left: 18px;
+  font-family: var(--mono);
+  font-size: 14px;
+}

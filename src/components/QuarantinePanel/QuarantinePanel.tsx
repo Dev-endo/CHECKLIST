@@ -52,6 +52,8 @@ export function QuarantinePanel({ client, userId, showPending = false }: Quarant
   const [view, setView] = useState<View>("registrar");
   // null enquanto carrega; só existe na aba do Reparo.
   const [pending, setPending] = useState<PendingQuarantine[] | "error" | null>(null);
+  // Trava: seriais bipados que não estão na lista Aguardando (não entram no registro).
+  const [unregistered, setUnregistered] = useState<{ serial: string; unit: string | null }[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -97,6 +99,22 @@ export function QuarantinePanel({ client, userId, showPending = false }: Quarant
         ),
       );
       return;
+    }
+    // Trava: só registra quem está na lista Aguardando.
+    if (showPending) {
+      if (!Array.isArray(pending)) {
+        setSerial(value);
+        toast("A lista Aguardando ainda está carregando. Aperte Enter de novo em instantes.");
+        return;
+      }
+      if (!waitingKeys.has(key)) {
+        const missingUnit = await lookupAsset(client, value)
+          .then((asset) => asset?.assetShortId ?? null)
+          .catch(() => null);
+        setUnregistered((prev) => (prev.some((item) => item.serial.toLowerCase() === key) ? prev : [{ serial: value, unit: missingUnit }, ...prev]));
+        toast(`Serial não registrado: ${value}`);
+        return;
+      }
     }
     const unit = await lookupAsset(client, value)
       .then((asset) => asset?.assetShortId ?? null)
@@ -215,6 +233,28 @@ export function QuarantinePanel({ client, userId, showPending = false }: Quarant
               ))}
             </fieldset>
           </form>
+
+          {unregistered.length > 0 && (
+            <div className={styles.unregistered} role="alert">
+              <div className={styles.unregisteredHead}>
+                <strong>
+                  Serial não registrado ({unregistered.length})
+                </strong>
+                <Button variant="small" onClick={() => setUnregistered([])}>
+                  Limpar
+                </Button>
+              </div>
+              <p>Estes ativos não constam na lista Aguardando e não foram registrados. Separe e avise o supervisor.</p>
+              <ul>
+                {unregistered.map((item) => (
+                  <li key={item.serial}>
+                    <strong>{item.serial}</strong>
+                    {item.unit ? ` · ${item.unit}` : " · fora da lista de ativos"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {showPending && waiting.length > 0 && (
             <p className={styles.pendingNote}>

@@ -54,7 +54,7 @@ const files = readdirSync(MIG)
   .filter((f) => /^2026100800\d{4}_.*\.sql$/.test(f))
   .filter((f) => {
     const n = Number(f.slice(10, 14));
-    return n >= 44 && n <= 122;
+    return n >= 44 && n <= 123;
   })
   // A 110 tira a trava de balão do Checklist manutenção (site oficial ainda sem balões). O fluxo de balões é testado
   // sem ela; no fim, ela é aplicada e o comportamento sem trava é conferido.
@@ -69,7 +69,7 @@ await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.
 await db.exec(`insert into public.profiles (id, name, email, role, extra_roles) values ('${U.tec3}','Tec3','t3@x','colaborador', '{tecnico}')`);
 await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.ana}','Ana','an@x','analista'),('${U.ana2}','Ana2','an2@x','analista')`);
 await applyAll(); // idempotente
-console.log(`migrations 44-122 aplicadas (2x, ${files.length} arquivos)`);
+console.log(`migrations 44-123 aplicadas (2x, ${files.length} arquivos)`);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${name}${cond ? "" : "  -> " + extra}`); };
@@ -616,6 +616,33 @@ await db.exec(`insert into public.service_orders (serial, os_number, user_id) va
 await as("vid", `select public.start_glass_flow('GV2', false)`);
 r = await as("vid", `select public.lab_direct_from_glass(array['GV2'], '${U.tec}')`);
 ok("aba Vidro direciona aparelho que foi para o vidro antes da entrega", !r.err && (await balloons("GV2")).at(-1)?.technician_id === U.tec, JSON.stringify(r));
+
+// ---- Conferência da quarentena (migration 123 + supabase/scripts/20261125_quarentena_conferencia.sql)
+for (const sn of ["CQ1", "CQ2", "CQ3", "CQ4"]) {
+  await db.exec(`insert into public.assets (serial_key, asset_short_id, model) values ('${sn.toLowerCase()}', 'U-${sn}', 'iPhone 12')`);
+  await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('${sn}', 'OS-${sn}', '${U.tec}')`);
+}
+await as("sup", `select public.lab_deliver(array['CQ1', 'CQ2', 'CQ3'], '${U.tec}')`);
+for (const sn of ["CQ1", "CQ2", "CQ3"]) await openAndFinish("tec", sn, "quarentena");
+const pendKeys = async () => (await as("sup", `select serial from public.quarantine_pending()`)).rows.map((x) => x.serial.toUpperCase());
+let pk = await pendKeys();
+ok("antes da conferência: CQ1, CQ2 e CQ3 aguardando", ["CQ1", "CQ2", "CQ3"].every((x) => pk.includes(x)) && !pk.includes("CQ4"), JSON.stringify(pk));
+// Conferência com só CQ1 e CQ4 (CQ4 está fisicamente lá, mas o sistema não esperava).
+const conf = readFileSync("supabase/scripts/20261125_quarentena_conferencia.sql", "utf8")
+  .replace(/unnest\(array\[[\s\S]*?\]\) s\)/g, "unnest(array['CQ1','CQ4']) s)");
+await db.exec(conf);
+pk = await pendKeys();
+ok("depois da conferência: só CQ1 e CQ4", pk.length === 2 && pk.includes("CQ1") && pk.includes("CQ4"), JSON.stringify(pk));
+r = await as("sup", `select technician from public.quarantine_pending() where serial = 'CQ4'`);
+ok("CQ4 entra como incluído na conferência", r.rows?.[0]?.technician === "Incluído na conferência", JSON.stringify(r));
+ok("nenhum resultado falso gravado", (await db.query(`select count(*)::int c from public.quarantine_checks where serial in ('CQ2','CQ3')`)).rows[0].c === 0);
+await db.exec(`insert into public.quarantine_checks (serial, result, user_id) values ('CQ4', 'aprovado', '${U.adm}')`);
+pk = await pendKeys();
+ok("bipado na quarentena, sai da lista", !pk.includes("CQ4"), JSON.stringify(pk));
+await as("sup", `select public.lab_deliver(array['CQ2'], '${U.tec}')`).catch(() => null);
+r = await openAndFinish("tec", "CQ2", "quarentena");
+pk = await pendKeys();
+ok("enviado de novo depois da conferência, volta para a lista", pk.includes("CQ2"), JSON.stringify([r, pk]));
 
 // ---- Migration 110: Checklist manutenção sem trava de balão
 await db.exec(readFileSync(MIG + NO_LOCK, "utf8"));
