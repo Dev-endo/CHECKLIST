@@ -48,15 +48,17 @@ await db.exec(`
 `);
 
 const NO_LOCK = "20261008000110_legacy_no_balloon_lock.sql";
+// A 121 parte do start_legacy_maintenance sem trava (110): é aplicada junto com ela, no fim.
+const LINK_OPEN = "20261008000121_link_open_checklist.sql";
 const files = readdirSync(MIG)
   .filter((f) => /^2026100800\d{4}_.*\.sql$/.test(f))
   .filter((f) => {
     const n = Number(f.slice(10, 14));
-    return n >= 44 && n <= 120;
+    return n >= 44 && n <= 121;
   })
   // A 110 tira a trava de balão do Checklist manutenção (site oficial ainda sem balões). O fluxo de balões é testado
   // sem ela; no fim, ela é aplicada e o comportamento sem trava é conferido.
-  .filter((f) => f !== NO_LOCK)
+  .filter((f) => f !== NO_LOCK && f !== LINK_OPEN)
   .sort();
 async function applyAll() {
   for (const f of files) await db.exec(readFileSync(MIG + f, "utf8"));
@@ -67,7 +69,7 @@ await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.
 await db.exec(`insert into public.profiles (id, name, email, role, extra_roles) values ('${U.tec3}','Tec3','t3@x','colaborador', '{tecnico}')`);
 await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.ana}','Ana','an@x','analista'),('${U.ana2}','Ana2','an2@x','analista')`);
 await applyAll(); // idempotente
-console.log(`migrations 44-120 aplicadas (2x, ${files.length} arquivos)`);
+console.log(`migrations 44-121 aplicadas (2x, ${files.length} arquivos)`);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${name}${cond ? "" : "  -> " + extra}`); };
@@ -612,6 +614,43 @@ await as("sup", `select public.lab_deliver(array['L1'], '${U.tec2}')`);
 const nl = await one("tec", `select public.start_legacy_maintenance('L1')`);
 b = (await balloons("L1")).at(-1);
 ok("sem trava: balão de outro técnico passa para quem abriu", typeof nl === "string" && b.technician_id === U.tec, JSON.stringify([nl, b]));
+
+// ---- Migration 121: checklist aberto antes do balão fecha o balão ao finalizar
+// Conserto de dados: um balão preso (aberto, sem checklist ligado) com o checklist do serial já finalizado.
+for (const sn of ["LK1", "LK2", "LK3"]) {
+  await db.exec(`insert into public.assets (serial_key, asset_short_id, model) values ('${sn.toLowerCase()}', 'U-${sn}', 'iPhone 14')`);
+  await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('${sn}', 'OS-${sn}', '${U.tec}')`);
+}
+const lk3 = await one("tec", `select public.start_legacy_maintenance('LK3')`);
+await db.exec(`delete from public.lab_events where serial_key = 'lk3'; delete from public.lab_balloons where serial_key = 'lk3'; delete from public.lab_assets where serial_key = 'lk3';`);
+await as("sup", `select public.lab_deliver(array['LK3'], '${U.tec}')`);
+await db.exec(`alter table public.repair_stages disable trigger lab_on_stage`);
+await db.exec(`update public.repair_stages set status = 'concluida', finished_at = now(), outcome = 'vidro' where id = '${lk3}'`);
+await db.exec(`alter table public.repair_stages enable trigger lab_on_stage`);
+ok("situação antiga: balão preso aberto", (await balloons("LK3")).at(-1).status === "aberto");
+await db.exec(readFileSync(MIG + LINK_OPEN, "utf8"));
+let blk = (await balloons("LK3")).at(-1);
+ok("conserto fecha o balão preso com o destino do checklist", blk.status === "finalizado" && blk.outcome === "vidro" && blk.stage_id === lk3 && (await asset("LK3")).status === "vidro", JSON.stringify(blk));
+// Checklist aberto antes da limpeza; depois o supervisor entrega e o técnico retoma e finaliza para o vidro.
+const lk1 = await one("tec", `select public.start_legacy_maintenance('LK1')`);
+await db.exec(`delete from public.lab_events where serial_key = 'lk1'; delete from public.lab_balloons where serial_key = 'lk1'; delete from public.lab_assets where serial_key = 'lk1';`);
+await as("sup", `select public.lab_deliver(array['LK1'], '${U.tec}')`);
+ok("entregue depois: balão sem checklist ligado", (await balloons("LK1")).at(-1).stage_id === null);
+const lk1b = await one("tec", `select public.start_legacy_maintenance('LK1')`);
+blk = (await balloons("LK1")).at(-1);
+ok("retomar o checklist liga ao balão", lk1b === lk1 && blk.stage_id === lk1, JSON.stringify([lk1b, blk]));
+const gLk = await goal("tec");
+r = await as("tec", `select public.finish_maintenance('${lk1}', array[]::text[], array[]::text[], p_glass => true)`);
+blk = (await balloons("LK1")).at(-1);
+const gLk2 = await goal("tec");
+ok("enviado para o vidro: balão fecha e conta na meta", !r.err && blk.status === "finalizado" && blk.outcome === "vidro" && gLk2.finalizados === gLk.finalizados + 1, JSON.stringify([r, blk, gLk, gLk2]));
+// Finalizar sem passar pela retomada (checklist sem ligação): o balão do serial fecha mesmo assim.
+const lk2 = await one("tec", `select public.start_legacy_maintenance('LK2')`);
+await db.exec(`delete from public.lab_events where serial_key = 'lk2'; delete from public.lab_balloons where serial_key = 'lk2'; delete from public.lab_assets where serial_key = 'lk2';`);
+await as("sup", `select public.lab_deliver(array['LK2'], '${U.tec}')`);
+r = await as("tec", `select public.finish_maintenance('${lk2}', array[]::text[], array[]::text[], p_glass => true)`);
+blk = (await balloons("LK2")).at(-1);
+ok("sem ligação: ao finalizar fecha o balão aberto do serial", !r.err && blk.status === "finalizado" && blk.stage_id === null, JSON.stringify([r, blk]));
 
 console.log(`\n${pass} passaram, ${fail} falharam`);
 process.exit(fail ? 1 : 0);
