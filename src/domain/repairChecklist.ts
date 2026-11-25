@@ -136,7 +136,11 @@ export function pendingTests(phase: ChecklistPhase, results: Results): string[] 
  * reprovado), vidro (sem exigir o checklist), revenda (com motivo) ou PT, perda total (com motivo; espera a
  * aprovação de um administrador ou supervisor).
  */
-export type FinishDestination = "auto" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado" | "manutencao";
+/**
+ * "auto": pelos testes (Estágio 2 do Reparo: reprovado vai para a Análise técnica). "quarentena": escolhida no
+ * Checklist manutenção e na Análise técnica; vai para a quarentena mesmo com teste reprovado.
+ */
+export type FinishDestination = "auto" | "quarentena" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado" | "manutencao";
 
 /** Destinos que não exigem o checklist: o aparelho vai para o vidro (e volta) ou espera a aprovação do PT. */
 export const skipsChecklist = (destination: FinishDestination) =>
@@ -187,6 +191,8 @@ export interface FinishInput {
   technicianId?: string;
   /** Aba Vidro: só estes testes (do checklist aberto) são exigidos; o resto do checklist não entra. */
   onlyTests?: readonly string[];
+  /** "Vidro e outra manutenção": o destino Vidro exige o checklist com o aparelho aberto (o fechado é depois do vidro). */
+  glassWithMaintenance?: boolean;
 }
 
 /** Tamanho mínimo da justificativa de envio para a Análise técnica (o banco confere o mesmo). */
@@ -202,8 +208,10 @@ export function finishBlockers(input: FinishInput): string[] {
     const missing = input.onlyTests.filter((id) => !input.results.aberto[id]).length;
     if (missing) blockers.push("Checklist de display: responda o teste");
   }
+  const skipped: readonly ChecklistPhase[] =
+    input.destination === "vidro" && input.glassWithMaintenance ? ["fechado"] : skippedPhases(input.destination);
   for (const phase of input.onlyTests ? [] : PHASES) {
-    if (skippedPhases(input.destination).includes(phase) || input.skipPhases?.includes(phase)) continue;
+    if (skipped.includes(phase) || input.skipPhases?.includes(phase)) continue;
     const missing = pendingTests(phase, input.results[phase]).length;
     if (missing) blockers.push(`${PHASE_LABELS[phase]}: faltam ${missing} teste(s) obrigatório(s)`);
     const confirmations = missingPhaseConfirmations(phase, input.results[phase]);
@@ -237,6 +245,7 @@ export function expectedOutcome(
   if (destination === "revenda") return "revenda";
   if (destination === "vidro") return "vidro";
   if (destination === "analise") return "analise";
+  if (destination === "quarentena") return "quarentena";
   if (onlyTests) return onlyTests.some((id) => results.aberto[id] === "fail") ? "analise" : "quarentena";
   const failed = PHASES.some((phase) => {
     const choice = new Set(choiceTests(phase));

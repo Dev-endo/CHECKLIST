@@ -13,11 +13,12 @@ describe("navGroups", () => {
       ["Quarentena", ["quarentena"]],
       ["Reprovados", ["reprovados"]],
       ["Defeito incorreto", ["defeito_incorreto"]],
-      ["Análise técnica", ["analise_tecnica", "reparo_placa", "analise_montagem"]],
+      ["Análise técnica", ["analise_tecnica"]],
       ["Vidro", ["vidro"]],
       ["Estoque", ["solicitacoes", "os"]],
       ["Análise", ["dashboard"]],
       ["Aprovação PT", ["aprovacao_pt"]],
+      ["Dia Laboratório", ["dia_lab_entrega", "dia_lab_acompanhamento"]],
       ["Liberação", ["liberacao"]],
       ["Administração", ["admin"]],
     ]);
@@ -25,27 +26,21 @@ describe("navGroups", () => {
 
   it("shows each function its own group", () => {
     expect(summary("tecnico")).toEqual([
-      ["Reparo", ["reparo", "reparo2"]],
       ["Checklist manutenção", ["checklist_manutencao"]],
       ["Quarentena", ["quarentena"]],
-      ["Reprovados", ["reprovados"]],
       ["Defeito incorreto", ["defeito_incorreto"]],
     ]);
     expect(summary("estoquista")).toEqual([
       ["Quarentena", ["quarentena"]],
-      ["Reprovados", ["reprovados"]],
       ["Defeito incorreto", ["defeito_incorreto"]],
       ["Estoque", ["solicitacoes", "os"]],
     ]);
     expect(summary("analista")).toEqual([
-      ["Quarentena", ["quarentena"]],
-      ["Reprovados", ["reprovados"]],
       ["Defeito incorreto", ["defeito_incorreto"]],
-      ["Análise técnica", ["analise_tecnica", "reparo_placa", "analise_montagem"]],
+      ["Análise técnica", ["analise_tecnica"]],
     ]);
     expect(summary("tecnico_vidro")).toEqual([
       ["Quarentena", ["quarentena"]],
-      ["Reprovados", ["reprovados"]],
       ["Defeito incorreto", ["defeito_incorreto"]],
       ["Vidro", ["vidro"]],
     ]);
@@ -55,6 +50,7 @@ describe("navGroups", () => {
       ["Defeito incorreto", ["defeito_incorreto"]],
       ["Análise", ["dashboard"]],
       ["Aprovação PT", ["aprovacao_pt"]],
+      ["Dia Laboratório", ["dia_lab_entrega", "dia_lab_acompanhamento"]],
     ]);
   });
 
@@ -63,7 +59,7 @@ describe("navGroups", () => {
   });
 
   it("has exactly one Quarentena tab for every role that has a function", () => {
-    const roles: UserRole[] = ["admin", "supervisor", "tecnico", "desmontador", "montador", "estoquista", "analista", "tecnico_vidro"];
+    const roles: UserRole[] = ["admin", "supervisor", "tecnico", "desmontador", "montador", "estoquista", "tecnico_vidro"];
     for (const role of roles) {
       expect(accessibleTabs(role).filter((tab) => tab === "quarentena")).toHaveLength(1);
     }

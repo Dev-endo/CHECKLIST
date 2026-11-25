@@ -38,6 +38,8 @@ interface FinishPanelProps {
   technicians?: readonly { id: string; name: string }[];
   technicianId?: string;
   onTechnician?: (id: string) => void;
+  /** "Vidro e outra manutenção": para o Vidro, o checklist com o aparelho aberto é obrigatório. */
+  glassOpenChecklist?: boolean;
 }
 
 /** Fim da manutenção: o que ainda falta e o destino (quarentena, análise técnica, vidro, revenda ou PT). */
@@ -61,6 +63,7 @@ export function FinishPanel({
   technicians = [],
   technicianId = "",
   onTechnician,
+  glassOpenChecklist = false,
 }: FinishPanelProps) {
   const blocked = blockers.length > 0;
   const summary = summarizeMaintenance(maintenanceItems);
@@ -139,8 +142,11 @@ export function FinishPanel({
           </select>
         </label>
       )}
-      {!onlyAuto && skipsChecklist(destination) && (
-        <p className={styles.muted}>Não precisa do checklist para este destino (se fez algum teste, ele fica salvo).</p>
+      {!onlyAuto && destination === "vidro" && glassOpenChecklist ? (
+        <p className={styles.muted}>Vidro e outra manutenção: faça o checklist com o aparelho aberto; o fechado é feito depois do vidro.</p>
+      ) : (
+        !onlyAuto &&
+        skipsChecklist(destination) && <p className={styles.muted}>Não precisa do checklist para este destino (se fez algum teste, ele fica salvo).</p>
       )}
       {!onlyAuto && needsReason(destination) && (
         <label className={styles.reason}>

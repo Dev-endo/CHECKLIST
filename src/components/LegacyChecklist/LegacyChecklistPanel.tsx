@@ -32,12 +32,19 @@ import {
   declareMaintenanceItems,
   finishMaintenance,
   requestGlassParts,
+  analysisSetBoardNote,
+  analysisTransfer,
+  startAnalysisChecklist,
   startLegacyMaintenance,
+  takeAnalysisChecklist,
   takeLegacyChecklist,
   type LegacyChecklist,
   type OpenStage,
 } from "../../services/supabase/repairService";
 import { assetsBySerial } from "../../services/supabase/stockBoardService";
+import { confirmTransfer, fetchMyBalloons, listLabTechnicians, transferBalloon, type LabTechnician, type MyBalloon } from "../../services/supabase/labDayService";
+import { serialKey, SOURCE_LABELS } from "../../domain/labDay";
+import { fetchAnalysisQueue, type AnalysisItem } from "../../services/supabase/analysisTechService";
 import { serialOfOrder } from "../../services/supabase/serviceOrderService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
@@ -61,8 +68,29 @@ const DESTINATION_LABELS = {
   revenda: "Revenda",
   pt: "PT (aprovação pendente)",
   bloqueado: "Bloqueado",
-  manutencao: "Manutenção (outro técnico)",
+  manutencao: "Transferido para técnico",
 } as const;
+
+/**
+ * Destinos do Checklist manutenção: os do Reparo (o Vidro não volta sozinho) mais Transferir para técnico. O destino é
+ * sempre escolhido: teste reprovado não manda sozinho para a Análise técnica.
+ */
+const LEGACY_DESTINATIONS = [
+  ...FINISH_DESTINATIONS.map((option) =>
+    option.id === "vidro"
+      ? { ...option, hint: "Não precisa do checklist: abre o serviço na aba Vidro. Depois, o supervisor ou o técnico de vidro direciona para um técnico." }
+      : option.id === "auto"
+        ? { id: "quarentena" as const, label: "Quarentena", hint: "Vai para a quarentena, mesmo com algum teste reprovado (a falha fica registrada)." }
+        : option,
+  ),
+  {
+    id: "manutencao" as const,
+    label: "Transferir para técnico",
+    hint: "Passa o ativo para outro técnico (o que já foi marcado fica salvo). Conta como finalizado para você; ele confirma o recebimento.",
+  },
+];
+
+const BALLOONS_POLL_MS = 15_000;
 
 const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const hour = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -80,6 +108,8 @@ function problemFor(error: unknown): Problem {
   const text = (error as { message?: string })?.message ?? "";
   if (text.includes("no_os")) return { kind: "no_os" };
   if (text.includes("legacy_other_owner")) return { kind: "other_owner", name: (error as { details?: string })?.details || "outro técnico" };
+  if (text.includes("lab_in_balloon"))
+    return { kind: "message", text: `Este ativo está no balão de ${(error as { details?: string })?.details || "um técnico"} (Dia Laboratório): segue com ele.` };
   if (text.includes("disassembly_open")) return { kind: "message", text: "Este aparelho está no Estágio 1 do Reparo: siga por lá." };
   if (text.includes("in_repair")) return { kind: "message", text: "Este aparelho está no Estágio 2 do Reparo: siga por lá." };
   if (text.includes("pt_pending")) return { kind: "message", text: "Este aparelho tem um PT aguardando a aprovação de um administrador ou supervisor." };
@@ -107,13 +137,39 @@ interface Opened {
  * começado é retomado; aparelho já finalizado ganha um checklist novo. Ao finalizar: quarentena, análise técnica ou
  * vidro. No topo, quantos checklists o técnico finalizou hoje.
  */
-export function LegacyChecklistPanel() {
+export function LegacyChecklistPanel({ mode = "manutencao" }: { mode?: "manutencao" | "analise" } = {}) {
   const { user, client } = useAuth();
-  if (!client || !user) return <p className={appStyles.banner}>Entre com a sua conta para usar o Checklist manutenção.</p>;
-  return <Legacy client={client} userId={user.id} technician={user.name || user.email} admin={canManageUsers(user.roles)} />;
+  const analysis = mode === "analise";
+  if (!client || !user) return <p className={appStyles.banner}>Entre com a sua conta para usar o {analysis ? "Análise técnica" : "Checklist manutenção"}.</p>;
+  return (
+    <Legacy
+      key={mode}
+      client={client}
+      userId={user.id}
+      technician={user.name || user.email}
+      admin={!analysis && canManageUsers(user.roles)}
+      analysis={analysis}
+    />
+  );
 }
 
-function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClient; userId: string; technician: string; admin: boolean }) {
+/**
+ * analysis: aba Análise técnica. Mesma estrutura do Checklist manutenção antigo (bipa o serial e o checklist abre), sem
+ * balões, meta nem transferência; só o analista usa.
+ */
+function Legacy({
+  client,
+  userId,
+  technician,
+  admin,
+  analysis,
+}: {
+  client: AppSupabaseClient;
+  userId: string;
+  technician: string;
+  admin: boolean;
+  analysis: boolean;
+}) {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState("");
@@ -150,6 +206,62 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
   const [requested, setRequested] = useState(false);
   // Por que o checklist está com o outro: ele começou, ou o ativo foi direcionado a ele (e por quem).
   const [ownerInfo, setOwnerInfo] = useState<{ directed: boolean; from: string | null } | null>(null);
+  // Dia Laboratório: os balões do técnico (um por ativo) e, na transferência, para quem vai.
+  const [balloons, setBalloons] = useState<MyBalloon[] | null>(null);
+  const [balloonReloads, setBalloonReloads] = useState(0);
+  const [labTechs, setLabTechs] = useState<LabTechnician[]>([]);
+  const [transferTo, setTransferTo] = useState("");
+  useEffect(() => {
+    if (analysis) return;
+    let active = true;
+    const load = () =>
+      fetchMyBalloons(client)
+        .then((found) => active && setBalloons(found))
+        .catch(() => active && setBalloons((current) => current ?? []));
+    void load();
+    const poll = setInterval(() => void load(), BALLOONS_POLL_MS);
+    return () => {
+      active = false;
+      clearInterval(poll);
+    };
+  }, [client, balloonReloads, analysis]);
+  useEffect(() => {
+    let active = true;
+    listLabTechnicians(client)
+      .then(
+        (found) =>
+          active &&
+          setLabTechs(
+            found
+              .filter((item) => analysis || item.id !== userId)
+              .sort((a, b) => Number(b.id === userId) - Number(a.id === userId) || a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }))
+              .map((item) => (item.id === userId ? { ...item, name: `${item.name} (você)` } : item)),
+          ),
+      )
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, userId, analysis]);
+  // O balão do serial bipado ("none": não é balão seu; "loading": a lista ainda não chegou).
+  const balloon = serial && balloons ? balloons.find((item) => serialKey(item.serial) === serialKey(serial)) ?? null : null;
+  const balloonState = !serial ? "" : analysis ? "analise" : balloons === null ? "loading" : balloon ? `${balloon.id}:${balloon.status}` : "none";
+  // Análise técnica: os aparelhos que aguardam a análise (para escolher sem bipar).
+  const [waiting, setWaiting] = useState<AnalysisItem[] | null>(null);
+  useEffect(() => {
+    if (!analysis) return;
+    let active = true;
+    const load = () =>
+      fetchAnalysisQueue(client)
+        .then((found) => active && setWaiting(found.filter((item) => item.status === "aguardando")))
+        .catch(() => active && setWaiting((current) => current ?? []));
+    void load();
+    const poll = setInterval(() => void load(), BALLOONS_POLL_MS);
+    return () => {
+      active = false;
+      clearInterval(poll);
+    };
+  }, [client, analysis, balloonReloads]);
   // Outro serial: esquece a OS do anterior e a escolha de OS nova.
   useEffect(() => {
     setCurrentOs(undefined);
@@ -285,7 +397,16 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
   useEffect(() => {
     setOpened(null);
     setProblem(null);
-    if (!serial) return;
+    if (!serial || balloonState === "loading") return;
+    // Só pelos balões (o admin abre qualquer um): o banco confere de novo.
+    if (!admin && balloonState === "none") {
+      setProblem({ kind: "message", text: "Este ativo não está nos seus balões. Peça ao supervisor para vinculá-lo a você." });
+      return;
+    }
+    if (balloonState.endsWith(":pendente")) {
+      setProblem({ kind: "message", text: "Transferência pendente: confirme o recebimento no balão acima para trabalhar neste ativo." });
+      return;
+    }
     let active = true;
     setOpening(true);
     (async () => {
@@ -296,7 +417,7 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
         if (active) setProblem({ kind: "confirm_os", os: previous?.osNumber ?? null });
         return;
       }
-      const stageId = await startLegacyMaintenance(client, serial);
+      const stageId = await (analysis ? startAnalysisChecklist : startLegacyMaintenance)(client, serial);
       const current = await fetchLastLegacy(client, serial).catch(() => null);
       if (!active) return;
       const resumed = previous?.id === stageId && previous.status !== "concluida";
@@ -315,7 +436,7 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
     return () => {
       active = false;
     };
-  }, [client, serial, tries, osConfirmed]);
+  }, [client, serial, tries, osConfirmed, balloonState, admin, analysis]);
 
   // No Vidro: quando o vidro termina o checklist volta sozinho; a tela tenta abrir de novo até liberar.
   const waitingGlass = Boolean(serial && problem?.kind === "message" && problem.waiting);
@@ -347,7 +468,7 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
   const takeOver = async (name: string) => {
     setBusy(true);
     try {
-      await takeLegacyChecklist(client, serial);
+      await (analysis ? takeAnalysisChecklist : takeLegacyChecklist)(client, serial);
       setTookFrom({ serial, name });
       retry();
     } catch (error) {
@@ -372,10 +493,40 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
   const glassLocked = Boolean(stageId && opened?.needsGlass);
   const glass: GlassAnswer | null = glassLocked ? "vidro_mais" : glassAnswer;
   const toGlass = glass === "so_vidro" || glass === "vidro_mais";
-  const destinations = toGlass
-    ? FINISH_DESTINATIONS.filter((option) => option.id === "vidro")
-    : FINISH_DESTINATIONS.filter((option) => option.id !== "vidro");
-  const finalDestination: FinishDestination = toGlass ? "vidro" : destination === "vidro" ? "auto" : destination;
+  // Transferir vale com qualquer resposta do vidro (e só para o balão aberto de um técnico).
+  // Na análise transfere o checklist aberto; no Checklist manutenção, o balão aberto.
+  const canTransfer = analysis ? Boolean(stageId) : Boolean(balloon && balloon.status === "aberto");
+  const destinations = (
+    toGlass
+      ? // Só vidro: Vidro (ou transferir). Vidro e outra manutenção: também a Análise técnica.
+        LEGACY_DESTINATIONS.filter(
+          (option) => option.id === "vidro" || option.id === "manutencao" || (glass === "vidro_mais" && option.id === "analise"),
+        )
+      : LEGACY_DESTINATIONS.filter((option) => option.id !== "vidro")
+  )
+    .filter((option) => option.id !== "manutencao" || canTransfer)
+    // Na própria Análise técnica não faz sentido mandar para a análise.
+    .filter((option) => !analysis || option.id !== "analise")
+    .map((option) =>
+      option.id === "vidro" && glass === "vidro_mais"
+        ? { ...option, hint: "Faça o checklist com o aparelho aberto: o aparelho vai para a aba Vidro e o fechado é feito depois do vidro." }
+        : analysis && option.id === "manutencao"
+        ? {
+            ...option,
+            hint: "Passa o ativo para um técnico (pode ser você), com o que já foi marcado. Ele confirma o recebimento e o ativo entra nos balões dele.",
+          }
+        : option,
+    );
+  const finalDestination: FinishDestination =
+    destination === "manutencao" && canTransfer
+      ? "manutencao"
+      : destination === "analise" && glass === "vidro_mais" && !analysis
+        ? "analise"
+        : toGlass
+        ? "vidro"
+        : destination === "vidro" || destination === "manutencao"
+          ? "auto"
+          : destination;
 
   const answerGlass = async (value: GlassAnswer) => {
     if (glassLocked) return;
@@ -383,7 +534,7 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
       setGlassAnswer(value);
       return;
     }
-    if (!window.confirm("Vidro e outra manutenção: ao finalizar, o aparelho vai para o vidro sem checklist. Confirmar?")) return;
+    if (!window.confirm("Vidro e outra manutenção: faça a manutenção e o checklist com o aparelho aberto; ao finalizar, o aparelho vai para o vidro. Confirmar?")) return;
     setBusy(true);
     try {
       await requestGlassParts(client, stageId);
@@ -399,21 +550,27 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
 
   // Falha com o aparelho aberto: o checklist fechado não precisa ser feito (o aparelho já não vai para a quarentena).
   const openFailed = phaseFailed("aberto", checklists.results.aberto);
+  // Falha com o aparelho aberto dispensa o checklist fechado, a não ser que o destino seja a Quarentena.
+  const skipClosed = openFailed && finalDestination !== "quarentena";
   const blockers = [
     ...(stageId ? [] : ["Bipe o serial do aparelho"]),
     // PT e Bloqueado não dependem da resposta do vidro.
-    ...(glass || finalDestination === "pt" || finalDestination === "bloqueado" ? [] : ["Responda se o aparelho é vidro"]),
+    ...(glass || finalDestination === "pt" || finalDestination === "bloqueado" || finalDestination === "manutencao" ? [] : ["Responda se o aparelho é vidro"]),
     ...finishBlockers({
       results: checklists.results,
       requests: [],
       returnsWaiting: 0,
       destination: finalDestination,
       resaleReason: reason,
-      skipPhases: openFailed ? ["fechado"] : [],
+      skipPhases: skipClosed ? ["fechado"] : [],
       analysisNote,
+      technicianId: transferTo,
+      glassWithMaintenance: glass === "vidro_mais",
     }),
+    // O destino é escolhido (nada vai sozinho para a Análise técnica).
+    ...(finalDestination === "auto" ? ["Escolha o destino do aparelho"] : []),
   ];
-  const outcome = expectedOutcome(checklists.results, finalDestination);
+  const outcome = expectedOutcome(checklists.results, finalDestination === "auto" ? "quarentena" : finalDestination);
 
   const clear = () => {
     setOsConfirmed(null);
@@ -423,34 +580,86 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
     setGlassAnswer(null);
     setAnalysisNote("");
     setReason("");
+    setTransferTo("");
     input.current?.focus();
   };
 
   // Finalizar abre o balão das manutenções feitas; ele confirma e chama o finish.
+  // Finalizar (e transferir) abre o balão das manutenções feitas; ele confirma e segue.
   const askFinish = () => {
-    // O destino Manutenção (outro técnico) é só da aba Vidro; aqui nunca é oferecido.
-    if (!stageId || busy || finalDestination === "manutencao") return;
+    if (!stageId || busy) return;
     setAsking(true);
   };
 
-  const finish = async (done: DoneItem[]) => {
-    if (!stageId || busy || finalDestination === "manutencao") return;
+  // Transferir para técnico: o balão passa para ele (pendente até confirmar); conta como finalizado para você.
+  const transfer = async (done: DoneItem[]) => {
+    if ((!analysis && !balloon) || (analysis && !stageId) || !stageId || !transferTo || busy) return;
+    const name = labTechs.find((item) => item.id === transferTo)?.name ?? "o técnico";
+    setBusy(true);
+    try {
+      await checklists.flush();
+      // As manutenções de quem transfere ficam no histórico da transferência.
+      await declareMaintenanceItems(client, stageId, done);
+      if (analysis && stageId) await analysisTransfer(client, stageId, transferTo, reason);
+      else if (balloon) await transferBalloon(client, balloon.id, transferTo, reason);
+      setAsking(false);
+      setLastDone({ serial, outcome: "manutencao" });
+      toast(`Ativo transferido para ${name}`);
+      setBalloonReloads((n) => n + 1);
+      setReloads((n) => n + 1);
+      clear();
+      window.scrollTo(0, 0);
+    } catch (error) {
+      setAsking(false);
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível transferir o ativo."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Transferência recebida: confirma e o balão pode ser trabalhado (entra na meta).
+  const confirmReceipt = async (item: MyBalloon) => {
+    if (!window.confirm(`Confirmar o recebimento de ${item.serial}${item.fromName ? `, transferido por ${item.fromName}` : ""}?`)) return;
+    setBusy(true);
+    try {
+      await confirmTransfer(client, item.id);
+      toast("Recebimento confirmado: o ativo entrou na sua meta");
+      setBalloonReloads((n) => n + 1);
+      setTyped(item.serial);
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível confirmar o recebimento."));
+      setBalloonReloads((n) => n + 1);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finish = async (done: DoneItem[], boardNote: string | null) => {
+    if (finalDestination === "manutencao") {
+      await transfer(done);
+      return;
+    }
+    if (!stageId || busy) return;
     setBusy(true);
     try {
       await checklists.flush();
       await declareMaintenanceItems(client, stageId, done);
+      // Análise: reparo em placa marcado nas manutenções feitas, com a observação (registrado ao finalizar).
+      if (analysis) await analysisSetBoardNote(client, stageId, boardNote);
       const result = await finishMaintenance(client, {
         stageId,
         requiredOpen: requiredTests("aberto"),
-        requiredClosed: openFailed || skippedPhases(finalDestination).includes("fechado") ? [] : requiredTests("fechado"),
+        requiredClosed: skipClosed || skippedPhases(finalDestination).includes("fechado") ? [] : requiredTests("fechado"),
         choice: [...choiceTests("aberto"), ...choiceTests("fechado")],
         destination: finalDestination,
         resaleReason: reason,
         analysisNote,
       });
+      if (analysis && boardNote) toast("Reparo em placa registrado");
       setAsking(false);
       setLastDone({ serial, outcome: result });
       setReloads((n) => n + 1);
+      setBalloonReloads((n) => n + 1);
       clear();
       window.scrollTo(0, 0);
     } catch (error) {
@@ -471,9 +680,11 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
   return (
     <>
       <header>
-        <h1 className={appStyles.title}>Checklist manutenção</h1>
+        <h1 className={appStyles.title}>{analysis ? "Análise técnica" : "Checklist manutenção"}</h1>
         <p className={appStyles.subtitle}>
-          Bipe o serial, faça os testes com o aparelho aberto e fechado e finalize: quarentena, análise técnica, vidro, revenda ou PT.
+          {analysis
+            ? "Bipe o serial (ou escolha um aparelho aguardando análise), faça os testes com o aparelho aberto e fechado e finalize: quarentena, vidro, revenda, PT ou bloqueado."
+            : "Escolha um dos seus ativos (ou bipe o serial para abrir o balão), faça os testes com o aparelho aberto e fechado e finalize: quarentena, análise técnica, vidro, revenda, PT, bloqueado ou transferir para outro técnico."}
         </p>
       </header>
 
@@ -518,7 +729,7 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
               autoFocus
               autoComplete="off"
               spellCheck={false}
-              placeholder="Bipe o serial ou digite a OS"
+              placeholder={analysis ? "Bipe o serial ou digite a OS" : "Bipe o serial para abrir o balão"}
               disabled={busy}
               onChange={(e) => setTyped(e.target.value)}
             />
@@ -653,16 +864,20 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
                 <strong>{problem.name}</strong> começou o checklist deste ativo.
               </>
             )}{" "}
-            Solicite a liberação do checklist para fazer você.
+            {analysis ? "Você pode recomeçar do zero ou deixar com quem começou." : "Solicite a liberação do checklist para fazer você."}
           </p>
-          <div className={stage1Styles.actions}>
-            <Button className={styles.green} disabled={busy || requested} onClick={() => void requestRelease()}>
-              {requested ? "Pedido enviado: aguardando o admin liberar" : "Solicitar liberação do checklist"}
-            </Button>
-          </div>
-          <p className={stage1Styles.hint}>
-            O admin libera na aba Liberação e o checklist passa para você, com as marcações já feitas. Se preferir recomeçar do zero:
-          </p>
+          {!analysis && (
+            <>
+              <div className={stage1Styles.actions}>
+                <Button className={styles.green} disabled={busy || requested} onClick={() => void requestRelease()}>
+                  {requested ? "Pedido enviado: aguardando o admin liberar" : "Solicitar liberação do checklist"}
+                </Button>
+              </div>
+              <p className={stage1Styles.hint}>
+                O admin libera na aba Liberação e o checklist passa para você, com as marcações já feitas. Se preferir recomeçar do zero:
+              </p>
+            </>
+          )}
           <div className={stage1Styles.actions}>
             <Button variant="ghost" disabled={busy} onClick={() => void takeOver(problem.name)}>
               Fazer um novo, do zero
@@ -674,15 +889,84 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
         </section>
       )}
 
-      {!serial && mine.length > 0 && (
-        <div className={stage1Styles.resume}>
-          Começados e não finalizados:
-          {mine.map((item) => (
-            <Button key={item.id} variant="small" onClick={() => setTyped(item.serial)}>
-              {item.serial} · OS {item.osNumber}
-            </Button>
-          ))}
-        </div>
+      {!serial && analysis && (
+        <section aria-label="Aguardando análise técnica">
+          {mine.length > 0 && (
+            <div className={stage1Styles.resume}>
+              Começados e não finalizados:
+              {mine.map((item) => (
+                <Button key={item.id} variant="small" onClick={() => setTyped(item.serial)}>
+                  {item.serial} · OS {item.osNumber}
+                </Button>
+              ))}
+            </div>
+          )}
+          <details>
+            <summary>Aguardando análise técnica: {waiting?.length ?? "…"}</summary>
+            <ul className={stage2Styles.devices}>
+              {waiting?.map((item) => (
+                <li key={item.id}>
+                  <button type="button" className={stage2Styles.device} disabled={busy} onClick={() => setTyped(item.serial)}>
+                    <strong className={stage2Styles.deviceSerial}>{item.serial}</strong>
+                    <span>{item.model ?? "Modelo não encontrado"}</span>
+                    {item.unit && <span className={stage2Styles.muted}>{item.unit}</span>}
+                    <span className={stage2Styles.deviceOs}>OS {item.osNumber}</span>
+                    {item.sendNote && <span className={stage2Styles.muted}>Motivo: {item.sendNote}</span>}
+                    <span className={stage2Styles.muted}>
+                      Enviado por {item.sentBy} · {when(item.sentAt ?? item.createdAt)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </section>
+      )}
+
+      {!serial && !analysis && (
+        <section aria-label="Seus balões">
+          <h2 className={stage1Styles.heading}>Seus ativos ({balloons?.filter((item) => item.status === "aberto").length ?? "…"})</h2>
+          {balloons === null && <p className={stage2Styles.muted}>Carregando…</p>}
+          {balloons?.length === 0 && (
+            <p className={stage2Styles.muted}>Nenhum ativo com você. O supervisor entrega os ativos na aba Dia Laboratório.</p>
+          )}
+          <ul className={stage2Styles.devices}>
+            {balloons?.map((item) => {
+              const pending = item.status === "pendente";
+              const started = mine.some((stage) => serialKey(stage.serial) === serialKey(item.serial));
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={[stage2Styles.device, pending ? stage2Styles.deviceWaiting : ""].join(" ")}
+                    disabled={busy}
+                    onClick={() => (pending ? void confirmReceipt(item) : setTyped(item.serial))}
+                  >
+                    <strong className={stage2Styles.deviceSerial}>{item.serial}</strong>
+                    <span>{item.model ?? "Modelo não encontrado"}</span>
+                    {item.unit && <span className={stage2Styles.muted}>{item.unit}</span>}
+                    {pending ? (
+                      <>
+                        <span className={stage2Styles.waitingTag}>{item.fromName ?? "Um técnico"} transferiu esse ativo para você</span>
+                        {item.note && <span className={stage2Styles.muted}>Motivo: {item.note}</span>}
+                        <span className={stage2Styles.muted}>Clique para confirmar o recebimento</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={stage2Styles.muted}>
+                          {started ? "Checklist começado" : SOURCE_LABELS[item.source]}
+                          {item.fromName && item.source !== "retorno" ? ` · ${item.fromName}` : ""}
+                        </span>
+                        {item.note && <span className={stage2Styles.muted}>{item.note}</span>}
+                      </>
+                    )}
+                    <span className={stage2Styles.muted}>desde {when(item.createdAt)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       <section className={styles.glass} aria-label="O aparelho é vidro?">
@@ -699,7 +983,7 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
               id: "vidro_mais",
               label: GLASS_LABELS.vidro_mais,
               hint: stageId
-                ? "Faça a manutenção; ao finalizar, vai para o vidro sem checklist."
+                ? "Faça a manutenção e o checklist aberto; ao finalizar, vai para o vidro."
                 : "Bipe o serial primeiro.",
               disabled: !stageId,
             },
@@ -707,7 +991,8 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
         />
         {glassLocked && (
           <p className={stage1Styles.hint} role="status">
-            Vidro e outra manutenção marcado. Faça a manutenção; ao finalizar, o aparelho vai para o vidro (checklist opcional).
+            Vidro e outra manutenção marcado. Faça a manutenção e o checklist com o aparelho aberto; ao finalizar, o aparelho vai para o vidro (o
+            fechado é feito depois do vidro).
           </p>
         )}
       </section>
@@ -715,9 +1000,10 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
       {PHASES.map((phase) => (
         <section key={phase} className={stage2Styles.phase} aria-label={PHASE_LABELS[phase]}>
           <h2 className={stage1Styles.heading}>{PHASE_LABELS[phase]}</h2>
-          {phase === "fechado" && openFailed ? (
+          {phase === "fechado" && skipClosed ? (
             <p className={stage1Styles.hint}>
-              Não precisa fazer: o aparelho teve falha nos testes com ele aberto. Finalize e escolha o destino (Análise técnica ou Vidro).
+              Não precisa fazer: o aparelho teve falha nos testes com ele aberto. Se o destino for a Quarentena, o checklist fechado
+              volta a ser obrigatório.
             </p>
           ) : !checklists.loaded ? (
             <p className={stage2Styles.muted}>Carregando…</p>
@@ -752,6 +1038,10 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
         analysisNote={analysisNote}
         onAnalysisNote={setAnalysisNote}
         hideCount
+        glassOpenChecklist={glass === "vidro_mais"}
+        technicians={labTechs}
+        technicianId={transferTo}
+        onTechnician={setTransferTo}
       />
 
       <DoneMaintenanceDialog
@@ -760,7 +1050,8 @@ function Legacy({ client, userId, technician, admin }: { client: AppSupabaseClie
         serial={serial}
         destination={DESTINATION_LABELS[outcome]}
         onCancel={() => setAsking(false)}
-        onConfirm={(done) => void finish(done)}
+        onConfirm={(done, boardNote) => void finish(done, boardNote)}
+        boardNote={analysis}
       />
     </>
   );

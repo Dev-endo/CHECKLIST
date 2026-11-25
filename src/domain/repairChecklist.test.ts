@@ -147,6 +147,19 @@ describe("expectedOutcome", () => {
     expect(expectedOutcome(ready().results, "analise")).toBe("analise");
     expect(expectedOutcome({ aberto: allOk("aberto"), fechado: { ...allOk("fechado"), cameras: "fail" } }, "vidro")).toBe("vidro");
   });
+
+  it("asks for the open checklist before glass when it is glass and another maintenance", () => {
+    const empty = { aberto: {}, fechado: {} };
+    const base = { results: empty, requests: [], returnsWaiting: 0, destination: "vidro" as const, resaleReason: "" };
+    expect(finishBlockers(base)).toEqual([]);
+    const blockers = finishBlockers({ ...base, glassWithMaintenance: true });
+    expect(blockers.some((text) => text.startsWith("Testes com o aparelho aberto"))).toBe(true);
+    expect(blockers.some((text) => text.startsWith("Testes com o aparelho fechado"))).toBe(false);
+  });
+
+  it("keeps the chosen quarantine even with a failed test (no automatic analysis)", () => {
+    expect(expectedOutcome({ aberto: { ...allOk("aberto"), sistema: "fail" }, fechado: allOk("fechado") }, "quarentena")).toBe("quarentena");
+  });
 });
 
 describe("failed tests", () => {

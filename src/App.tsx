@@ -11,12 +11,14 @@ import { DisassemblyChecklist } from "./components/DisassemblyChecklist/Disassem
 import { AssemblyChecklist } from "./components/AssemblyChecklist/AssemblyChecklist";
 import { LoansPanel } from "./components/LoansPanel/LoansPanel";
 import { PartsControl } from "./components/PartsControl/PartsControl";
-import { AnalysisTechPanel } from "./components/AnalysisTechPanel/AnalysisTechPanel";
 import { BoardRepairPanel } from "./components/AnalysisTechPanel/BoardRepairPanel";
 import { GlassPanel } from "./components/GlassPanel/GlassPanel";
 import { LegacyChecklistPanel } from "./components/LegacyChecklist/LegacyChecklistPanel";
 import { MyProduction } from "./components/MyProduction/MyProduction";
 import { DailyGoal } from "./components/DailyGoal/DailyGoal";
+import { LabGoal } from "./components/DailyGoal/LabGoal";
+import { DeliveryTab } from "./components/LabDay/DeliveryTab";
+import { TrackingTab } from "./components/LabDay/TrackingTab";
 import { Stage2Panel } from "./components/RepairStage2/Stage2Panel";
 import { Stage1Panel } from "./components/RepairStage1/Stage1Panel";
 import { StockAlerts } from "./components/StockAlerts/StockAlerts";
@@ -250,8 +252,9 @@ export default function App() {
             Seu acesso ainda não foi liberado. Peça ao administrador para definir o seu papel.
           </div>
         )}
-        {/* Meta do dia (liberados para quarentena e vidro) no topo do Reparo e do Checklist manutenção. */}
-        {client && (activeTab === "reparo" || activeTab === "reparo2" || activeTab === "checklist_manutencao") && <DailyGoal client={client} />}
+        {/* Meta do dia: no Reparo, liberados para quarentena e vidro; no Checklist manutenção, os balões do Dia Laboratório. */}
+        {client && (activeTab === "reparo" || activeTab === "reparo2") && <DailyGoal client={client} />}
+        {client && activeTab === "checklist_manutencao" && <LabGoal client={client} />}
         {activeTab === "reparo" && <Stage1Panel />}
         {activeTab === "reparo2" && (
           <>
@@ -261,7 +264,8 @@ export default function App() {
         )}
         {activeTab === "checklist_manutencao" && <LegacyChecklistPanel />}
         {activeTab === "vidro" && <GlassPanel />}
-        {activeTab === "analise_tecnica" && <AnalysisTechPanel />}
+        {/* Análise técnica: checklist sem balões (mesma estrutura do Checklist manutenção antigo), só o analista. */}
+        {activeTab === "analise_tecnica" && <LegacyChecklistPanel mode="analise" />}
         {activeTab === "reparo_placa" && <BoardRepairPanel />}
         {activeTab === "analise_montagem" && (
           <Stage2Panel
@@ -283,6 +287,8 @@ export default function App() {
         {activeTab === "registros" && client && <ReviewSection client={client} onOpen={handleOpen} />}
         {activeTab === "dashboard" && client && <DashboardPanel client={client} />}
         {activeTab === "aprovacao_pt" && client && <PtApprovalPanel client={client} />}
+        {activeTab === "dia_lab_entrega" && <DeliveryTab />}
+        {activeTab === "dia_lab_acompanhamento" && <TrackingTab />}
         {activeTab === "liberacao" && <ReleasePanel />}
         {activeTab === "admin" && client && <AdminPanel client={client} currentUserId={userId} />}
 

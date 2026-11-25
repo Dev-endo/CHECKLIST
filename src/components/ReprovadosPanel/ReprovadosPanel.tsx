@@ -1,4 +1,6 @@
-import { useState, type ClipboardEvent, type FormEvent } from "react";
+import { useEffect, useState, type ClipboardEvent, type FormEvent } from "react";
+import { useAuth } from "../../auth/AuthProvider";
+import { directRejected, listLabTechnicians, type DirectRejectedResult, type LabTechnician } from "../../services/supabase/labDayService";
 import { splitAssetId } from "../../domain/device";
 import { OUTCOME_LABELS } from "../../domain/repairChecklist";
 import { describeRepairError } from "../../domain/repairStages";
@@ -47,8 +49,9 @@ const emptyRow = (serial: string): ReprovadoRow => ({
 });
 
 /**
- * Reprovados: bipa vários seriais de uma vez (como na Quarentena) e, ao concluir, mostra por aparelho o técnico
- * responsável e quem fez a desmontagem, o checklist, a manutenção e a montagem.
+ * Reprovados (supervisor e admin): bipa vários seriais de uma vez (como na Quarentena) e, ao concluir, mostra por
+ * aparelho o técnico responsável e quem fez a desmontagem, o checklist, a manutenção e a montagem. Depois, direciona os
+ * reprovados para um técnico: cada um vira um balão no Checklist manutenção dele.
  */
 export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
   const toast = useToast();
@@ -56,6 +59,59 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ReprovadoRow[] | null>(null);
+  // Direcionar os reprovados para um técnico: cada serial vira um balão no Checklist manutenção dele.
+  const { user } = useAuth();
+  const myId = user?.id ?? "";
+  const [technicians, setTechnicians] = useState<LabTechnician[]>([]);
+  const [technicianId, setTechnicianId] = useState("");
+  const [directed, setDirected] = useState<Map<string, DirectRejectedResult>>(new Map());
+  useEffect(() => {
+    let active = true;
+    listLabTechnicians(client)
+      .then(
+        (found) =>
+          active &&
+          setTechnicians(
+            [...found].sort((a, b) => Number(b.id === myId) - Number(a.id === myId) || a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
+          ),
+      )
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, myId]);
+
+  const direct = async () => {
+    if (!result || !technicianId || busy) return;
+    const pending = result.map((row) => row.serial).filter((value) => !directed.get(value.toLowerCase())?.ok);
+    if (!pending.length) return;
+    const name = technicians.find((item) => item.id === technicianId)?.name ?? "o técnico";
+    if (!window.confirm(`Direcionar ${pending.length} ativo(s) para ${name}? Cada um vira um balão no Checklist manutenção dele.`)) return;
+    setBusy(true);
+    try {
+      const found = await directRejected(client, pending, technicianId);
+      setDirected((prev) => {
+        const next = new Map(prev);
+        for (const item of found) next.set(item.serial.toLowerCase(), item);
+        return next;
+      });
+      const ok = found.filter((item) => item.ok).length;
+      const skipped = found.length - ok;
+      toast(`${ok} ativo(s) direcionado(s) para ${name}${skipped ? ` · ${skipped} não direcionado(s): veja a coluna Balão` : ""}`);
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível direcionar os ativos."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const balloonLabel = (value: string) => {
+    const item = directed.get(value.toLowerCase());
+    if (!item) return "—";
+    if (item.ok) return `Direcionado para ${item.holder ?? "o técnico"}`;
+    if (item.reason === "com_tecnico") return `Já está com ${item.holder ?? "um técnico"}`;
+    return "Serial fora da lista de ativos";
+  };
 
   // Vários de uma vez (colados da planilha, por exemplo) ou um bipado: repetidos são ignorados.
   const addMany = async (values: string[]) => {
@@ -127,6 +183,7 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
   const restart = () => {
     setResult(null);
     setEntries([]);
+    setDirected(new Map());
   };
 
   const unitOf = (serialValue: string) => entries.find((entry) => entry.serial === serialValue)?.unit ?? null;
@@ -155,6 +212,7 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
                   <th>Manutenções feitas</th>
                   <th>Montagem</th>
                   <th>Quarentena</th>
+                  <th>Balão</th>
                 </tr>
               </thead>
               <tbody>
@@ -198,6 +256,7 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
                           </small>
                         )}
                       </td>
+                      <td>{balloonLabel(row.serial)}</td>
                     </tr>
                   );
                 })}
@@ -205,8 +264,24 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
             </table>
           </div>
           <div className={quarantineStyles.footer}>
-            <span />
-            <Button onClick={restart}>Nova lista</Button>
+            <label style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <strong>Direcionar para técnico:</strong>
+              <select value={technicianId} disabled={busy} onChange={(e) => setTechnicianId(e.target.value)} style={{ width: "auto" }}>
+                <option value="">{technicians.length ? "Escolha o técnico…" : "Nenhum técnico encontrado"}</option>
+                {technicians.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                    {item.id === myId ? " (você)" : ""}
+                  </option>
+                ))}
+              </select>
+              <Button disabled={busy || !technicianId} onClick={() => void direct()}>
+                {busy ? "Direcionando…" : "Direcionar"}
+              </Button>
+            </label>
+            <Button variant="ghost" onClick={restart}>
+              Nova lista
+            </Button>
           </div>
         </>
       ) : (

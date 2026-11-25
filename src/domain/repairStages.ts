@@ -83,6 +83,17 @@ export function describeRepairError(error: { code?: string; message?: string } |
   if (text.includes("handover_target_invalid")) return "Escolha um técnico de manutenção (outra pessoa, não você).";
   if (text.includes("return_reason_required")) return "Explique por que está devolvendo a peça (pelo menos 5 letras).";
   if (text.includes("replace_reason_required")) return "Explique por que está substituindo a peça.";
+  // Dia Laboratório (migration 108).
+  if (text.includes("board_note_required")) return "Escreva a observação do serviço feito na placa (pelo menos 5 letras).";
+  if (text.includes("lab_in_balloon")) return "Este ativo está no balão de um técnico do Dia Laboratório: segue com ele.";
+  if (text.includes("lab_no_balloon")) return "Este ativo não está nos seus balões. Peça ao supervisor para vinculá-lo a você.";
+  if (text.includes("lab_transfer_pending")) return "Transferência pendente: quem recebeu precisa confirmar o recebimento antes.";
+  if (text.includes("lab_serial_not_found")) return "Serial não encontrado na lista de ativos.";
+  if (text.includes("lab_serial_taken")) return "Este ativo já está com um técnico.";
+  if (text.includes("lab_not_in_glass")) return "Só dá para direcionar ativos que estão no Vidro.";
+  if (text.includes("lab_not_rejected")) return "Este ativo não está mais aguardando redistribuição.";
+  if (text.includes("lab_technician_invalid")) return "Escolha um técnico (outra pessoa, não você).";
+  if (text.includes("lab_balloon_closed")) return "Este balão já mudou. Atualize a tela.";
   if (error?.code === "42501" || text.includes("sem permissão")) return "Seu perfil não pode fazer isso.";
   if (text.includes("pedido já fechado")) return "Essa solicitação já foi fechada.";
   if (text.includes("stage_closed")) return "Essa etapa já foi concluída.";

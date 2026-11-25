@@ -111,3 +111,48 @@ só enquanto `pendente`; ninguém apaga. Só o admin altera `profiles.role`, e n
 próprio. O acesso anônimo foi removido.
 
 Depois de mudar o schema, regenere `src/services/supabase/database.types.ts`.
+
+### Dia Laboratório (migration 108)
+
+Aba de supervisor e admin, com duas sub-abas:
+
+- **Entrega de ativos**: bipa ou cola os seriais, escolhe o técnico (papel `tecnico`) e vincula. Cada ativo vira um
+  **balão** no Checklist manutenção do técnico. O ativo que está no Vidro é direcionado; o reprovado na quarentena
+  aparece no balão fixo **Ativos reprovados** e o supervisor escolhe quem faz a manutenção.
+- **Acompanhamento**: entraram, saíram (meta de saída: PT e quarentena aprovada), destinos, quarentena e o que ainda
+  está no laboratório. Todos os números abrem a lista dos ativos (com busca e exportação CSV); a lista por técnico
+  mostra a bancada, as transferências pendentes e os transferidos.
+
+No **Checklist manutenção** o técnico trabalha pelos balões; desde a migration 110 ele também pode bipar um serial
+sem balão (o checklist abre e vira balão dele; o balão de outro técnico passa para quem abriu). Ao finalizar, qualquer destino abate 1 da meta
+do dia (meta = balões do técnico); **Transferir para técnico** também conta como finalizado para quem transfere, e
+só entra na meta de quem recebe depois que ele confirma o recebimento. O técnico de vidro direciona os ativos com
+status Vidro (o ativo não volta sozinho para quem enviou).
+
+Tabelas: `lab_assets` (uma linha por passagem do ativo pelo laboratório), `lab_balloons` (um balão aberto por ativo)
+e `lab_events` (histórico). Sem acesso direto: tudo passa pelas funções `lab_*`, que conferem o papel. Gatilhos em
+`repair_stages` (checklist aberto ou finalizado), `repair_checklist_results` (bloqueia a transferência pendente) e
+`quarantine_checks` (aprovado sai; reprovado aguarda redistribuição).
+
+A aba **Reparo** (Estágios 1 e 2) aparece só para o admin. A sub-aba **Análise técnica** (migration 109) é um
+checklist com a mesma estrutura do Checklist manutenção antigo (bipa o serial e abre, sem balões) e só o analista
+usam o analista e o admin. O analista vê apenas Defeito incorreto e Análise técnica; as telas antigas Reparo em placa e
+Checklist e montagem saíram do menu. Destinos: os mesmos do Checklist manutenção, sem "Análise técnica".
+"Transferir para técnico" aceita a própria pessoa (vira um balão seu, já aberto). O **reparo em placa** é uma das
+manutenções feitas (ao finalizar): marcado, pede a observação do serviço feito e fica registrado como placa de quem
+fez, em qualquer destino (migration 113). Ao finalizar, a fila da análise do aparelho é fechada e, no Dia Laboratório, o ativo sai de "Aguardando análise
+técnica" para o destino. Ativo que está no balão de um técnico não abre na análise.
+
+No Checklist manutenção e na Análise técnica o **destino é sempre escolhido**: teste reprovado não manda o aparelho
+sozinho para a Análise técnica. "Quarentena" vale mesmo com teste reprovado (a falha fica registrada; migration 114).
+O Estágio 2 do Reparo continua mandando o reprovado para a análise.
+
+Cada passagem do ativo pelo laboratório é amarrada à OS (migration 115): o ativo que volta com a mesma OS reabre a
+passagem anterior, e no Acompanhamento o mesmo serial só conta de novo se tiver outra OS.
+
+Testes do banco (Postgres em WASM, sem tocar no Supabase):
+
+```sh
+npm i --no-save @electric-sql/pglite
+node supabase/tests/lab_day.pglite.mjs
+```

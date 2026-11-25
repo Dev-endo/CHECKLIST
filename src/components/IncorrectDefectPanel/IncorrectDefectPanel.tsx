@@ -10,6 +10,9 @@ import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
 import { useToast } from "../Toast/ToastProvider";
 import styles from "./IncorrectDefectPanel.module.css";
 
+// Peças da manutenção mais o vidro frontal, que só existe como defeito não identificado.
+const DEFECT_OPTIONS: readonly string[] = [...MAINTENANCE_ITEMS, "Vidro frontal"];
+
 const when = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
 /**
@@ -101,7 +104,7 @@ export function IncorrectDefectPanel({ client }: { client: AppSupabaseClient }) 
           {asset.found === false && <p className={styles.help}>Serial não encontrado na planilha de ativos. Confira se foi bipado certo.</p>}
           <p className={styles.help}>Qual peça estava com defeito e não foi identificada?</p>
           <div className={styles.grid}>
-            {MAINTENANCE_ITEMS.map((name) => (
+            {DEFECT_OPTIONS.map((name) => (
               <label key={name} className={styles.option}>
                 <input type="checkbox" checked={parts.includes(name)} disabled={busy} onChange={() => toggle(name)} />
                 <span>{name}</span>

@@ -12,7 +12,8 @@ import {
   saveGlassDisplay,
   type GlassJob,
 } from "../../services/supabase/glassService";
-import { listMaintenanceTechnicians, type MaintenanceTechnician } from "../../services/supabase/repairService";
+import { useAuth } from "../../auth/AuthProvider";
+import { directFromGlass, listLabTechnicians, type LabTechnician } from "../../services/supabase/labDayService";
 import { Button } from "../Button/Button";
 import { Checklist } from "../Checklist/Checklist";
 import styles from "./GlassPanel.module.css";
@@ -30,12 +31,30 @@ type Run = (job: GlassJob, task: () => Promise<unknown>, done: string, fallback:
  * "Troca de display" é só uma marca (vem sozinha quando o teste falha, ou o técnico marca antes do teste): não depende
  * de enviar para outro técnico e não pede nada ao estoque.
  */
-export function GlassJobActions({ client, job, loading, direct, run }: { client: AppSupabaseClient; job: GlassJob; loading: boolean; direct: boolean; run: Run }) {
+export function GlassJobActions({
+  client,
+  job,
+  loading,
+  direct,
+  run,
+  labDirect = false,
+}: {
+  client: AppSupabaseClient;
+  job: GlassJob;
+  loading: boolean;
+  direct: boolean;
+  run: Run;
+  /** Ativo do Dia Laboratório (status Vidro): não volta sozinho; o técnico de vidro direciona para um técnico. */
+  labDirect?: boolean;
+}) {
   const open = job.status === "aguardando" || job.status === "em_andamento";
   const concluded = job.status === "vidro_concluido";
   const [results, setResults] = useState<Results>({});
   const [loaded, setLoaded] = useState(false);
-  const [technicians, setTechnicians] = useState<MaintenanceTechnician[]>([]);
+  const { user } = useAuth();
+  const myId = user?.id ?? "";
+  // Técnicos e admins (quem está logado primeiro: dá para enviar para si mesmo).
+  const [technicians, setTechnicians] = useState<LabTechnician[]>([]);
   // Troca de display pedida à mão (a falha no teste também pede, sozinha).
   const [displayAsked, setDisplayAsked] = useState(false);
   const dirty = useRef(false);
@@ -51,13 +70,19 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
       setResults(found);
       setLoaded(true);
     });
-    listMaintenanceTechnicians(client)
-      .then((found) => active && setTechnicians(found))
+    listLabTechnicians(client)
+      .then(
+        (found) =>
+          active &&
+          setTechnicians(
+            [...found].sort((a, b) => Number(b.id === myId) - Number(a.id === myId) || a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
+          ),
+      )
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [client, job.id, concluded]);
+  }, [client, job.id, concluded, myId]);
 
   // Grava sozinho pouco depois de parar de marcar.
   const persist = useCallback(async () => {
@@ -106,18 +131,24 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
   const sendToTechnician = (technicianId: string) => {
     if (!technicianId) return;
     const name = technicians.find((item) => item.id === technicianId)?.name ?? "o técnico";
+    if (labDirect) {
+      if (!window.confirm(`Direcionar o ativo para ${name}? Ele vira um balão no Checklist manutenção dele${wantsDisplay ? ", com a troca de display solicitada" : ""}.`)) return;
+      void run(job, flushThen(() => directFromGlass(client, [job.serial], technicianId, wantsDisplay)), `Ativo direcionado para ${name}`, "Não foi possível direcionar o ativo.");
+      return;
+    }
     if (!window.confirm(`Enviar o aparelho para ${name}? O vidro é finalizado${wantsDisplay ? " com a troca de display solicitada" : ""}.`)) return;
     void run(job, flushThen(() => glassSendDisplay(client, job.id, technicianId, wantsDisplay)), `Aparelho enviado para ${name}`, "Não foi possível enviar o aparelho.");
   };
 
   const picker = (
     <label className={styles.muted}>
-      Enviar para outro técnico:{" "}
+      {labDirect ? "Direcionar para técnico:" : "Enviar para técnico:"}{" "}
       <select value="" disabled={loading || !canFinish} onChange={(e) => sendToTechnician(e.target.value)}>
         <option value="">{technicians.length ? "Escolha o técnico…" : "Nenhum técnico encontrado"}</option>
         {technicians.map((item) => (
           <option key={item.id} value={item.id}>
             {item.name}
+            {item.id === myId ? " (você)" : ""}
           </option>
         ))}
       </select>
@@ -162,7 +193,7 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
             Finalizar vidro
           </Button>
         )}
-        {!direct && canFinish && (
+        {!direct && !labDirect && canFinish && (
           <Button
             disabled={loading}
             onClick={() => void run(job, flushThen(() => finishGlass(client, job.id, wantsDisplay)), `Entregue a ${job.responsible}`, "Não foi possível entregar o aparelho.")}
@@ -170,7 +201,11 @@ export function GlassJobActions({ client, job, loading, direct, run }: { client:
             Entregar ao responsável ({job.responsible})
           </Button>
         )}
-        {!canFinish && <span className={styles.muted}>Responda o checklist de display (ou solicite a troca) para {direct ? "finalizar" : "entregar ao responsável"}.</span>}
+        {!canFinish && (
+          <span className={styles.muted}>
+            Responda o checklist de display (ou solicite a troca) para {labDirect ? "direcionar" : direct ? "finalizar" : "entregar ao responsável"}.
+          </span>
+        )}
         {picker}
       </div>
     </>

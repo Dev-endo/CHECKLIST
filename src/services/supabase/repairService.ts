@@ -133,6 +133,22 @@ export async function fetchMyOpenStages(
 export const startLegacyMaintenance = (client: AppSupabaseClient, serial: string) =>
   call<string>(client, "start_legacy_maintenance", { p_serial: serial });
 
+/** Análise técnica (migration 109): o analista abre o checklist sem balão. */
+export const startAnalysisChecklist = (client: AppSupabaseClient, serial: string) =>
+  call<string>(client, "start_analysis_checklist", { p_serial: serial });
+
+/** Análise: Transferir para técnico. Vira um balão pendente dele, com o checklist e as marcações. */
+export const analysisTransfer = (client: AppSupabaseClient, stageId: string, technicianId: string, note: string) =>
+  call<string>(client, "analysis_transfer", { p_stage_id: stageId, p_technician: technicianId, p_note: note.trim() || null });
+
+/** Análise: a observação do reparo em placa (manutenção feita); null limpa. Registrada ao finalizar o checklist. */
+export const analysisSetBoardNote = (client: AppSupabaseClient, stageId: string, note: string | null) =>
+  call<null>(client, "analysis_set_board_note", { p_stage_id: stageId, p_note: note?.trim() || null });
+
+/** Checklist da análise começado por outro analista: passa para quem bipou, em branco. */
+export const takeAnalysisChecklist = (client: AppSupabaseClient, serial: string) =>
+  call<string>(client, "take_analysis_checklist", { p_serial: serial });
+
 /** Checklist manutenção começado por outro técnico: passa para quem bipou, em branco ("Fazer um novo?" → Sim). */
 export const takeLegacyChecklist = (client: AppSupabaseClient, serial: string) =>
   call<string>(client, "take_legacy_checklist", { p_serial: serial });
@@ -441,7 +457,7 @@ export const finishMaintenance = (
     requiredOpen: string[];
     requiredClosed: string[];
     choice: string[];
-    destination: "auto" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado";
+    destination: "auto" | "quarentena" | "vidro" | "revenda" | "analise" | "pt" | "bloqueado";
     resaleReason: string;
     /** Motivo do envio para a Análise técnica (obrigatório quando o aparelho vai para lá). */
     analysisNote?: string;
@@ -459,6 +475,8 @@ export const finishMaintenance = (
     p_analysis_note: input.analysisNote?.trim() || null,
     p_pt: input.destination === "pt",
     p_blocked: input.destination === "bloqueado",
+    // Quarentena escolhida (migration 114): vai para a quarentena mesmo com teste reprovado.
+    ...(input.destination === "quarentena" ? { p_quarantine: true } : {}),
   });
 
 /** Manutenções que contam para quem finaliza a etapa (a placa que ele reparou e cada peça usada de vez). */
@@ -609,5 +627,6 @@ export async function fetchReprovados(client: AppSupabaseClient, serials: readon
 }
 
 /** Manutenções que o técnico informa ao finalizar o checklist (migration 95): trocam a lista da etapa; vazia = nenhuma. */
-export const declareMaintenanceItems = (client: AppSupabaseClient, stageId: string, items: readonly { nome: string; qtd: number }[]) =>
+/** Manutenções feitas; a Placa leva a observação do que foi feito (obs, migration 117). */
+export const declareMaintenanceItems = (client: AppSupabaseClient, stageId: string, items: readonly { nome: string; qtd: number; obs?: string }[]) =>
   call<null>(client, "declare_maintenance_items", { p_stage_id: stageId, p_items: [...items] });

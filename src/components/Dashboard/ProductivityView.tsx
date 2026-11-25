@@ -7,6 +7,7 @@ import {
   type Productivity,
   type ProductivityDevice,
 } from "../../services/supabase/dashboardService";
+import { fetchLabProductivity, type LabProductivity } from "../../services/supabase/labDayService";
 import { Button } from "../Button/Button";
 import styles from "./Productivity.module.css";
 import dashStyles from "./Dashboard.module.css";
@@ -37,6 +38,8 @@ export function ProductivityView({ client, initialDay }: { client: AppSupabaseCl
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [devices, setDevices] = useState<ProductivityDevice[] | null>(null);
+  // Meta dos balões (Dia Laboratório), por técnico; sem a migration 108 fica vazia.
+  const [lab, setLab] = useState<Map<string, LabProductivity>>(new Map());
   const today = toDateInputValue();
   const isToday = day === today;
 
@@ -48,6 +51,9 @@ export function ProductivityView({ client, initialDay }: { client: AppSupabaseCl
     fetchProductivity(client, day)
       .then((found) => active && setRows(found))
       .catch(() => active && setFailed(true));
+    fetchLabProductivity(client, day)
+      .then((found) => active && setLab(found))
+      .catch(() => active && setLab(new Map()));
     return () => {
       active = false;
     };
@@ -65,7 +71,12 @@ export function ProductivityView({ client, initialDay }: { client: AppSupabaseCl
     };
   }, [client, open, day]);
 
-  const hit = rows?.filter((row) => row.batida).length ?? 0;
+  // Quem teve balões no dia é medido pela meta dos balões; os outros, pela meta dos liberados.
+  const hitOf = (row: Productivity) => {
+    const balloons = lab.get(row.userId);
+    return balloons ? balloons.finished >= balloons.goal : row.batida;
+  };
+  const hit = rows?.filter(hitOf).length ?? 0;
 
   return (
     <section aria-label="Produtividade individual">
@@ -87,7 +98,8 @@ export function ProductivityView({ client, initialDay }: { client: AppSupabaseCl
         )}
       </div>
       <p className={dashStyles.muted}>
-        Meta: 6 aparelhos liberados no dia para a quarentena e para o vidro. Clique no técnico para ver o motivo, as manutenções e os aparelhos.
+        Meta do Checklist manutenção: finalizar todos os ativos (balões) do dia, transferidos contam. Sem balões no dia, vale a meta de 10
+        liberados para a quarentena e o vidro. Clique no técnico para ver o motivo, as manutenções e os aparelhos.
         {isToday ? " Hoje o dia ainda não terminou: os números continuam mudando." : ""}
       </p>
 
@@ -103,17 +115,22 @@ export function ProductivityView({ client, initialDay }: { client: AppSupabaseCl
       <ul className={styles.list}>
         {rows?.map((row) => {
           const expanded = open === row.userId;
+          const balloons = lab.get(row.userId);
+          const batida = hitOf(row);
           return (
-            <li key={row.userId} className={[styles.item, row.batida ? styles.hit : styles.miss].join(" ")}>
+            <li key={row.userId} className={[styles.item, batida ? styles.hit : styles.miss].join(" ")}>
               <button type="button" className={styles.head} aria-expanded={expanded} onClick={() => setOpen(expanded ? null : row.userId)}>
-                <span className={[styles.badge, row.batida ? styles.badgeHit : styles.badgeMiss].join(" ")}>
-                  {row.batida ? "✓ Meta batida" : isToday ? "Meta não batida (até agora)" : "✗ Meta não batida"}
+                <span className={[styles.badge, batida ? styles.badgeHit : styles.badgeMiss].join(" ")}>
+                  {batida ? "✓ Meta batida" : isToday ? "Meta não batida (até agora)" : "✗ Meta não batida"}
                 </span>
                 <strong className={styles.name}>{row.name}</strong>
                 <span className={styles.numbers}>
-                  {row.liberados}/{row.meta} liberados · {row.manutencoes} manutenção(ões)
+                  {balloons
+                    ? `${balloons.finished}/${balloons.goal} ativos finalizados · ${balloons.transferred} transferido(s)`
+                    : `${row.liberados}/${row.meta} liberados`}{" "}
+                  · {row.manutencoes} manutenção(ões)
                 </span>
-                {!row.batida && !row.justificativa && !isToday && <span className={styles.noNote}>sem justificativa</span>}
+                {!batida && !row.justificativa && !isToday && <span className={styles.noNote}>sem justificativa</span>}
                 <span className={styles.chevron} aria-hidden="true">
                   {expanded ? "▲" : "▼"}
                 </span>
@@ -121,7 +138,7 @@ export function ProductivityView({ client, initialDay }: { client: AppSupabaseCl
 
               {expanded && (
                 <div className={styles.body}>
-                  {!row.batida && (
+                  {!batida && (
                     <div className={styles.note}>
                       <span className={styles.label}>Motivo de não bater a meta</span>
                       <p>{row.justificativa ?? (isToday ? "Ainda não justificou." : "O técnico não justificou.")}</p>

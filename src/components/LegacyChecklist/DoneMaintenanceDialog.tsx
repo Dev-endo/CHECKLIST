@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { MAINTENANCE_ITEMS } from "../../domain/maintenance";
+import { MAINTENANCE_ITEMS, PLACA_ITEM } from "../../domain/maintenance";
 import { Button } from "../Button/Button";
 import styles from "../MaintenanceDialog/MaintenanceDialog.module.css";
 
 /** O que o técnico informou: nome da manutenção e quantas. */
 export interface DoneItem {
+  /** Placa: a observação do que foi feito. */
+  obs?: string;
   nome: string;
   qtd: number;
 }
@@ -19,18 +21,24 @@ interface DoneMaintenanceDialogProps {
   /** Para onde o aparelho vai (texto do destino escolhido). */
   destination: string;
   onCancel: () => void;
-  onConfirm: (items: DoneItem[]) => void;
+  /** boardNote: a observação da placa, quando marcada (também vai no item Placa). */
+  onConfirm: (items: DoneItem[], boardNote: string | null) => void;
+  /** Análise técnica: "Placa" aparece como "Reparo em placa". Em qualquer checklist, Placa marcada pede a observação. */
+  boardNote?: boolean;
 }
+
+const BOARD_NOTE_MIN = 5;
 
 /**
  * Balão ao finalizar o checklist manutenção (com vidro ou sem): o técnico marca as manutenções que fez, com a
  * quantidade, e vê o total. Elas contam para ele e aparecem na aba Reprovados.
  */
-export function DoneMaintenanceDialog({ open, busy = false, serial, destination, onCancel, onConfirm }: DoneMaintenanceDialogProps) {
+export function DoneMaintenanceDialog({ open, busy = false, serial, destination, onCancel, onConfirm, boardNote = false }: DoneMaintenanceDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState<Record<string, number>>({});
   // Resposta explícita de que nenhuma manutenção foi feita (ex.: só vidro).
   const [none, setNone] = useState(false);
+  const [note, setNote] = useState("");
 
   useEffect(() => {
     const element = dialog.current;
@@ -38,6 +46,7 @@ export function DoneMaintenanceDialog({ open, busy = false, serial, destination,
     if (open && !element.open) {
       setSelected({});
       setNone(false);
+      setNote("");
       element.showModal();
     }
     if (!open && element.open) element.close();
@@ -45,7 +54,9 @@ export function DoneMaintenanceDialog({ open, busy = false, serial, destination,
 
   const items = OPTIONS.filter((name) => selected[name]).map((name) => ({ nome: name, qtd: selected[name] as number }));
   const total = items.reduce((sum, item) => sum + item.qtd, 0);
-  const ready = total > 0 || none;
+  // Placa marcada: abre a observação do que foi feito (obrigatória).
+  const board = Boolean(selected[PLACA_ITEM]);
+  const ready = (total > 0 || none) && (!board || note.trim().length >= BOARD_NOTE_MIN);
 
   const toggle = (name: string) => {
     setNone(false);
@@ -71,7 +82,7 @@ export function DoneMaintenanceDialog({ open, busy = false, serial, destination,
         {OPTIONS.map((name) => (
           <label key={name} className={styles.option}>
             <input type="checkbox" checked={Boolean(selected[name])} disabled={busy} onChange={() => toggle(name)} />
-            <span>{name}</span>
+            <span>{boardNote && name === PLACA_ITEM ? "Reparo em placa" : name}</span>
             {selected[name] ? (
               <input
                 type="number"
@@ -87,6 +98,21 @@ export function DoneMaintenanceDialog({ open, busy = false, serial, destination,
           </label>
         ))}
       </div>
+
+      {board && (
+        <label className={styles.help} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <strong>Observação do serviço feito na placa (obrigatório)</strong>
+          <textarea
+            value={note}
+            rows={3}
+            maxLength={1000}
+            disabled={busy}
+            autoFocus
+            placeholder="O que foi feito? Ex.: troca do CI de carga, reballing, jumper"
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+      )}
 
       <label className={styles.option}>
         <input
@@ -107,7 +133,15 @@ export function DoneMaintenanceDialog({ open, busy = false, serial, destination,
         <Button variant="ghost" disabled={busy} onClick={onCancel}>
           Voltar
         </Button>
-        <Button disabled={busy || !ready} onClick={() => onConfirm(items)}>
+        <Button
+          disabled={busy || !ready}
+          onClick={() =>
+            onConfirm(
+              items.map((item) => (board && item.nome === PLACA_ITEM ? { ...item, obs: note.trim() } : item)),
+              board ? note.trim() : null,
+            )
+          }
+        >
           {busy ? "Finalizando…" : "Finalizar checklist"}
         </Button>
       </div>

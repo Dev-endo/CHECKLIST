@@ -72,6 +72,8 @@ export type TabId =
   | "registros"
   | "dashboard"
   | "aprovacao_pt"
+  | "dia_lab_entrega"
+  | "dia_lab_acompanhamento"
   | "liberacao"
   | "admin";
 
@@ -85,9 +87,9 @@ export function canManageUsers(role: Roles): boolean {
   return hasRole(role, "admin");
 }
 
-/** Aba Reparo (estágio 1: OS, desmontagem, análise básica e pedido de peça): o técnico (e o admin). */
+/** Aba Reparo (Estágios 1 e 2): só o admin. O técnico trabalha pelo Checklist manutenção (balões). */
 export function canDoRepair(role: Roles): boolean {
-  return hasRole(role, "tecnico", "admin");
+  return hasRole(role, "admin");
 }
 
 /** Checklist de manutenção: técnicos (e o admin, para testar e acompanhar). */
@@ -138,9 +140,29 @@ export function receivesStockAlerts(role: Roles): boolean {
   return hasRole(role, "estoquista");
 }
 
-/** Aba Quarentena: todo mundo que tem função (só quem está "Sem função" fica de fora). */
+/** Abas Quarentena e Reprovados: quem tem função, menos o analista (ele só usa Defeito incorreto e Análise técnica). */
 export function canUseQuarantine(role: Roles): boolean {
-  return hasRole(role, "admin", "supervisor", "tecnico", "desmontador", "montador", "estoquista", "analista", "tecnico_vidro");
+  return hasRole(role, "admin", "supervisor", "tecnico", "desmontador", "montador", "estoquista", "tecnico_vidro");
+}
+
+/** Aba Reprovados (consulta e direcionamento para um técnico): supervisor e admin. */
+export function canSeeReprovados(role: Roles): boolean {
+  return hasRole(role, "admin", "supervisor");
+}
+
+/** Aba Defeito incorreto: todos que usam a Quarentena e também o analista. */
+export function canReportIncorrectDefect(role: Roles): boolean {
+  return canUseQuarantine(role) || hasRole(role, "analista");
+}
+
+/** Aba Dia Laboratório (entrega de ativos e acompanhamento): supervisor e admin. */
+export function canUseLabDay(role: Roles): boolean {
+  return hasRole(role, "admin", "supervisor");
+}
+
+/** Direcionar para um técnico os ativos que estão no Vidro: supervisor, admin e técnico de vidro. */
+export function canDirectFromGlass(role: Roles): boolean {
+  return hasRole(role, "admin", "supervisor", "tecnico_vidro");
 }
 
 /** Aba Vidro: o técnico de vidro (e o admin). */
@@ -148,8 +170,14 @@ export function canDoGlass(role: Roles): boolean {
   return hasRole(role, "tecnico_vidro", "admin");
 }
 
-/** Aba Análise técnica: o analista (e o admin). */
+/** Reparo em placa e Checklist e montagem (telas antigas, fora do menu): só o admin. O reparo em placa agora é uma das
+ * manutenções feitas do checklist da Análise técnica. */
 export function canDoAnalysis(role: Roles): boolean {
+  return hasRole(role, "admin");
+}
+
+/** Sub-aba Análise técnica (checklist da análise, sem balões): o analista (e o admin). */
+export function canDoAnalysisChecklist(role: Roles): boolean {
   return hasRole(role, "analista", "admin");
 }
 
@@ -163,14 +191,18 @@ export function accessibleTabs(role: Roles): TabId[] {
   const tabs: TabId[] = [];
   // Técnico: Reparo. Técnico de placa: Análise técnica. Técnico de vidro: Vidro. Estoquista: Estoque.
   // Supervisor: Análise. Todos: Quarentena. Admin: tudo.
-  if (canDoRepair(role)) tabs.push("reparo", "reparo2", "checklist_manutencao");
-  if (canUseQuarantine(role)) tabs.push("quarentena", "reprovados", "defeito_incorreto");
-  if (canDoAnalysis(role)) tabs.push("analise_tecnica", "reparo_placa", "analise_montagem");
+  if (canDoRepair(role)) tabs.push("reparo", "reparo2");
+  if (canDoMaintenance(role)) tabs.push("checklist_manutencao");
+  if (canUseQuarantine(role)) tabs.push("quarentena");
+  if (canSeeReprovados(role)) tabs.push("reprovados");
+  if (canReportIncorrectDefect(role)) tabs.push("defeito_incorreto");
+  if (canDoAnalysisChecklist(role)) tabs.push("analise_tecnica");
   if (canDoGlass(role)) tabs.push("vidro");
   if (canManageStock(role)) tabs.push("solicitacoes");
   if (canViewOs(role)) tabs.push("os");
   if (canSeeDashboard(role)) tabs.push("dashboard");
   if (canApprovePt(role)) tabs.push("aprovacao_pt");
+  if (canUseLabDay(role)) tabs.push("dia_lab_entrega", "dia_lab_acompanhamento");
   if (canManageUsers(role)) tabs.push("liberacao", "admin");
   return tabs;
 }

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider";
-import { canManageUsers } from "../../domain/roles";
+import { canDirectFromGlass, canManageUsers } from "../../domain/roles";
+import { serialKey } from "../../domain/labDay";
+import { fetchGlassSerials } from "../../services/supabase/labDayService";
+import { AssignAssets } from "../LabDay/AssignAssets";
+import { Button } from "../Button/Button";
 import { describeRepairError } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import {
@@ -37,10 +41,18 @@ const STATE_LABELS = { aguardando: "Aguardando", em_andamento: "Em andamento", v
 export function GlassPanel() {
   const { user, client } = useAuth();
   if (!client || !user) return <p className={appStyles.banner}>Entre com a sua conta para usar o Vidro.</p>;
-  return <Glass client={client} userId={user.id} isAdmin={canManageUsers(user.roles)} technician={user.name || user.email} />;
+  return (
+    <Glass
+      client={client}
+      userId={user.id}
+      isAdmin={canManageUsers(user.roles)}
+      technician={user.name || user.email}
+      canDirect={canDirectFromGlass(user.roles)}
+    />
+  );
 }
 
-function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseClient; userId: string; isAdmin: boolean; technician: string }) {
+function Glass({ client, userId, isAdmin, technician, canDirect }: { client: AppSupabaseClient; userId: string; isAdmin: boolean; technician: string; canDirect: boolean }) {
   const toast = useToast();
   const [jobs, setJobs] = useState<GlassJob[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -48,6 +60,9 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
   const [reloads, setReloads] = useState(0);
   const reload = useCallback(() => setReloads((n) => n + 1), []);
   const [doneToday, setDoneToday] = useState<number | null>(null);
+  // Dia Laboratório: seriais com status Vidro (direcionados para um técnico, não voltam sozinhos).
+  const [labGlass, setLabGlass] = useState<Set<string>>(new Set());
+  const [directing, setDirecting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -63,11 +78,17 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
       countGlassDoneSince(client, startOfToday())
         .then((n) => active && setDoneToday(n))
         .catch(() => undefined);
+    const loadLab = () =>
+      fetchGlassSerials(client)
+        .then((found) => active && setLabGlass(found))
+        .catch(() => undefined);
     void load();
     void loadDone();
+    void loadLab();
     const poll = setInterval(() => {
       void load();
       void loadDone();
+      void loadLab();
     }, POLL_MS);
     return () => {
       active = false;
@@ -100,6 +121,7 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
   const renderJob = (job: GlassJob) => {
     const loading = busy === job.id;
     const direct = job.origin === "vidro";
+    const labDirect = labGlass.has(serialKey(job.serial));
     return (
       <div className={[styles.card, styles[`s_${job.status}`]].join(" ")}>
         <div className={styles.head}>
@@ -112,7 +134,8 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
         <p className={styles.who}>
           {direct ? "Recebido direto no vidro por" : "Desmontado por"} <strong>{job.responsible}</strong> · {ORIGIN_LABELS[job.origin]} · pedido em {when(job.createdAt)}
         </p>
-        <GlassJobActions client={client} job={job} loading={loading} direct={direct} run={run} />
+        {labDirect && <p className={styles.who}>Dia Laboratório: depois do vidro, direcione para um técnico (não volta sozinho).</p>}
+        <GlassJobActions client={client} job={job} loading={loading} direct={direct} run={run} labDirect={labDirect} />
       </div>
     );
   };
@@ -125,6 +148,15 @@ function Glass({ client, userId, isAdmin, technician }: { client: AppSupabaseCli
           Bipe o serial para receber um aparelho direto no vidro, ou atenda os enviados pelo Reparo. Conclua o vidro e responda o checklist de display. Tudo certo, o aparelho volta para quem desmontou (ou o vidro é finalizado, se chegou direto); display com falha (ou solicitado), você escolhe quem faz.
         </p>
       </header>
+
+      {canDirect && (
+        <section aria-label="Direcionar para técnico">
+          <Button variant={directing ? "ghost" : "primary"} onClick={() => setDirecting((value) => !value)}>
+            {directing ? "Fechar direcionamento" : `Direcionar para técnico${labGlass.size ? ` (${labGlass.size} no Vidro)` : ""}`}
+          </Button>
+          {directing && <AssignAssets client={client} mode="vidro" onDone={reload} />}
+        </section>
+      )}
 
       <GlassDirect client={client} userId={userId} isAdmin={isAdmin} technician={technician} jobs={jobs} renderJob={renderJob} reloadJobs={reload} />
 

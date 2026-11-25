@@ -1,0 +1,402 @@
+.muted {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+/* Entrega: duas caixas grandes, do mesmo tamanho, lado a lado (empilhadas no celular). */
+.boxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 12px 0;
+}
+
+@media (max-width: 760px) {
+  .boxes {
+    grid-template-columns: 1fr;
+  }
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 320px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.boxTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.box textarea {
+  flex: 1;
+  min-height: 240px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 15px;
+  resize: vertical;
+}
+
+.techList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tech {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* O estilo global deixa todo input com 100% de largura: o rádio fica no tamanho natural, à esquerda do nome. */
+.tech input[type="radio"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.techName {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.tech:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.preview {
+  margin: 8px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.previewHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.previewList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.previewItem {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(90px, 1fr) minmax(0, 2fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .previewItem {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+.tag {
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.tagWarn {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.tagOk {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.success {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.error {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+/* Balão fixo "Ativos reprovados". */
+.rejected {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 360px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--crit);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rejected:disabled {
+  border-left-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
+.rejectedValue {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+/* Contadores do acompanhamento. */
+.section {
+  margin: 18px 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat:hover,
+.stat:focus-visible,
+.statActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.statBig .statValue {
+  font-size: 34px;
+}
+
+.statValue {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.statOk .statValue {
+  color: var(--ok);
+}
+
+.statCrit .statValue {
+  color: var(--crit);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: end;
+  margin: 10px 0;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.filters input {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  background: var(--bg);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.list {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.listHead h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.person {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .person {
+    grid-template-columns: 1fr;
+  }
+}
+
+.personName {
+  font-weight: 700;
+}
+
+.serialLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Checkboxes (lista de reprovados e troca de display) no tamanho natural. */
+.table input[type="checkbox"],
+.checkRow input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.checkRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13.5px;
+}
