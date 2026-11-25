@@ -10,8 +10,8 @@ import recordStyles from "../RecordsPanel/RecordsPanel.module.css";
 import { useToast } from "../Toast/ToastProvider";
 import styles from "./IncorrectDefectPanel.module.css";
 
-// Peças da manutenção mais o vidro frontal, que só existe como defeito não identificado.
-const DEFECT_OPTIONS: readonly string[] = [...MAINTENANCE_ITEMS, "Vidro frontal"];
+// Deflatores: as peças da manutenção, o vidro frontal (só existe como defeito não identificado) e o ativo sem defeito.
+const DEFECT_OPTIONS: readonly string[] = [...MAINTENANCE_ITEMS, "Vidro frontal", "Ativo sem defeito"];
 
 const when = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
