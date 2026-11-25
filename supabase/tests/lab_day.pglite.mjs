@@ -52,7 +52,7 @@ const files = readdirSync(MIG)
   .filter((f) => /^2026100800\d{4}_.*\.sql$/.test(f))
   .filter((f) => {
     const n = Number(f.slice(10, 14));
-    return n >= 44 && n <= 119;
+    return n >= 44 && n <= 120;
   })
   // A 110 tira a trava de balão do Checklist manutenção (site oficial ainda sem balões). O fluxo de balões é testado
   // sem ela; no fim, ela é aplicada e o comportamento sem trava é conferido.
@@ -67,7 +67,7 @@ await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.
 await db.exec(`insert into public.profiles (id, name, email, role, extra_roles) values ('${U.tec3}','Tec3','t3@x','colaborador', '{tecnico}')`);
 await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.ana}','Ana','an@x','analista'),('${U.ana2}','Ana2','an2@x','analista')`);
 await applyAll(); // idempotente
-console.log(`migrations 44-119 aplicadas (2x, ${files.length} arquivos)`);
+console.log(`migrations 44-120 aplicadas (2x, ${files.length} arquivos)`);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${name}${cond ? "" : "  -> " + extra}`); };
@@ -573,6 +573,30 @@ const byS = Object.fromEntries((r.rows ?? []).map((x) => [x.serial.toUpperCase()
 ok("cada serial com o seu resultado", r.rows?.length === 3 && byS.RP1?.ok && byS.RP2?.reason === "com_tecnico" && byS.RP2?.holder === "Tec2" && byS.NADA?.reason === "nao_encontrado", JSON.stringify(r));
 const brp = (await balloons("RP1")).at(-1);
 ok("vira balão do técnico como reprovado redistribuído", brp?.technician_id === U.tec && brp.source === "redistribuicao" && brp.status === "aberto", JSON.stringify(brp));
+
+// ---- Corrigir o técnico na Entrega (migration 120)
+for (const sn of ["RA1", "RA2"]) {
+  await db.exec(`insert into public.assets (serial_key, asset_short_id, model) values ('${sn.toLowerCase()}', 'U-${sn}', 'iPhone 13')`);
+  await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('${sn}', 'OS-${sn}', '${U.tec}')`);
+}
+await as("sup", `select public.lab_deliver(array['RA1', 'RA2'], '${U.tec}')`);
+const ra1 = await one("tec", `select public.start_legacy_maintenance('RA1')`);
+await as("tec", `select public.save_repair_checklist('${ra1}', 'aberto', '{"t1":"ok"}'::jsonb)`);
+const gBeforeRa = await goal("tec");
+r = await as("tec", `select * from public.lab_reassign(array['RA1'], '${U.tec2}')`);
+ok("técnico não corrige o responsável", r.err?.includes("sem permissão"), JSON.stringify(r));
+r = await as("sup", `select * from public.lab_reassign(array['RA1', 'RA2', 'NADA'], '${U.tec2}')`);
+const byRa = Object.fromEntries((r.rows ?? []).map((x) => [x.serial.toUpperCase(), x]));
+ok("supervisor troca o técnico (cada serial com o seu resultado)", byRa.RA1?.ok && byRa.RA1.previous === "Tec" && byRa.RA2?.ok && byRa.NADA?.reason === "sem_balao", JSON.stringify(r));
+const bra = (await balloons("RA1")).at(-1);
+ok("o balão passa para o novo técnico", bra.technician_id === U.tec2 && bra.status === "aberto", JSON.stringify(bra));
+ok("o checklist em andamento vai junto", (await db.query(`select technician_id from public.repair_stages where id = '${ra1}'`)).rows[0].technician_id === U.tec2);
+r = await as("tec2", `select public.start_legacy_maintenance('RA1')`);
+ok("o novo técnico continua o mesmo checklist", !r.err && Object.values(r.rows[0])[0] === ra1, JSON.stringify(r));
+const gAfterRa = await goal("tec");
+ok("sai da meta de quem estava (sem contar como finalizado)", gAfterRa.meta === gBeforeRa.meta - 2 && gAfterRa.finalizados === gBeforeRa.finalizados, JSON.stringify([gBeforeRa, gAfterRa]));
+r = await as("sup", `select * from public.lab_reassign(array['RA1'], '${U.tec2}')`);
+ok("mesmo técnico: nada muda", r.rows?.[0]?.reason === "mesmo_tecnico", JSON.stringify(r));
 
 // ---- Migration 110: Checklist manutenção sem trava de balão
 await db.exec(readFileSync(MIG + NO_LOCK, "utf8"));

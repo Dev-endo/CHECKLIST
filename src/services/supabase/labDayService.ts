@@ -91,6 +91,17 @@ export interface DirectRejectedResult {
 export const directRejected = (client: AppSupabaseClient, serials: readonly string[], technicianId: string) =>
   call<DirectRejectedResult[] | null>(client, "lab_direct_rejected", { p_serials: serials, p_technician: technicianId }).then((found) => found ?? []);
 
+/** Entrega: corrige o técnico dos ativos já vinculados (o balão passa para o escolhido). */
+export interface ReassignResult {
+  serial: string;
+  ok: boolean;
+  reason: "sem_balao" | "mesmo_tecnico" | null;
+  previous: string | null;
+}
+
+export const reassignAssets = (client: AppSupabaseClient, serials: readonly string[], technicianId: string) =>
+  call<ReassignResult[] | null>(client, "lab_reassign", { p_serials: serials, p_technician: technicianId }).then((found) => found ?? []);
+
 // Técnico ------------------------------------------------------------------------------------------------------------
 
 export interface MyBalloon {

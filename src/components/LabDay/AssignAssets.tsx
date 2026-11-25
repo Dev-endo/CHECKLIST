@@ -3,7 +3,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { parseSerials, PROBLEM_LABELS, LAB_STATUS_LABELS, previewRows, validSerials, type SerialCheck } from "../../domain/labDay";
 import { describeRepairError } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import { deliverAssets, directFromGlass, listLabTechnicians, previewSerials, type LabTechnician } from "../../services/supabase/labDayService";
+import { deliverAssets, directFromGlass, listLabTechnicians, previewSerials, reassignAssets, type LabTechnician } from "../../services/supabase/labDayService";
 import { Button } from "../Button/Button";
 import styles from "./LabDay.module.css";
 
@@ -33,6 +33,8 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
   const [technicians, setTechnicians] = useState<LabTechnician[] | null>(null);
   const [technicianId, setTechnicianId] = useState("");
   const [display, setDisplay] = useState(false);
+  // Corrigir o técnico dos já vinculados a outro (só na Entrega).
+  const [reassign, setReassign] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +82,12 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
 
   const rows = previewRows(serials, checks, glass);
   const ready = validSerials(rows);
-  const warnings = rows.filter((row) => row.problem).length;
   const technician = technicians?.find((item) => item.id === technicianId);
+  // Já vinculados a outro técnico (sem repetir): na Entrega dá para trocar o técnico deles.
+  const taken = glass ? [] : rows.filter((row) => row.problem === "com_tecnico");
+  const toMove = reassign ? taken.filter((row) => row.holder !== technician?.name).map((row) => row.serial) : [];
+  const warnings = rows.filter((row) => row.problem && !(reassign && row.problem === "com_tecnico")).length;
+  const total = ready.length + toMove.length;
 
   const remove = (index: number) => {
     const next = serials.filter((_, i) => i !== index);
@@ -89,16 +95,26 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
   };
 
   const submit = async () => {
-    if (!ready.length || !technician || busy) return;
-    if (warnings && !window.confirm(`${warnings} serial(is) com aviso ficam de fora. ${glass ? "Direcionar" : "Vincular"} os outros ${ready.length}?`)) return;
+    if (!total || !technician || busy) return;
+    if (warnings && !window.confirm(`${warnings} serial(is) com aviso ficam de fora. Seguir com os outros ${total}?`)) return;
+    if (toMove.length && !window.confirm(`Trocar para ${technician.name} o técnico de ${toMove.length} ativo(s) já vinculado(s)? O checklist em andamento vai junto.`)) return;
     setBusy(true);
     setError(null);
     setDone(null);
     try {
-      const total = glass ? await directFromGlass(client, ready, technician.id, display) : await deliverAssets(client, ready, technician.id);
-      setDone(`${total} ${total === 1 ? "ativo" : "ativos"} ${glass ? (total === 1 ? "direcionado" : "direcionados") : total === 1 ? "vinculado" : "vinculados"} para ${technician.name}.`);
+      const parts: string[] = [];
+      if (ready.length) {
+        const count = glass ? await directFromGlass(client, ready, technician.id, display) : await deliverAssets(client, ready, technician.id);
+        parts.push(`${count} ${count === 1 ? "ativo" : "ativos"} ${glass ? (count === 1 ? "direcionado" : "direcionados") : count === 1 ? "vinculado" : "vinculados"}`);
+      }
+      if (toMove.length) {
+        const moved = (await reassignAssets(client, toMove, technician.id)).filter((item) => item.ok).length;
+        parts.push(`${moved} com o técnico trocado`);
+      }
+      setDone(`${parts.join(" e ")} para ${technician.name}.`);
       setText("");
       setDisplay(false);
+      setReassign(false);
       onDone?.();
     } catch (e) {
       const err = e as { message?: string; details?: string };
@@ -210,6 +226,15 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
         </div>
       )}
 
+      {taken.length > 0 && (
+        <label className={styles.checkRow}>
+          <input type="checkbox" checked={reassign} disabled={busy} onChange={(e) => setReassign(e.target.checked)} />
+          <span>
+            <strong>Trocar o técnico</strong> dos {taken.length} já vinculado(s) a outro técnico para o técnico escolhido (correção de erro)
+          </span>
+        </label>
+      )}
+
       {glass && (
         <label className={styles.checkRow}>
           <input type="checkbox" checked={display} disabled={busy} onChange={(e) => setDisplay(e.target.checked)} />
@@ -218,11 +243,11 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
       )}
 
       <div className={styles.actions}>
-        <Button disabled={busy || looking || !ready.length || !technician} onClick={() => void submit()}>
-          {busy ? "Enviando…" : glass ? "Direcionar para técnico" : "Vincular ativos"}
-          {ready.length ? ` (${ready.length})` : ""}
+        <Button disabled={busy || looking || !total || !technician} onClick={() => void submit()}>
+          {busy ? "Enviando…" : glass ? "Direcionar para técnico" : toMove.length && !ready.length ? "Trocar técnico" : "Vincular ativos"}
+          {total ? ` (${total})` : ""}
         </Button>
-        {!technician && ready.length > 0 && <span className={styles.muted}>Escolha o técnico.</span>}
+        {!technician && (ready.length > 0 || taken.length > 0) && <span className={styles.muted}>Escolha o técnico.</span>}
         {text && (
           <Button variant="ghost" disabled={busy} onClick={() => setText("")}>
             Limpar
