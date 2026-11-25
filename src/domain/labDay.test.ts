@@ -170,6 +170,22 @@ describe("Quarentena card", () => {
     const groups = labOverview([], [balloon("Z9", { status: "finalizado", outcome: "quarentena", finishedAt: today })], from, to, waiting);
     expect(groups.destino_quarentena.map((row) => row.serial).sort()).toEqual(["Q1", "Q2"]);
   });
+
+  it("uses the waiting list in Ainda no laboratório too, without repeating a serial", () => {
+    const waiting = [
+      { serial: "Q1", unit: null, os: "1", technician: "Tec", status: "Aguardando quarentena", at: today },
+      { serial: "V1", unit: null, os: null, technician: "Incluído na conferência", status: "Aguardando quarentena", at: today },
+    ];
+    const board = [
+      asset("Q9", { status: "quarentena" }), // status quarentena, mas fora da conferência
+      asset("V1", { status: "vidro" }),
+      asset("A1", { status: "aguardando_manutencao" }),
+    ];
+    const groups = labOverview(board, [], from, to, waiting);
+    expect(groups.lab_quarentena.map((row) => row.serial).sort()).toEqual(["Q1", "V1"]);
+    expect(groups.quarentena_aguardando.map((row) => row.serial).sort()).toEqual(["Q1", "V1"]);
+    expect(groups.lab_total.map((row) => row.serial).sort()).toEqual(["A1", "Q1", "V1"]);
+  });
 });
 
 describe("technicianSummaries", () => {
