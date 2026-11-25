@@ -17,6 +17,7 @@ import {
 import { canUseLabDay } from "../../domain/roles";
 import type { AppSupabaseClient } from "../../services/supabase/client";
 import { fetchBalloonReport, fetchBoard, fetchLabHistory, type LabHistoryEntry } from "../../services/supabase/labDayService";
+import { fetchQuarantinePending } from "../../services/supabase/quarantineService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
 import styles from "./LabDay.module.css";
@@ -72,6 +73,8 @@ function Tracking({ client }: { client: AppSupabaseClient }) {
   const [query, setQuery] = useState("");
   const [board, setBoard] = useState<BoardAsset[] | null>(null);
   const [balloons, setBalloons] = useState<BalloonRow[] | null>(null);
+  // Card Quarentena: a lista Aguardando da aba Quarentena.
+  const [waitingQuarantine, setWaitingQuarantine] = useState<ListRow[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
   const [history, setHistory] = useState<{ serial: string; entries: LabHistoryEntry[] | null } | null>(null);
@@ -93,15 +96,39 @@ function Tracking({ client }: { client: AppSupabaseClient }) {
           setFailed(false);
         })
         .catch(() => active && setFailed(true));
+    const loadWaiting = () =>
+      fetchQuarantinePending(client)
+        .then(
+          (found) =>
+            active &&
+            setWaitingQuarantine(
+              found.map((item) => ({
+                serial: item.serial,
+                unit: item.unit,
+                os: item.osNumber === "—" ? null : item.osNumber,
+                technician: item.technician,
+                status: "Aguardando quarentena",
+                at: item.sentAt,
+              })),
+            ),
+        )
+        .catch(() => undefined);
+    void loadWaiting();
     void load();
-    const poll = setInterval(() => void load(), POLL_MS);
+    const poll = setInterval(() => {
+      void load();
+      void loadWaiting();
+    }, POLL_MS);
     return () => {
       active = false;
       clearInterval(poll);
     };
   }, [client, range]);
 
-  const groups = useMemo(() => (board && balloons ? labOverview(board, balloons, range.start, range.end) : null), [board, balloons, range]);
+  const groups = useMemo(
+    () => (board && balloons ? labOverview(board, balloons, range.start, range.end, waitingQuarantine) : null),
+    [board, balloons, range, waitingQuarantine],
+  );
   const people = useMemo(() => (balloons ? technicianSummaries(balloons, range.start, range.end) : null), [balloons, range]);
 
   const openHistory = (serial: string) => {

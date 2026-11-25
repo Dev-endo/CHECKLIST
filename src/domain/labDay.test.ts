@@ -160,6 +160,18 @@ describe("labOverview", () => {
   });
 });
 
+describe("Quarentena card", () => {
+  it("shows the quarantine waiting list when given (one per serial)", () => {
+    const waiting = [
+      { serial: "Q1", unit: null, os: "1", technician: "Tec", status: "Aguardando quarentena", at: today },
+      { serial: "q1", unit: null, os: "1", technician: "Tec", status: "Aguardando quarentena", at: yesterday },
+      { serial: "Q2", unit: null, os: null, technician: "Incluído na conferência", status: "Aguardando quarentena", at: today },
+    ];
+    const groups = labOverview([], [balloon("Z9", { status: "finalizado", outcome: "quarentena", finishedAt: today })], from, to, waiting);
+    expect(groups.destino_quarentena.map((row) => row.serial).sort()).toEqual(["Q1", "Q2"]);
+  });
+});
+
 describe("technicianSummaries", () => {
   const balloons = [
     balloon("C1", {}),

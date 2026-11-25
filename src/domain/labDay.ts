@@ -190,7 +190,7 @@ export const GROUP_LABELS: Record<GroupId, string> = {
   destino_pt: "PT",
   destino_revenda: "Revenda",
   destino_vidro: "Vidro",
-  destino_quarentena: "Quarentena",
+  destino_quarentena: "Quarentena (aguardando)",
   destino_bloqueado: "Bloqueado",
   destino_analise: "Avaliação técnica",
   quarentena_aguardando: "Quarentena aguardando",
@@ -299,7 +299,14 @@ export function uniqueBySerialOs(rows: readonly ListRow[]): ListRow[] {
  * Painel geral: cada contador com a lista dos ativos dele (o mesmo serial só conta de novo com outra OS). Entraram, saíram, destinos e quarentena aprovada ou
  * reprovada são do período; "ainda no laboratório" é o retrato de agora.
  */
-export function labOverview(board: readonly BoardAsset[], balloons: readonly BalloonRow[], from: Date, to: Date): Record<GroupId, ListRow[]> {
+export function labOverview(
+  board: readonly BoardAsset[],
+  balloons: readonly BalloonRow[],
+  from: Date,
+  to: Date,
+  /** Lista Aguardando da aba Quarentena (conferência física): quando vem, é o que o card Quarentena mostra. */
+  quarantineWaiting?: readonly ListRow[] | null,
+): Record<GroupId, ListRow[]> {
   const groups = {} as Record<GroupId, ListRow[]>;
   groups.entraram = board.filter((a) => inRange(a.enteredAt, from, to)).map((a) => assetRow(a, a.enteredAt));
   groups.sairam = board
@@ -326,6 +333,8 @@ export function labOverview(board: readonly BoardAsset[], balloons: readonly Bal
     groups[group] = inLab.filter((a) => a.status === status).map((a) => assetRow(a));
   }
   for (const id of Object.keys(groups) as GroupId[]) groups[id] = uniqueBySerialOs(groups[id]);
+  // Por destino > Quarentena: a lista Aguardando da aba Quarentena (bate com a conferência física).
+  if (quarantineWaiting) groups.destino_quarentena = uniqueBySerial([...quarantineWaiting]);
   // Entraram: cada serial conta uma vez no período, mesmo com outra OS (fica a entrada mais recente).
   groups.entraram = uniqueBySerial(groups.entraram);
   return groups;
