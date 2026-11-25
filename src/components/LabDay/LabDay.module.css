@@ -400,3 +400,14 @@
   color: var(--muted);
   font-size: 13.5px;
 }
+
+/* Entrega: quantos ativos o técnico escolhido já tem na bancada. */
+.benchNote {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}

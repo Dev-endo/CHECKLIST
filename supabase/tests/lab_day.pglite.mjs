@@ -54,7 +54,7 @@ const files = readdirSync(MIG)
   .filter((f) => /^2026100800\d{4}_.*\.sql$/.test(f))
   .filter((f) => {
     const n = Number(f.slice(10, 14));
-    return n >= 44 && n <= 121;
+    return n >= 44 && n <= 122;
   })
   // A 110 tira a trava de balão do Checklist manutenção (site oficial ainda sem balões). O fluxo de balões é testado
   // sem ela; no fim, ela é aplicada e o comportamento sem trava é conferido.
@@ -69,7 +69,7 @@ await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.
 await db.exec(`insert into public.profiles (id, name, email, role, extra_roles) values ('${U.tec3}','Tec3','t3@x','colaborador', '{tecnico}')`);
 await db.exec(`insert into public.profiles (id, name, email, role) values ('${U.ana}','Ana','an@x','analista'),('${U.ana2}','Ana2','an2@x','analista')`);
 await applyAll(); // idempotente
-console.log(`migrations 44-121 aplicadas (2x, ${files.length} arquivos)`);
+console.log(`migrations 44-122 aplicadas (2x, ${files.length} arquivos)`);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${name}${cond ? "" : "  -> " + extra}`); };
@@ -599,6 +599,23 @@ const gAfterRa = await goal("tec");
 ok("sai da meta de quem estava (sem contar como finalizado)", gAfterRa.meta === gBeforeRa.meta - 2 && gAfterRa.finalizados === gBeforeRa.finalizados, JSON.stringify([gBeforeRa, gAfterRa]));
 r = await as("sup", `select * from public.lab_reassign(array['RA1'], '${U.tec2}')`);
 ok("mesmo técnico: nada muda", r.rows?.[0]?.reason === "mesmo_tecnico", JSON.stringify(r));
+
+// ---- Entregar um aparelho que já está no vidro (migration 122)
+await db.exec(`insert into public.assets (serial_key, asset_short_id, model) values ('gv1', 'U-GV1', 'iPhone 14')`);
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('GV1', 'OS-GV1', '${U.tec}')`);
+r = await as("vid", `select public.start_glass_flow('GV1', false)`);
+ok("aparelho foi para o vidro antes da entrega", !r.err && (await db.query(`select count(*)::int c from public.repair_glass_jobs where serial = 'GV1' and status <> 'concluido'`)).rows[0].c === 1, JSON.stringify(r));
+r = await as("sup", `select lab_status from public.lab_preview(array['GV1'])`);
+ok("prévia mostra que está no Vidro", r.rows?.[0]?.lab_status === "vidro", JSON.stringify(r));
+r = await as("sup", `select public.lab_deliver(array['GV1'], '${U.tec2}')`);
+const bgv = (await balloons("GV1")).at(-1);
+ok("entregar = direcionar do vidro (balão Direcionado do Vidro)", !r.err && bgv?.source === "vidro" && bgv.technician_id === U.tec2, JSON.stringify([r, bgv]));
+ok("o serviço de vidro é fechado (não volta sozinho depois)", (await db.query(`select count(*)::int c from public.repair_glass_jobs where serial = 'GV1' and status <> 'concluido'`)).rows[0].c === 0);
+await db.exec(`insert into public.assets (serial_key, asset_short_id, model) values ('gv2', 'U-GV2', 'iPhone 14')`);
+await db.exec(`insert into public.service_orders (serial, os_number, user_id) values ('GV2', 'OS-GV2', '${U.tec}')`);
+await as("vid", `select public.start_glass_flow('GV2', false)`);
+r = await as("vid", `select public.lab_direct_from_glass(array['GV2'], '${U.tec}')`);
+ok("aba Vidro direciona aparelho que foi para o vidro antes da entrega", !r.err && (await balloons("GV2")).at(-1)?.technician_id === U.tec, JSON.stringify(r));
 
 // ---- Migration 110: Checklist manutenção sem trava de balão
 await db.exec(readFileSync(MIG + NO_LOCK, "utf8"));

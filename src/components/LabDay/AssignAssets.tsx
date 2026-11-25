@@ -3,7 +3,15 @@ import { useAuth } from "../../auth/AuthProvider";
 import { parseSerials, PROBLEM_LABELS, LAB_STATUS_LABELS, previewRows, validSerials, type SerialCheck } from "../../domain/labDay";
 import { describeRepairError } from "../../domain/repairStages";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import { deliverAssets, directFromGlass, listLabTechnicians, previewSerials, reassignAssets, type LabTechnician } from "../../services/supabase/labDayService";
+import {
+  deliverAssets,
+  directFromGlass,
+  fetchBalloonReport,
+  listLabTechnicians,
+  previewSerials,
+  reassignAssets,
+  type LabTechnician,
+} from "../../services/supabase/labDayService";
 import { Button } from "../Button/Button";
 import styles from "./LabDay.module.css";
 
@@ -35,6 +43,29 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
   const [display, setDisplay] = useState(false);
   // Corrigir o técnico dos já vinculados a outro (só na Entrega).
   const [reassign, setReassign] = useState(false);
+  // Entrega: quantos ativos o técnico escolhido já tem (na bancada e aguardando confirmação de transferência).
+  const [bench, setBench] = useState<{ technicianId: string; open: number; pending: number } | null>(null);
+  const [benchReloads, setBenchReloads] = useState(0);
+  useEffect(() => {
+    setBench(null);
+    if (glass || !technicianId) return;
+    let active = true;
+    const now = new Date();
+    fetchBalloonReport(client, now, new Date(now.getTime() + 1000))
+      .then((found) => {
+        if (!active) return;
+        const mine = found.filter((item) => item.technicianId === technicianId);
+        setBench({
+          technicianId,
+          open: mine.filter((item) => item.status === "aberto").length,
+          pending: mine.filter((item) => item.status === "pendente").length,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client, glass, technicianId, benchReloads]);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +146,7 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
       setText("");
       setDisplay(false);
       setReassign(false);
+      setBenchReloads((n) => n + 1);
       onDone?.();
     } catch (e) {
       const err = e as { message?: string; details?: string };
@@ -179,6 +211,15 @@ export function AssignAssets({ client, mode, onDone, initialSerials }: AssignAss
               </li>
             ))}
           </ul>
+          {!glass && technician && (
+            <p className={styles.benchNote} role="status" aria-live="polite">
+              {bench?.technicianId !== technician.id
+                ? "Contando os ativos do técnico…"
+                : `${technician.id === myId ? "Você já tem" : `${technician.name} já tem`} ${bench.open} ${bench.open === 1 ? "ativo" : "ativos"} na bancada${
+                    bench.pending ? ` + ${bench.pending} aguardando confirmação de transferência` : ""
+                  }.`}
+            </p>
+          )}
         </div>
       </div>
 
