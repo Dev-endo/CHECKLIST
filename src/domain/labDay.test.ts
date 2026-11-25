@@ -152,7 +152,9 @@ describe("labOverview", () => {
       from,
       to,
     );
-    expect(repeated.entraram.map((row) => `${row.serial}:${row.os}`).sort()).toEqual(["D1:OS-1", "D2:OS-7", "D2:OS-8"]);
+    // Entraram: um por serial, qualquer OS; os demais contadores seguem um por serial e OS.
+    expect(repeated.entraram.map((row) => row.serial).sort()).toEqual(["D1", "D2"]);
+    expect(repeated.lab_total.map((row) => `${row.serial}:${row.os}`).sort()).toEqual(["D1:OS-1", "D2:OS-7", "D2:OS-8"]);
     expect(repeated.lab_total.filter((row) => row.serial === "D1")).toHaveLength(1);
     expect(repeated.lab_total.find((row) => row.serial === "D1")?.at).toBe(later);
   });

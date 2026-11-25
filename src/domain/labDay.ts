@@ -267,6 +267,17 @@ export function latestPerAsset(balloons: readonly BalloonRow[]): BalloonRow[] {
   return [...latest.values()].filter((b) => b.osNumber || !withOs.has(serialKey(b.serial)));
 }
 
+/** Um por serial (qualquer OS): fica a linha mais recente. */
+export function uniqueBySerial(rows: readonly ListRow[]): ListRow[] {
+  const latest = new Map<string, ListRow>();
+  for (const row of rows) {
+    const key = serialKey(row.serial);
+    const current = latest.get(key);
+    if (!current || new Date(row.at).getTime() > new Date(current.at).getTime()) latest.set(key, row);
+  }
+  return [...latest.values()].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+}
+
 /**
  * O mesmo serial conta uma vez por OS (fica a movimentação mais recente). Sem OS, só conta se o serial não aparecer
  * com nenhuma OS no grupo.
@@ -315,6 +326,8 @@ export function labOverview(board: readonly BoardAsset[], balloons: readonly Bal
     groups[group] = inLab.filter((a) => a.status === status).map((a) => assetRow(a));
   }
   for (const id of Object.keys(groups) as GroupId[]) groups[id] = uniqueBySerialOs(groups[id]);
+  // Entraram: cada serial conta uma vez no período, mesmo com outra OS (fica a entrada mais recente).
+  groups.entraram = uniqueBySerial(groups.entraram);
   return groups;
 }
 
