@@ -341,12 +341,15 @@ export function labOverview(
     groups.destino_quarentena = waiting;
     groups.quarentena_aguardando = waiting;
     groups.lab_quarentena = waiting;
-    // Ainda no laboratório: os demais status + a lista Aguardando (o serial que já conta em outro status não repete).
-    const others = uniqueBySerialOs(inLab.filter((a) => a.status !== "quarentena").map((a) => assetRow(a)));
-    const counted = new Set(others.map((row) => serialKey(row.serial)));
-    groups.lab_total = [...others, ...waiting.filter((row) => !counted.has(serialKey(row.serial)))].sort(
-      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
-    );
+    // Cada serial conta num card só: quem está na lista Aguardando (conferência física) sai dos outros cards de
+    // "Ainda no laboratório", e o total é a soma dos cards.
+    const inQuarantine = new Set(waiting.map((row) => serialKey(row.serial)));
+    const notWaiting = (row: ListRow) => !inQuarantine.has(serialKey(row.serial));
+    for (const [group, status] of IN_LAB_GROUPS) {
+      if (status !== "quarentena") groups[group] = groups[group].filter(notWaiting);
+    }
+    const others = uniqueBySerialOs(inLab.filter((a) => a.status !== "quarentena").map((a) => assetRow(a))).filter(notWaiting);
+    groups.lab_total = [...others, ...waiting].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }
   // Entraram: cada serial conta uma vez no período, mesmo com outra OS (fica a entrada mais recente).
   groups.entraram = uniqueBySerial(groups.entraram);

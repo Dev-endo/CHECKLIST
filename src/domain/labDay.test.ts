@@ -171,7 +171,7 @@ describe("Quarentena card", () => {
     expect(groups.destino_quarentena.map((row) => row.serial).sort()).toEqual(["Q1", "Q2"]);
   });
 
-  it("uses the waiting list in Ainda no laboratório too, without repeating a serial", () => {
+  it("uses the waiting list in Ainda no laboratório too, each serial in one card only", () => {
     const waiting = [
       { serial: "Q1", unit: null, os: "1", technician: "Tec", status: "Aguardando quarentena", at: today },
       { serial: "V1", unit: null, os: null, technician: "Incluído na conferência", status: "Aguardando quarentena", at: today },
@@ -185,6 +185,10 @@ describe("Quarentena card", () => {
     expect(groups.lab_quarentena.map((row) => row.serial).sort()).toEqual(["Q1", "V1"]);
     expect(groups.quarentena_aguardando.map((row) => row.serial).sort()).toEqual(["Q1", "V1"]);
     expect(groups.lab_total.map((row) => row.serial).sort()).toEqual(["A1", "Q1", "V1"]);
+    // V1 está na conferência da quarentena: sai do Vidro, e a soma dos cards bate com o total.
+    expect(groups.lab_vidro).toHaveLength(0);
+    const cards = groups.lab_vidro.length + groups.lab_aguardando.length + groups.lab_analise.length + groups.lab_quarentena.length + groups.lab_reprovados.length + groups.lab_pendentes.length;
+    expect(cards).toBe(groups.lab_total.length);
   });
 });
 
