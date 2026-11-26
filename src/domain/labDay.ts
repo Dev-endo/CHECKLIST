@@ -365,6 +365,8 @@ export interface TechnicianRow {
   transferredTo: string | null;
   receivedFrom: string | null;
   at: string;
+  /** Ainda com ele (aberto ou transferência pendente): o supervisor pode retirar. */
+  removable: boolean;
 }
 
 export interface TechnicianSummary {
@@ -409,6 +411,7 @@ export function technicianSummaries(balloons: readonly BalloonRow[], from: Date,
       transferredTo: balloon.status === "transferido" ? balloon.transferredTo : null,
       receivedFrom: balloon.source === "transferencia" ? balloon.fromName : null,
       at: balloon.finishedAt ?? balloon.confirmedAt ?? balloon.createdAt,
+      removable: balloon.status === "aberto" || balloon.status === "pendente",
     });
   }
   return [...byTech.values()]

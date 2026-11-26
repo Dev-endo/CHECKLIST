@@ -102,6 +102,17 @@ export interface ReassignResult {
 export const reassignAssets = (client: AppSupabaseClient, serials: readonly string[], technicianId: string) =>
   call<ReassignResult[] | null>(client, "lab_reassign", { p_serials: serials, p_technician: technicianId }).then((found) => found ?? []);
 
+/** Acompanhamento: retira o ativo do técnico sem transferir (o balão some; entrega por engano sai de "Entraram"). */
+export interface RemoveResult {
+  serial: string;
+  ok: boolean;
+  reason: "sem_balao" | "checklist_aberto" | null;
+  previous: string | null;
+}
+
+export const removeAssets = (client: AppSupabaseClient, serials: readonly string[]) =>
+  call<RemoveResult[] | null>(client, "lab_remove", { p_serials: serials }).then((found) => found ?? []);
+
 // Técnico ------------------------------------------------------------------------------------------------------------
 
 export interface MyBalloon {

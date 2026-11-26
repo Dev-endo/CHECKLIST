@@ -16,7 +16,8 @@ import {
 } from "../../domain/labDay";
 import { canUseLabDay } from "../../domain/roles";
 import type { AppSupabaseClient } from "../../services/supabase/client";
-import { fetchBalloonReport, fetchBoard, fetchLabHistory, type LabHistoryEntry } from "../../services/supabase/labDayService";
+import { fetchBalloonReport, fetchBoard, fetchLabHistory, removeAssets, type LabHistoryEntry } from "../../services/supabase/labDayService";
+import { describeRepairError } from "../../domain/repairStages";
 import { fetchQuarantinePending } from "../../services/supabase/quarantineService";
 import appStyles from "../../App.module.css";
 import { Button } from "../Button/Button";
@@ -38,6 +39,7 @@ const EVENT_LABELS: Record<string, string> = {
   responsavel_trocado: "Responsável trocado (admin)",
   retorno: "Voltou para o técnico",
   pt_recusado: "PT recusado",
+  retirado: "Retirado do técnico (supervisor)",
 };
 
 const startOfDay = (value: string) => new Date(`${value}T00:00:00`);
@@ -78,6 +80,8 @@ function Tracking({ client }: { client: AppSupabaseClient }) {
   const [failed, setFailed] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
   const [history, setHistory] = useState<{ serial: string; entries: LabHistoryEntry[] | null } | null>(null);
+  // Sobe ao retirar um ativo do técnico: recarrega o acompanhamento na hora.
+  const [reloads, setReloads] = useState(0);
 
   const range = useMemo(() => {
     const start = startOfDay(from <= to ? from : to);
@@ -123,7 +127,7 @@ function Tracking({ client }: { client: AppSupabaseClient }) {
       active = false;
       clearInterval(poll);
     };
-  }, [client, range]);
+  }, [client, range, reloads]);
 
   const groups = useMemo(
     () => (board && balloons ? labOverview(board, balloons, range.start, range.end, waitingQuarantine) : null),
@@ -257,7 +261,16 @@ function Tracking({ client }: { client: AppSupabaseClient }) {
         ))}
       </ul>
 
-      {selectedTech && <TechnicianList summary={selectedTech} query={query} onClose={() => setSelection(null)} onSerial={openHistory} />}
+      {selectedTech && (
+        <TechnicianList
+          client={client}
+          summary={selectedTech}
+          query={query}
+          onClose={() => setSelection(null)}
+          onSerial={openHistory}
+          onChanged={() => setReloads((n) => n + 1)}
+        />
+      )}
 
       {history && (
         <div className={styles.list} aria-label={`Histórico de ${history.serial}`}>
@@ -377,8 +390,49 @@ function AssetList({ title, rows, query, onClose, onSerial }: { title: string; r
   );
 }
 
-function TechnicianList({ summary, query, onClose, onSerial }: { summary: TechnicianSummary; query: string; onClose: () => void; onSerial: (serial: string) => void }) {
+function TechnicianList({
+  client,
+  summary,
+  query,
+  onClose,
+  onSerial,
+  onChanged,
+}: {
+  client: AppSupabaseClient;
+  summary: TechnicianSummary;
+  query: string;
+  onClose: () => void;
+  onSerial: (serial: string) => void;
+  onChanged: () => void;
+}) {
   const visible = summary.rows.filter((row) => matchesSerial(row.serial, query));
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const remove = async (serial: string) => {
+    if (busy) return;
+    if (
+      !window.confirm(
+        `Retirar ${serial} de ${summary.name} sem transferir para ninguém? Sai da bancada e da meta dele; se foi entregue por engano, sai também de "Entraram".`,
+      )
+    )
+      return;
+    setBusy(serial);
+    setMessage(null);
+    try {
+      const [result] = await removeAssets(client, [serial]);
+      if (result?.ok) setMessage(`${serial} retirado de ${summary.name}.`);
+      else if (result?.reason === "checklist_aberto")
+        setMessage(`${serial}: o técnico já abriu o checklist. Ele precisa finalizar, ou troque o responsável na Entrega de ativos.`);
+      else setMessage(`${serial} já não está mais com ${summary.name}.`);
+      onChanged();
+    } catch (e) {
+      setMessage(describeRepairError(e as { message?: string }, "Não foi possível retirar o ativo."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportCsv = () =>
     download(
       `ativos-${summary.name.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.csv`,
@@ -402,6 +456,11 @@ function TechnicianList({ summary, query, onClose, onSerial }: { summary: Techni
           </Button>
         </div>
       </div>
+      {message && (
+        <p className={styles.muted} role="status">
+          {message}
+        </p>
+      )}
       {!visible.length ? (
         <p className={styles.muted}>Nenhum ativo{query ? " com esse serial" : ""}.</p>
       ) : (
@@ -415,6 +474,7 @@ function TechnicianList({ summary, query, onClose, onSerial }: { summary: Techni
                 <th>Status/Destino</th>
                 <th>Transferido para</th>
                 <th>Recebido de</th>
+                <th aria-label="Ações" />
               </tr>
             </thead>
             <tbody>
@@ -430,6 +490,13 @@ function TechnicianList({ summary, query, onClose, onSerial }: { summary: Techni
                   <td>{row.status}</td>
                   <td>{row.transferredTo ?? "—"}</td>
                   <td>{row.receivedFrom ?? "—"}</td>
+                  <td>
+                    {row.removable && (
+                      <Button variant="small" disabled={busy !== null} onClick={() => void remove(row.serial)} title="Retirar do técnico sem transferir">
+                        {busy === row.serial ? "Retirando…" : "Retirar"}
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
