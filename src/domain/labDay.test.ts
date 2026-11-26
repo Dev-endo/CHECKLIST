@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deskLabel,
+  flowOverview,
   goalReached,
   labOverview,
   parseSerials,
@@ -10,6 +11,7 @@ import {
   validSerials,
   type BalloonRow,
   type BoardAsset,
+  type FlowEvent,
   type SerialCheck,
   type TechnicianSummary,
 } from "./labDay";
@@ -241,5 +243,76 @@ describe("goal and export", () => {
 
   it("exports CSV for Excel", () => {
     expect(toCsv(["Serial", "Status"], [["A1", "Em quarentena; aguardando"]])).toBe('﻿Serial;Status\r\nA1;"Em quarentena; aguardando"');
+  });
+});
+
+describe("flowOverview", () => {
+  // Datas locais: consulta de 26/11, quarentena de 25/11.
+  const at = (day: number, hour: number) => new Date(2026, 10, day, hour).toISOString();
+  const day26 = new Date(2026, 10, 26);
+  const day27 = new Date(2026, 10, 27);
+  const ev = (serial: string, kind: FlowEvent["kind"], when: string, extra: Partial<FlowEvent> = {}): FlowEvent => ({
+    kind,
+    serial,
+    os: "OS1",
+    unit: null,
+    technician: "Tec",
+    at: when,
+    currentStatus: "aguardando_manutencao",
+    result: null,
+    resultAt: null,
+    ...extra,
+  });
+  const events = [
+    ev("E1", "entrega", at(26, 9)),
+    ev("E1", "entrega", at(26, 10)),
+    ev("E2", "entrega", at(26, 9), { currentStatus: "pt" }),
+    ev("E3", "entrega", at(25, 9)),
+    ev("V1", "vidro", at(26, 11), { currentStatus: "quarentena" }),
+    ev("R1", "retorno", at(26, 12)),
+    ev("S1", "saida", at(26, 13), { result: "pt" }),
+    ev("S2", "saida", at(26, 13), { result: "bloqueado" }),
+    ev("S3", "saida", at(26, 13), { result: "revenda" }),
+    ev("Q1", "quarentena", at(25, 10), { result: "aprovado", resultAt: at(26, 9) }),
+    ev("Q2", "quarentena", at(25, 10), { result: "reprovado", resultAt: at(26, 9) }),
+    ev("Q3", "quarentena", at(25, 10)),
+    ev("Q4", "quarentena", at(25, 10), { result: "aprovado", resultAt: at(27, 9) }),
+    ev("Q5", "quarentena", at(26, 10), { result: "aprovado", resultAt: at(26, 11) }),
+    ev("Q6", "quarentena", at(24, 10), { result: "aprovado", resultAt: at(26, 9) }),
+  ];
+  const groups = flowOverview(events, day26, day27);
+  const serials = (id: keyof typeof groups) => groups[id].map((row) => row.serial).sort();
+
+  it("splits entries by origin, once per serial and OS", () => {
+    expect(serials("entraram")).toEqual(["E1", "E2"]);
+    expect(serials("vidro_montagem")).toEqual(["V1"]);
+    expect(serials("retornaram")).toEqual(["R1"]);
+  });
+
+  it("splits exits by destination and sums the total with quarantine released", () => {
+    expect(serials("saida_pt")).toEqual(["S1"]);
+    expect(serials("saida_bloqueado")).toEqual(["S2"]);
+    expect(serials("saida_revenda")).toEqual(["S3"]);
+    expect(serials("saidas_total")).toEqual(["Q1", "S1", "S2", "S3"]);
+  });
+
+  it("links quarantine D-1 to released on D", () => {
+    expect(serials("quarentena_ontem")).toEqual(["Q1", "Q2", "Q3", "Q4"]);
+    expect(serials("quarentena_liberado")).toEqual(["Q1"]);
+    expect(serials("quarentena_recusado")).toEqual(["Q2"]);
+    // Q4 só foi liberado depois de D.
+    expect(serials("quarentena_ainda")).toEqual(["Q3", "Q4"]);
+  });
+
+  it("applies the serial search to every card", () => {
+    const found = flowOverview(events, day26, day27, "q1");
+    expect(found.quarentena_ontem.map((row) => row.serial)).toEqual(["Q1"]);
+    expect(found.entraram).toEqual([]);
+  });
+
+  it("runs day by day on longer periods", () => {
+    const two = flowOverview(events, new Date(2026, 10, 25), day27);
+    expect(two.quarentena_ontem.map((row) => row.serial).sort()).toEqual(["Q1", "Q2", "Q3", "Q4", "Q6"]);
+    expect(two.quarentena_liberado.map((row) => row.serial).sort()).toEqual(["Q1"]);
   });
 });

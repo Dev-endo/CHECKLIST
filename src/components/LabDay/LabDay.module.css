@@ -411,3 +411,54 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Total de saídas: secundário, abaixo dos cards de saída. */
+.totalLink {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted, inherit);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.totalLink:hover,
+.totalLink:focus-visible {
+  border-color: var(--accent);
+}
+
+/* Serial bipado: "Aparece em" e o Fechar na mesma linha. */
+.lookupBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 10px;
+}
+
+.lookupClose {
+  margin-left: auto;
+}
+
+/* Por técnico: setinha verde no fim do nome; a lista abre logo abaixo. */
+.chevron {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  vertical-align: -2px;
+  color: var(--ok);
+  transition: transform 0.15s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.people > li > .list {
+  margin-top: 6px;
+}

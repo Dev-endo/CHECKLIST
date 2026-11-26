@@ -356,6 +356,136 @@ export function labOverview(
   return groups;
 }
 
+// Operação no período (migration 125) --------------------------------------------------------------------------------
+
+/** Um evento do período: entrada (supervisor, Vidro ou retorno), saída (PT/Bloqueado/Revenda) ou envio à quarentena. */
+export interface FlowEvent {
+  kind: "entrega" | "vidro" | "retorno" | "saida" | "quarentena";
+  serial: string;
+  os: string | null;
+  unit: string | null;
+  technician: string | null;
+  at: string;
+  /** Onde o ativo está agora. */
+  currentStatus: LabStatus | null;
+  /** Saída: o destino. Quarentena: o primeiro resultado depois do envio (aprovado ou reprovado). */
+  result: string | null;
+  resultAt: string | null;
+}
+
+export type FlowGroupId =
+  | "entraram"
+  | "vidro_montagem"
+  | "retornaram"
+  | "saida_pt"
+  | "saida_bloqueado"
+  | "saida_revenda"
+  | "saidas_total"
+  | "quarentena_ontem"
+  | "quarentena_liberado"
+  | "quarentena_recusado"
+  | "quarentena_ainda";
+
+export const FLOW_LABELS: Record<FlowGroupId, string> = {
+  entraram: "Entraram",
+  vidro_montagem: "Saíram do vidro para montagem",
+  retornaram: "Retornaram",
+  saida_pt: "PT",
+  saida_bloqueado: "Bloqueado",
+  saida_revenda: "Revenda",
+  saidas_total: "Total de saídas",
+  quarentena_ontem: "Foram para quarentena ontem",
+  quarentena_liberado: "Quarentena liberado",
+  quarentena_recusado: "Quarentena recusado",
+  quarentena_ainda: "Ainda em quarentena",
+};
+
+const ENTRY_LABELS: Record<"entrega" | "vidro" | "retorno", string> = {
+  entrega: "Entregue pelo supervisor",
+  vidro: "Direcionado do Vidro",
+  retorno: "Retornou para o técnico",
+};
+
+const shiftDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const startOfLocalDay = (iso: string) => {
+  const date = new Date(iso);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+const flowRow = (event: FlowEvent, status: string): ListRow => ({
+  serial: event.serial,
+  unit: event.unit,
+  os: event.os,
+  technician: event.technician,
+  status,
+  at: event.at,
+});
+
+/**
+ * Operação no período. Entradas e saídas são do período (o mesmo serial com a mesma OS conta uma vez por card).
+ * Quarentena, dia a dia: para cada dia D do período, os enviados em D-1; "liberado" = aprovado até o fim de D;
+ * "recusado" = reprovado até o fim de D (é redistribuído e volta em "Retornaram"); "ainda" = os enviados que não foram
+ * aprovados nem reprovados até o fim de D. A busca de serial vale para todos os cards.
+ */
+export function flowOverview(events: readonly FlowEvent[], from: Date, to: Date, query = ""): Record<FlowGroupId, ListRow[]> {
+  const visible = events.filter((event) => matchesSerial(event.serial, query));
+  const inPeriod = visible.filter((event) => inRange(event.at, from, to));
+  const groups = {} as Record<FlowGroupId, ListRow[]>;
+
+  const entries = (kind: "entrega" | "vidro" | "retorno") =>
+    uniqueBySerialOs(inPeriod.filter((event) => event.kind === kind).map((event) => flowRow(event, ENTRY_LABELS[kind])));
+  groups.entraram = entries("entrega");
+  groups.vidro_montagem = entries("vidro");
+  groups.retornaram = entries("retorno");
+
+  const exits = (destination: "pt" | "bloqueado" | "revenda") =>
+    uniqueBySerialOs(
+      inPeriod
+        .filter((event) => event.kind === "saida" && event.result === destination)
+        .map((event) => flowRow(event, OUTCOME_LABELS[destination])),
+    );
+  groups.saida_pt = exits("pt");
+  groups.saida_bloqueado = exits("bloqueado");
+  groups.saida_revenda = exits("revenda");
+
+  // Quarentena: enviados em D-1 para cada D do período; um por serial e dia de envio (fica o envio mais recente).
+  const sends = new Map<string, FlowEvent>();
+  for (const event of visible) {
+    if (event.kind !== "quarentena" || !inRange(event.at, shiftDays(from, -1), shiftDays(to, -1))) continue;
+    const key = `${serialKey(event.serial)}|${startOfLocalDay(event.at).getTime()}`;
+    const current = sends.get(key);
+    if (!current || new Date(event.at).getTime() > new Date(current.at).getTime()) sends.set(key, event);
+  }
+  const sent = [...sends.values()].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  const decided = (event: FlowEvent, result: "aprovado" | "reprovado") =>
+    event.result === result && !!event.resultAt && new Date(event.resultAt).getTime() < shiftDays(startOfLocalDay(event.at), 2).getTime();
+  const sentLabel = (event: FlowEvent) => `Enviado em ${shortDate(event.at)}`;
+  groups.quarentena_ontem = sent.map((event) => flowRow(event, sentLabel(event)));
+  groups.quarentena_liberado = sent
+    .filter((event) => decided(event, "aprovado"))
+    .map((event) => ({ ...flowRow(event, `${sentLabel(event)} · liberado em ${shortDate(event.resultAt!)}`), at: event.resultAt! }));
+  groups.quarentena_recusado = sent
+    .filter((event) => decided(event, "reprovado"))
+    .map((event) => ({ ...flowRow(event, `${sentLabel(event)} · recusado em ${shortDate(event.resultAt!)}`), at: event.resultAt! }));
+  groups.quarentena_ainda = sent
+    .filter((event) => !decided(event, "aprovado") && !decided(event, "reprovado"))
+    .map((event) => flowRow(event, sentLabel(event)));
+
+  groups.saidas_total = [...groups.saida_pt, ...groups.saida_bloqueado, ...groups.saida_revenda, ...groups.quarentena_liberado].sort(
+    (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+  );
+
+  return groups;
+}
+
 /** Linha da lista do técnico: Técnico | Serial | Unit ID | Status/Destino | Transferido para | Recebido de. */
 export interface TechnicianRow {
   technician: string;

@@ -5,6 +5,7 @@ import {
   type BalloonSource,
   type BalloonStatus,
   type BoardAsset,
+  type FlowEvent,
   type LabGoal,
   type LabStatus,
   type SerialCheck,
@@ -110,8 +111,9 @@ export interface RemoveResult {
   previous: string | null;
 }
 
-export const removeAssets = (client: AppSupabaseClient, serials: readonly string[]) =>
-  call<RemoveResult[] | null>(client, "lab_remove", { p_serials: serials }).then((found) => found ?? []);
+/** `force`: retira mesmo com o checklist já aberto (sem ele, volta "checklist_aberto" para a tela avisar). */
+export const removeAssets = (client: AppSupabaseClient, serials: readonly string[], force = false) =>
+  call<RemoveResult[] | null>(client, "lab_remove", { p_serials: serials, p_force: force }).then((found) => found ?? []);
 
 // Técnico ------------------------------------------------------------------------------------------------------------
 
@@ -267,6 +269,34 @@ export async function fetchBalloonReport(client: AppSupabaseClient, from: Date, 
     confirmedAt: row.confirmed_at,
     finishedAt: row.finished_at,
     osNumber: row.os_number ?? null,
+  }));
+}
+
+/** Operação no período (migration 125): entradas, saídas e envios para a quarentena, com o status atual do ativo. */
+export async function fetchLabFlow(client: AppSupabaseClient, from: Date, to: Date): Promise<FlowEvent[]> {
+  const found = await call<
+    {
+      kind: FlowEvent["kind"];
+      serial: string;
+      os_number: string | null;
+      unit: string | null;
+      technician: string | null;
+      happened_at: string;
+      current_status: LabStatus | null;
+      result: string | null;
+      result_at: string | null;
+    }[] | null
+  >(client, "lab_flow", { p_from: from.toISOString(), p_to: to.toISOString() });
+  return (found ?? []).map((row) => ({
+    kind: row.kind,
+    serial: row.serial,
+    os: row.os_number,
+    unit: row.unit,
+    technician: row.technician,
+    at: row.happened_at,
+    currentStatus: row.current_status,
+    result: row.result,
+    resultAt: row.result_at,
   }));
 }
 
