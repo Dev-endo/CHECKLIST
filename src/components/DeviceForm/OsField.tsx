@@ -73,6 +73,11 @@ export function OsField({ client, serial, disabled = false, onRegistered, onCurr
     if (current && !window.confirm(`Este ativo já tem a OS ${current.osNumber}. Registrar a OS ${number} como uma nova passagem pelo laboratório?`)) return;
     setSaving(true);
     try {
+      // Serial bipado no campo da OS por engano: não registra (senão bipar esse serial abre o outro aparelho).
+      if (number.toLowerCase() === key.toLowerCase() || (await lookupAsset(client, number).catch(() => null))) {
+        toast(`${number} é um serial, não uma OS. Digite o número da OS.`);
+        return;
+      }
       const asset = await lookupAsset(client, key).catch(() => null);
       const result = await registerServiceOrder(client, { serial: key, osNumber: number, unit: asset?.assetShortId ?? null });
       if (result === "duplicate") {

@@ -354,7 +354,8 @@ function Legacy({
     }
   };
 
-  // Digitou o serial ou o número da OS: se for uma OS registrada, troca pelo serial do aparelho dela.
+  // Digitou o serial ou o número da OS: se for uma OS registrada, troca pelo serial do aparelho dela. Um serial da
+  // lista de ativos vale como serial mesmo que alguém o tenha registrado por engano como OS de outro aparelho.
   useEffect(() => {
     let active = true;
     const timer = setTimeout(() => {
@@ -363,7 +364,8 @@ function Legacy({
         setSerial("");
         return;
       }
-      serialOfOrder(client, value)
+      assetsBySerial(client, [value])
+        .then((assets) => (assets.has(value.toLowerCase()) ? null : serialOfOrder(client, value)))
         .catch(() => null)
         .then((found) => {
           if (!active) return;
