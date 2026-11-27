@@ -65,6 +65,10 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
   const [technicians, setTechnicians] = useState<LabTechnician[]>([]);
   const [technicianId, setTechnicianId] = useState("");
   const [directed, setDirected] = useState<Map<string, DirectRejectedResult>>(new Map());
+  // Marcados para direcionar (serial em minúsculas): cada um pode ir para um técnico diferente.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Bipar mais seriais depois do resultado: entram no fim da tabela.
+  const [more, setMore] = useState("");
   useEffect(() => {
     let active = true;
     listLabTechnicians(client)
@@ -83,8 +87,11 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
 
   const direct = async () => {
     if (!result || !technicianId || busy) return;
-    const pending = result.map((row) => row.serial).filter((value) => !directed.get(value.toLowerCase())?.ok);
-    if (!pending.length) return;
+    const pending = result.map((row) => row.serial).filter((value) => selected.has(value.toLowerCase()) && !directed.get(value.toLowerCase())?.ok);
+    if (!pending.length) {
+      toast("Marque os ativos que vão para este técnico.");
+      return;
+    }
     const name = technicians.find((item) => item.id === technicianId)?.name ?? "o técnico";
     if (!window.confirm(`Direcionar ${pending.length} ativo(s) para ${name}? Cada um vira um balão no Checklist manutenção dele.`)) return;
     setBusy(true);
@@ -93,6 +100,12 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
       setDirected((prev) => {
         const next = new Map(prev);
         for (const item of found) next.set(item.serial.toLowerCase(), item);
+        return next;
+      });
+      // Os direcionados saem da seleção; os outros continuam marcados para tentar de novo ou escolher outro técnico.
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const item of found) if (item.ok) next.delete(item.serial.toLowerCase());
         return next;
       });
       const ok = found.filter((item) => item.ok).length;
@@ -173,6 +186,7 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
       // Na ordem em que foram bipados; serial sem retorno aparece vazio.
       const byKey = new Map(found.map((row) => [row.serial.trim().toLowerCase(), row]));
       setResult(entries.map((entry) => byKey.get(entry.serial.trim().toLowerCase()) ?? emptyRow(entry.serial)));
+      setSelected(new Set());
     } catch (error) {
       toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível buscar os responsáveis. Tente de novo."));
     } finally {
@@ -184,9 +198,59 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
     setResult(null);
     setEntries([]);
     setDirected(new Map());
+    setSelected(new Set());
+    setMore("");
   };
 
+  // Na tela do resultado: bipa (ou cola) mais seriais; cada um entra no fim da tabela já marcado.
+  const addMore = async (values: string[]) => {
+    if (!result || busy) return;
+    const known = new Set(result.map((row) => row.serial.trim().toLowerCase()));
+    const fresh = [...new Map(values.map((value) => [value.toLowerCase(), value])).values()].filter((value) => !known.has(value.toLowerCase()));
+    if (!fresh.length) {
+      if (values.length) toast(values.length === 1 ? "Esse serial já está na tabela." : "Esses seriais já estão na tabela.");
+      return;
+    }
+    const accepted = fresh.slice(0, Math.max(0, MAX_SERIALS - result.length));
+    if (!accepted.length) {
+      toast(`A lista aceita até ${MAX_SERIALS} seriais.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const found = await fetchReprovados(client, accepted);
+      await registerReprovados(client, accepted).catch(() => undefined);
+      const units = new Map<string, string>();
+      for (let i = 0; i < accepted.length; i += CHUNK) {
+        const assets = await assetsBySerial(client, accepted.slice(i, i + CHUNK)).catch(() => null);
+        assets?.forEach((asset, key) => units.set(key, asset.unit));
+      }
+      const byKey = new Map(found.map((row) => [row.serial.trim().toLowerCase(), row]));
+      setEntries((prev) => [...prev, ...accepted.map((value) => ({ serial: value, unit: units.get(value.toLowerCase()) ?? null }))]);
+      setResult((prev) => [...(prev ?? []), ...accepted.map((value) => byKey.get(value.toLowerCase()) ?? emptyRow(value))]);
+      setSelected((prev) => new Set([...prev, ...accepted.map((value) => value.toLowerCase())]));
+      if (accepted.length > 1) toast(`${accepted.length} seriais adicionados`);
+    } catch (error) {
+      toast(describeRepairError(error as { code?: string; message?: string }, "Não foi possível buscar os responsáveis. Tente de novo."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = (value: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const key = value.toLowerCase();
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const unitOf = (serialValue: string) => entries.find((entry) => entry.serial === serialValue)?.unit ?? null;
+  // Só dá para marcar quem ainda não foi direcionado.
+  const selectable = (result ?? []).map((row) => row.serial.toLowerCase()).filter((key) => !directed.get(key)?.ok);
+  const allSelected = selectable.length > 0 && selectable.every((key) => selected.has(key));
+  const selectedCount = selectable.filter((key) => selected.has(key)).length;
 
   return (
     <section className={recordStyles.panel} aria-label="Reprovados">
@@ -196,13 +260,52 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
 
       {result ? (
         <>
+          <form
+            className={quarantineStyles.form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const values = splitSerials(more);
+              setMore("");
+              void addMore(values);
+            }}
+          >
+            <label className={quarantineStyles.serial}>
+              Bipar mais
+              <input
+                value={more}
+                onChange={(e) => setMore(e.target.value)}
+                onPaste={(e) => {
+                  const values = splitSerials(e.clipboardData.getData("text"));
+                  if (values.length < 2) return;
+                  e.preventDefault();
+                  setMore("");
+                  void addMore(values);
+                }}
+                placeholder="Bipe o serial e aperte Enter, ou cole vários de uma vez"
+                autoComplete="off"
+                autoFocus
+                disabled={busy}
+              />
+            </label>
+          </form>
           <p className={quarantineStyles.pendingNote}>
-            Quem fez cada etapa de {result.length} aparelho(s), na OS mais recente de cada um. “—” quer dizer que a etapa não tem registro.
+            Quem fez cada etapa de {result.length} aparelho(s), na OS mais recente de cada um. “—” quer dizer que a etapa não tem registro. Marque
+            os ativos, escolha o técnico e clique em Direcionar; repita com outros ativos para outro técnico.
           </p>
           <div className={styles.scroll}>
             <table className={styles.table}>
               <thead>
                 <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todos"
+                      title="Selecionar todos"
+                      checked={allSelected}
+                      disabled={busy || !selectable.length}
+                      onChange={() => setSelected(allSelected ? new Set() : new Set(selectable))}
+                    />
+                  </th>
                   <th>Serial</th>
                   <th>OS</th>
                   <th>Técnico responsável</th>
@@ -218,8 +321,19 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
               <tbody>
                 {result.map((row) => {
                   const unit = unitOf(row.serial);
+                  const key = row.serial.toLowerCase();
+                  const done = !!directed.get(key)?.ok;
                   return (
                     <tr key={row.serial}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={`Selecionar ${row.serial}`}
+                          checked={!done && selected.has(key)}
+                          disabled={busy || done}
+                          onChange={() => toggle(row.serial)}
+                        />
+                      </td>
                       <td>
                         <strong>{row.serial}</strong>
                         {unit && (
@@ -275,8 +389,8 @@ export function ReprovadosPanel({ client }: { client: AppSupabaseClient }) {
                   </option>
                 ))}
               </select>
-              <Button disabled={busy || !technicianId} onClick={() => void direct()}>
-                {busy ? "Direcionando…" : "Direcionar"}
+              <Button disabled={busy || !technicianId || !selectedCount} onClick={() => void direct()}>
+                {busy ? "Aguarde…" : `Direcionar${selectedCount ? ` (${selectedCount})` : ""}`}
               </Button>
             </label>
             <Button variant="ghost" onClick={restart}>

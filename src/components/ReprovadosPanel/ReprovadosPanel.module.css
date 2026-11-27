@@ -25,3 +25,17 @@
   display: block;
   opacity: 0.7;
 }
+
+/* Coluna de seleção: marca cada ativo para direcionar. */
+.table th:first-child,
+.table td:first-child {
+  width: 1%;
+  vertical-align: middle;
+}
+
+.table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}

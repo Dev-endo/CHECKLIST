@@ -462,3 +462,13 @@
 .people > li > .list {
   margin-top: 6px;
 }
+
+/* Lista do técnico: título de cada grupo (na bancada / já saiu da bancada). */
+.groupRow th {
+  padding-top: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}

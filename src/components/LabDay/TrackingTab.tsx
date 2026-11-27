@@ -611,6 +611,10 @@ function TechnicianList({
   onChanged: () => void;
 }) {
   const visible = summary.rows.filter((row) => matchesSerial(row.serial, query));
+  // Na bancada (aberto ou transferência pendente) é o que conta no número; o resto é o que ele já finalizou ou
+  // transferiu no período (ex.: mandou para a quarentena) e aparece separado.
+  const onBench = visible.filter((row) => row.removable);
+  const done = visible.filter((row) => !row.removable);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -690,32 +694,42 @@ function TechnicianList({
               </tr>
             </thead>
             <tbody>
-              {visible.map((row, index) => (
-                <tr key={`${row.serial}-${index}`}>
-                  <td>{row.technician}</td>
-                  <td>
-                    <button type="button" className={styles.serialLink} onClick={() => onSerial(row.serial)} title="Ver histórico">
-                      {row.serial}
-                    </button>
-                  </td>
-                  <td>{row.unit ?? "—"}</td>
-                  <td>{row.status}</td>
-                  <td>{row.transferredTo ?? "—"}</td>
-                  <td>{row.receivedFrom ?? "—"}</td>
-                  <td>
-                    {row.removable && (
-                      <Button
-                        variant="small"
-                        disabled={busy !== null}
-                        onClick={() => void remove(row.serial)}
-                        title="Retirar do técnico sem transferir"
-                      >
-                        {busy === row.serial ? "Retirando…" : "Retirar"}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {[
+                { title: `Na bancada (${onBench.length})`, rows: onBench },
+                { title: `Já saiu da bancada no período (${done.length})`, rows: done },
+              ]
+                .filter((group) => group.rows.length)
+                .flatMap((group) => [
+                  <tr key={group.title} className={styles.groupRow}>
+                    <th colSpan={7}>{group.title}</th>
+                  </tr>,
+                  ...group.rows.map((row, index) => (
+                    <tr key={`${group.title}-${row.serial}-${index}`}>
+                      <td>{row.technician}</td>
+                      <td>
+                        <button type="button" className={styles.serialLink} onClick={() => onSerial(row.serial)} title="Ver histórico">
+                          {row.serial}
+                        </button>
+                      </td>
+                      <td>{row.unit ?? "—"}</td>
+                      <td>{row.status}</td>
+                      <td>{row.transferredTo ?? "—"}</td>
+                      <td>{row.receivedFrom ?? "—"}</td>
+                      <td>
+                        {row.removable && (
+                          <Button
+                            variant="small"
+                            disabled={busy !== null}
+                            onClick={() => void remove(row.serial)}
+                            title="Retirar do técnico sem transferir"
+                          >
+                            {busy === row.serial ? "Retirando…" : "Retirar"}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  )),
+                ])}
             </tbody>
           </table>
         </div>
